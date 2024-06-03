@@ -11,7 +11,7 @@
 	<name>logicaldoc-webdav</name>
 	<packaging>jar</packaging>
 	<properties>
-		<jackrabbit.version>2.19.3</jackrabbit.version>
+		<jackrabbit.version>2.20.11</jackrabbit.version>
 	</properties>
 	<dependencies>
 		<dependency>
