@@ -13,7 +13,7 @@
 	<properties>
 		<cxf.swagger.ui.version>4.13.2</cxf.swagger.ui.version>
 		<cxf.swagger.v3.version>2.1.6</cxf.swagger.v3.version>
-		<cxf.rs-service-description.version>3.6.2</cxf.rs-service-description.version>
+		<cxf.rs-service-description.version>3.6.4</cxf.rs-service-description.version>
 	</properties>
 	<dependencies>
 		<dependency>
