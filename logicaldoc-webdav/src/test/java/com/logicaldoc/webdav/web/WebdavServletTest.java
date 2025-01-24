@@ -5,7 +5,6 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.SQLException;
 
@@ -18,8 +17,8 @@ import com.logicaldoc.core.document.Document;
 import com.logicaldoc.core.document.DocumentDAO;
 import com.logicaldoc.util.io.FileUtil;
 import com.logicaldoc.util.plugin.PluginException;
-import com.logicaldoc.web.util.MockServletRequest;
-import com.logicaldoc.web.util.MockServletResponse;
+import com.logicaldoc.util.servlet.MockServletRequest;
+import com.logicaldoc.util.servlet.MockServletResponse;
 import com.logicaldoc.webdav.AbstractWebdavTestCase;
 
 public class WebdavServletTest extends AbstractWebdavTestCase {
@@ -34,7 +33,7 @@ public class WebdavServletTest extends AbstractWebdavTestCase {
 	private DocumentDAO docDao;
 
 	@Override
-	public void setUp() throws FileNotFoundException, IOException, SQLException, PluginException {
+	public void setUp() throws IOException, SQLException, PluginException {
 		super.setUp();
 
 		docDao = (DocumentDAO) context.getBean("DocumentDAO");
@@ -76,7 +75,7 @@ public class WebdavServletTest extends AbstractWebdavTestCase {
 		testDELETE();
 	}
 
-	public void testVERSIONCONTROL() throws IOException, PersistenceException {
+	public void testVERSIONCONTROL() throws IOException {
 		File tempFile = FileUtil.createTempFile("webdav", ".xml");
 		try {
 			MockServletResponse response = new MockServletResponse(tempFile);
@@ -88,7 +87,7 @@ public class WebdavServletTest extends AbstractWebdavTestCase {
 		}
 	}
 
-	public void testREPORT() throws IOException, PersistenceException {
+	public void testREPORT() throws IOException {
 		// This WebDAV mehod is not really implemented
 		File tempFile = FileUtil.createTempFile("webdav", ".xml");
 		try {
@@ -159,7 +158,7 @@ public class WebdavServletTest extends AbstractWebdavTestCase {
 		}
 	}
 
-	public void testOPTIONS() throws IOException, PersistenceException {
+	public void testOPTIONS() throws IOException {
 		File tempFile = FileUtil.createTempFile("webdav", ".xml");
 		try {
 			MockServletResponse response = new MockServletResponse(tempFile);
@@ -173,7 +172,7 @@ public class WebdavServletTest extends AbstractWebdavTestCase {
 		}
 	}
 
-	public void testMKCOL() throws IOException, PersistenceException {
+	public void testMKCOL() throws IOException {
 		File tempFile = FileUtil.createTempFile("webdav", ".xml");
 		try {
 			assertFalse(callPROPFIND().contains(PREFIX + "/folder6/newfolder"));
@@ -188,7 +187,7 @@ public class WebdavServletTest extends AbstractWebdavTestCase {
 		}
 	}
 
-	public void testMOVE() throws IOException, PersistenceException {
+	public void testMOVE() throws IOException {
 		File tempFile = FileUtil.createTempFile("webdav", ".xml");
 		try {
 			assertTrue(callPROPFIND().contains(PREFIX + "/five.pdf"));
@@ -206,7 +205,7 @@ public class WebdavServletTest extends AbstractWebdavTestCase {
 		}
 	}
 
-	public void testCOPY() throws IOException, PersistenceException {
+	public void testCOPY() throws IOException {
 		File tempFile = FileUtil.createTempFile("webdav", ".xml");
 		try {
 			assertTrue(callPROPFIND().contains(PREFIX + "/one.pdf"));

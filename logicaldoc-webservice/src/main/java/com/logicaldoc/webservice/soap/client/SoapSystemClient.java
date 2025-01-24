@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.logicaldoc.core.PersistenceException;
+import com.logicaldoc.core.security.Tenant;
 import com.logicaldoc.core.security.authentication.AuthenticationException;
 import com.logicaldoc.webservice.WebserviceException;
 import com.logicaldoc.webservice.model.WSParameter;
@@ -25,7 +26,13 @@ public class SoapSystemClient extends SoapClient<SystemService> implements Syste
 	@Override
 	public List<WSParameter> getStatistics(String sid)
 			throws AuthenticationException, WebserviceException, PersistenceException {
-		final List<WSParameter> params = client.getStatistics(sid);
+		return this.getTenantStatistics(sid, Tenant.SYSTEM_ID);
+	}
+
+	@Override
+	public List<WSParameter> getTenantStatistics(String sid, long tenantId)
+			throws AuthenticationException, WebserviceException, PersistenceException {
+		final List<WSParameter> params = client.getTenantStatistics(sid, tenantId);
 		if (params != null)
 			return params;
 		else

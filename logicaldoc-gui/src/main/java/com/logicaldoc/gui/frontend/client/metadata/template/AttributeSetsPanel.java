@@ -1,15 +1,15 @@
 package com.logicaldoc.gui.frontend.client.metadata.template;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIAttributeSet;
 import com.logicaldoc.gui.common.client.beans.GUITemplate;
 import com.logicaldoc.gui.common.client.data.AttributeSetsDS;
+import com.logicaldoc.gui.common.client.grid.IdListGridField;
+import com.logicaldoc.gui.common.client.grid.RefreshableListGrid;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.common.client.widgets.HTMLPanel;
 import com.logicaldoc.gui.common.client.widgets.InfoPanel;
-import com.logicaldoc.gui.common.client.widgets.grid.RefreshableListGrid;
 import com.logicaldoc.gui.frontend.client.services.AttributeSetService;
 import com.smartgwt.client.data.AdvancedCriteria;
 import com.smartgwt.client.data.Record;
@@ -64,8 +64,7 @@ public class AttributeSetsPanel extends VLayout {
 		listing.setHeight("55%");
 		listing.setShowResizeBar(true);
 
-		ListGridField id = new ListGridField("id", 50);
-		id.setHidden(true);
+		ListGridField id = new IdListGridField();
 
 		ListGridField name = new ListGridField("name", I18N.message("name"), 200);
 		name.setCanFilter(true);
@@ -91,7 +90,7 @@ public class AttributeSetsPanel extends VLayout {
 		list.setAutoFetchData(true);
 		list.setWidth100();
 		list.setHeight100();
-		list.setFields(name, label, description);
+		list.setFields(id, name, label, description);
 		list.setSelectionType(SelectionStyle.SINGLE);
 		list.setShowRecordComponents(true);
 		list.setShowRecordComponentsByCell(true);
@@ -127,7 +126,7 @@ public class AttributeSetsPanel extends VLayout {
 
 		list.addCellContextClickHandler(event -> {
 			ListGridRecord rec = list.getSelectedRecord();
-			if (!"true".equals(rec.getAttributeAsString("readonly"))) {
+			if (!Boolean.parseBoolean(rec.getAttributeAsString("readonly"))) {
 				showContextMenu();
 			}
 			event.cancel();
@@ -137,13 +136,7 @@ public class AttributeSetsPanel extends VLayout {
 			Record rec = list.getSelectedRecord();
 			if (rec != null)
 				AttributeSetService.Instance.get().getAttributeSet(rec.getAttributeAsLong("id"),
-						new AsyncCallback<>() {
-
-							@Override
-							public void onFailure(Throwable caught) {
-								GuiLog.serverError(caught);
-							}
-
+						new DefaultAsyncCallback<>() {
 							@Override
 							public void onSuccess(GUIAttributeSet attSet) {
 								showSetDetails(attSet);
@@ -170,12 +163,7 @@ public class AttributeSetsPanel extends VLayout {
 		delete.setTitle(I18N.message("ddelete"));
 		delete.addClickHandler(event -> LD.ask(I18N.message("question"), I18N.message("confirmdelete"), confirm -> {
 			if (Boolean.TRUE.equals(confirm)) {
-				AttributeSetService.Instance.get().delete(id, new AsyncCallback<>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				AttributeSetService.Instance.get().delete(id, new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Void result) {
 						list.removeSelectedData();
@@ -229,5 +217,15 @@ public class AttributeSetsPanel extends VLayout {
 	protected void onAddAttributeSet() {
 		list.deselectAllRecords();
 		showSetDetails(new GUIAttributeSet());
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

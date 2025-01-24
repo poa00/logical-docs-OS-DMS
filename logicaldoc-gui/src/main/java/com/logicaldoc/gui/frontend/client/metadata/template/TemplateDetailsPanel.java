@@ -1,9 +1,8 @@
 package com.logicaldoc.gui.frontend.client.metadata.template;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUITemplate;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.widgets.EditingTabSet;
 import com.logicaldoc.gui.frontend.client.services.TemplateService;
 import com.smartgwt.client.types.Overflow;
@@ -64,12 +63,7 @@ public class TemplateDetailsPanel extends VLayout {
 
 		tabSet = new EditingTabSet(saveEvent -> onSave(), cancelEvent -> {
 			if (template.getId() != 0) {
-				TemplateService.Instance.get().getTemplate(template.getId(), new AsyncCallback<>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				TemplateService.Instance.get().getTemplate(template.getId(), new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(GUITemplate template) {
 						setTemplate(template);
@@ -175,20 +169,12 @@ public class TemplateDetailsPanel extends VLayout {
 		stdValid = validationPanel.validate();
 		if (!stdValid)
 			tabSet.selectTab(1);
-		stdValid = securityPanel.validate();
-		if (!stdValid)
-			tabSet.selectTab(2);
 		return stdValid;
 	}
 
 	private void onSave() {
 		if (validate()) {
-			TemplateService.Instance.get().save(template, new AsyncCallback<>() {
-				@Override
-				public void onFailure(Throwable caught) {
-					GuiLog.serverError(caught);
-				}
-
+			TemplateService.Instance.get().save(template, new DefaultAsyncCallback<>() {
 				@Override
 				public void onSuccess(GUITemplate result) {
 					templatesPanel.updateRecord(result);
@@ -196,5 +182,15 @@ public class TemplateDetailsPanel extends VLayout {
 				}
 			});
 		}
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

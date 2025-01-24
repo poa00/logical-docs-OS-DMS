@@ -1,8 +1,8 @@
 package com.logicaldoc.gui.frontend.client.panels;
 
 import com.google.gwt.user.client.Window;
-import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.logicaldoc.gui.common.client.Constants;
+import com.logicaldoc.gui.common.client.IgnoreAsyncCallback;
 import com.logicaldoc.gui.common.client.Menu;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.SessionObserver;
@@ -15,7 +15,7 @@ import com.logicaldoc.gui.common.client.util.RequestInfo;
 import com.logicaldoc.gui.common.client.util.WindowUtils;
 import com.logicaldoc.gui.common.client.widgets.IncomingMessage;
 import com.logicaldoc.gui.frontend.client.administration.AdminScreen;
-import com.logicaldoc.gui.frontend.client.dashboard.DashboardPanel;
+import com.logicaldoc.gui.frontend.client.dashboard.messages.DashboardPanel;
 import com.logicaldoc.gui.frontend.client.document.DocumentsPanel;
 import com.logicaldoc.gui.frontend.client.menu.MainMenu;
 import com.logicaldoc.gui.frontend.client.search.Search;
@@ -115,12 +115,7 @@ public class MainPanel extends VLayout implements SessionObserver {
 
 	private void retrieveAlerts() {
 		InfoService.Instance.get().getInfo(I18N.getLocale(), Session.get().getTenantName(), false,
-				new AsyncCallback<>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						// Nothing to do
-					}
-
+				new IgnoreAsyncCallback<>() {
 					@Override
 					public void onSuccess(GUIInfo info) {
 						StringBuilder alerts = new StringBuilder();
@@ -228,7 +223,7 @@ public class MainPanel extends VLayout implements SessionObserver {
 		DashboardPanel.get().setDefaultOpenTab(DashboardPanel.CALENDAR);
 		DashboardPanel.get().getTabSet().selectTab(DashboardPanel.CALENDAR);
 	}
-	
+
 	public void selectReadingsTab() {
 		selectDashboardTab();
 		DashboardPanel.get().setDefaultOpenTab(DashboardPanel.READINGREQUESTS);
@@ -245,5 +240,15 @@ public class MainPanel extends VLayout implements SessionObserver {
 
 	public IncomingMessage getIncomingMessage() {
 		return incomingMessage;
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

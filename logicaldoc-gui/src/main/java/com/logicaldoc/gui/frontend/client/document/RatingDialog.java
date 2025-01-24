@@ -2,19 +2,19 @@ package com.logicaldoc.gui.frontend.client.document;
 
 import java.util.LinkedHashMap;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIDocument;
 import com.logicaldoc.gui.common.client.beans.GUIRating;
 import com.logicaldoc.gui.common.client.controllers.DocumentController;
 import com.logicaldoc.gui.common.client.data.RatingsDS;
+import com.logicaldoc.gui.common.client.grid.DateListGridField;
+import com.logicaldoc.gui.common.client.grid.DateListGridField.DateCellFormatter;
 import com.logicaldoc.gui.common.client.i18n.I18N;
 import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.AwesomeFactory;
 import com.logicaldoc.gui.common.client.util.DocUtil;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField.DateCellFormatter;
 import com.logicaldoc.gui.frontend.client.services.DocumentService;
 import com.smartgwt.client.types.Alignment;
 import com.smartgwt.client.types.HeaderControls;
@@ -123,11 +123,10 @@ public class RatingDialog extends Window {
 				RatingDialog.this.rating.setUserId(Session.get().getUser().getId());
 				RatingDialog.this.rating.setVote(Integer.parseInt(vm.getValueAsString("stars")));
 
-				DocumentService.Instance.get().saveRating(RatingDialog.this.rating, new AsyncCallback<>() {
-
+				DocumentService.Instance.get().saveRating(RatingDialog.this.rating, new DefaultAsyncCallback<>() {
 					@Override
 					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
+						super.onFailure(caught);
 						destroy();
 					}
 
@@ -144,13 +143,7 @@ public class RatingDialog extends Window {
 		ratingForm.setItems(actualRating, totalVotes, yourVote, vote);
 		layout.addMember(ratingForm);
 
-		DocumentService.Instance.get().getUserRating(rat.getDocId(), new AsyncCallback<>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
+		DocumentService.Instance.get().getUserRating(rat.getDocId(), new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(final GUIRating vote) {
 				if (vote != null) {
@@ -172,14 +165,8 @@ public class RatingDialog extends Window {
 					alreadyVotedForm.setItems(alreadyVoted);
 
 					ButtonItem delete = new ButtonItem("delete", I18N.message("deleteyourvote"));
-					delete.addClickHandler(event -> DocumentService.Instance.get().deleteRating(vote.getId(),
-							new AsyncCallback<>() {
-
-								@Override
-								public void onFailure(Throwable caught) {
-									GuiLog.serverError(caught);
-								}
-
+					delete.addClickHandler(
+							event -> DocumentService.Instance.get().deleteRating(vote.getId(), new DefaultAsyncCallback<>() {
 								@Override
 								public void onSuccess(Integer rating) {
 									afterSaveOrDelete();
@@ -200,18 +187,22 @@ public class RatingDialog extends Window {
 		// the rating is changed. We need to know if
 		// this operation into the Documents list
 		// panel or into the Search list panel.
-		DocumentService.Instance.get().getById(rating.getDocId(), new AsyncCallback<>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
+		DocumentService.Instance.get().getById(rating.getDocId(), new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(GUIDocument doc) {
 				DocumentController.get().modified(doc);
 				destroy();
 			}
 		});
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+	
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

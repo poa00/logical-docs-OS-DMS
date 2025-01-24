@@ -1,49 +1,53 @@
 package com.logicaldoc.gui.frontend.client.menu;
 
+import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import com.google.gwt.core.client.GWT;
 import com.google.gwt.http.client.URL;
 import com.google.gwt.user.client.Window;
-import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.logicaldoc.gui.common.client.Constants;
 import com.logicaldoc.gui.common.client.CookiesManager;
 import com.logicaldoc.gui.common.client.Feature;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
-import com.logicaldoc.gui.common.client.beans.GUICriterion;
+import com.logicaldoc.gui.common.client.beans.GUIAccessControlEntry;
 import com.logicaldoc.gui.common.client.beans.GUIDocument;
 import com.logicaldoc.gui.common.client.beans.GUIFolder;
 import com.logicaldoc.gui.common.client.beans.GUIParameter;
-import com.logicaldoc.gui.common.client.beans.GUISearchOptions;
 import com.logicaldoc.gui.common.client.beans.GUITenant;
+import com.logicaldoc.gui.common.client.beans.GUIValue;
 import com.logicaldoc.gui.common.client.controllers.DocumentController;
 import com.logicaldoc.gui.common.client.controllers.DocumentObserver;
 import com.logicaldoc.gui.common.client.controllers.FolderController;
 import com.logicaldoc.gui.common.client.controllers.FolderObserver;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.AwesomeFactory;
 import com.logicaldoc.gui.common.client.util.DocUtil;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.LD;
+import com.logicaldoc.gui.common.client.util.SecurityUtil;
 import com.logicaldoc.gui.common.client.util.Util;
+import com.logicaldoc.gui.common.client.util.ValuesCallback;
 import com.logicaldoc.gui.common.client.util.WindowUtils;
-import com.logicaldoc.gui.frontend.client.document.grid.DocumentGridUtil;
+import com.logicaldoc.gui.frontend.client.chatgpt.ChatGPTTray;
 import com.logicaldoc.gui.frontend.client.docusign.DocuSignSettings;
 import com.logicaldoc.gui.frontend.client.docusign.EnvelopeDetails;
 import com.logicaldoc.gui.frontend.client.docusign.Envelopes;
-import com.logicaldoc.gui.frontend.client.dropbox.DropboxAuthorizationWizard;
+import com.logicaldoc.gui.frontend.client.dropbox.DropboxAuthorization;
 import com.logicaldoc.gui.frontend.client.dropbox.DropboxDialog;
-import com.logicaldoc.gui.frontend.client.gdrive.GDriveMenuItem;
+import com.logicaldoc.gui.frontend.client.dropbox.DropboxService;
+import com.logicaldoc.gui.frontend.client.google.drive.DriveMenuItem;
 import com.logicaldoc.gui.frontend.client.menu.features.Features;
+import com.logicaldoc.gui.frontend.client.onlyoffice.OnlyOfficeCreate;
+import com.logicaldoc.gui.frontend.client.onlyoffice.OnlyOfficeEditor;
 import com.logicaldoc.gui.frontend.client.panels.MainPanel;
-import com.logicaldoc.gui.frontend.client.search.Search;
+import com.logicaldoc.gui.frontend.client.services.ChatGPTService;
 import com.logicaldoc.gui.frontend.client.services.DocuSignService;
 import com.logicaldoc.gui.frontend.client.services.DocumentService;
-import com.logicaldoc.gui.frontend.client.services.DropboxService;
 import com.logicaldoc.gui.frontend.client.services.SettingService;
 import com.logicaldoc.gui.frontend.client.services.ShareFileService;
 import com.logicaldoc.gui.frontend.client.services.TenantService;
@@ -59,6 +63,7 @@ import com.smartgwt.client.widgets.Img;
 import com.smartgwt.client.widgets.form.fields.SelectItem;
 import com.smartgwt.client.widgets.form.fields.TextItem;
 import com.smartgwt.client.widgets.form.fields.events.ChangedEvent;
+import com.smartgwt.client.widgets.layout.HLayout;
 import com.smartgwt.client.widgets.menu.Menu;
 import com.smartgwt.client.widgets.menu.MenuItem;
 import com.smartgwt.client.widgets.menu.events.MenuItemClickEvent;
@@ -73,23 +78,27 @@ import com.smartgwt.client.widgets.toolbar.ToolStripButton;
  */
 public class MainMenu extends ToolStrip implements FolderObserver, DocumentObserver {
 
+	private static final String CREATEDOC = "createdoc";
+
+	private static final String EDITDOC = "editdoc";
+
+	private static final String APIKEY = "apikey";
+
+	private static final String AUTHORIZE = "authorize";
+
 	private static final String WINDOW_SETTNGS = "location=no,status=no,toolbar=no,menubar=no,resizable=yes,scrollbars=yes";
 
 	private static final String BLANK = "_blank";
-
-	private static final String SEARCH = "search";
-
-	private static final String FULLTEXT = "fulltext";
 
 	private ToolStripButton tools;
 
 	private static MainMenu instance = null;
 
-	private SelectItem searchType = new SelectItem();
-
-	private TextItem searchBox = new TextItem();
-
 	private ToolStripButton evaluation;
+
+	private List<MenuTray> trays = new ArrayList<>();
+
+	private int currentTray = 0;
 
 	public static MainMenu get() {
 		if (instance == null)
@@ -104,6 +113,11 @@ public class MainMenu extends ToolStrip implements FolderObserver, DocumentObser
 		DocumentController.get().addObserver(this);
 
 		setWidth100();
+
+		trays.add(new QuickSearchTray());
+		if (Feature.enabled(Feature.CHATGPT)
+				&& com.logicaldoc.gui.common.client.Menu.enabled(com.logicaldoc.gui.common.client.Menu.CHATGPT))
+			trays.add(new ChatGPTTray());
 
 		boolean banner = Session.get().getConfigAsBoolean("gui.banner");
 
@@ -129,17 +143,12 @@ public class MainMenu extends ToolStrip implements FolderObserver, DocumentObser
 			tenantItem.addChangedHandler(event -> {
 				long tenantId = Long.parseLong(event.getValue().toString());
 				if (tenantId != Session.get().getInfo().getTenant().getId())
-					TenantService.Instance.get().changeSessionTenant(tenantId, new AsyncCallback<>() {
+					TenantService.Instance.get().changeSessionTenant(tenantId, new DefaultAsyncCallback<>() {
 
 						@Override
 						public void onSuccess(GUITenant tenant) {
 							Session.get().getInfo().setTenant(tenant);
 							Util.redirectToRoot();
-						}
-
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
 						}
 					});
 			});
@@ -155,7 +164,7 @@ public class MainMenu extends ToolStrip implements FolderObserver, DocumentObser
 
 		addFill();
 
-		addSearchBox();
+		addTrayBar();
 
 		onFolderSelected(FolderController.get().getCurrentFolder());
 	}
@@ -180,84 +189,26 @@ public class MainMenu extends ToolStrip implements FolderObserver, DocumentObser
 		addButton(account, 1);
 	}
 
-	private void onSearch() {
-		GUISearchOptions options = new GUISearchOptions();
+	/**
+	 * Adds a tray bar that displays one of the registered trays
+	 */
+	private void addTrayBar() {
+		HLayout trayPanel = new HLayout();
+		trayPanel.setAutoWidth();
+		trayPanel.addMember(trays.get(0));
+		addMember(trayPanel);
 
-		Integer pageSize = DocumentGridUtil.getPageSizeFromSpec(Session.get().getUser().getHitsGrid());
-		if (pageSize == null)
-			pageSize = Session.get().getConfigAsInt("search.hits");
-		options.setMaxHits(pageSize);
-
-		String field = searchType.getValueAsString();
-		String value = searchBox.getValueAsString().trim();
-		if (FULLTEXT.equals(field)) {
-			options.setType(GUISearchOptions.TYPE_FULLTEXT);
-			options.setExpression(value);
-			options.setExpressionLanguage(I18N.getLocale());
-			options.setType(GUISearchOptions.TYPE_FULLTEXT);
-			options.setFields(Constants.getFulltextDefaultFields());
-			options.setCriteria(null);
-		} else {
-			options.setType(GUISearchOptions.TYPE_PARAMETRIC);
-			options.setTopOperator("matchall");
-			GUICriterion criterion = new GUICriterion();
-			criterion.setField(field);
-			criterion.setOperator("contains");
-			if ("id".equals(field)) {
-				criterion.setOperator("equals");
-				try {
-					criterion.setLongValue(Long.parseLong(value));
-				} catch (Exception t) {
-					criterion.setLongValue(0L);
-				}
-			} else
-				criterion.setStringValue(value);
-			options.setCaseSensitive(0);
-			options.setCriteria(Arrays.asList(criterion));
-		}
-
-		Search.get().setOptions(options);
-		Search.get().search();
-	}
-
-	private void addSearchBox() {
-
-		searchBox.setShowTitle(false);
-		searchBox.setDefaultValue(I18N.message(SEARCH) + "...");
-		searchBox.setWidth(160);
-		searchBox.addKeyPressHandler(event -> {
-			if (event.getKeyName() == null)
-				return;
-			if (Constants.KEY_ENTER.equalsIgnoreCase(event.getKeyName())) {
-				onSearch();
-			}
+		ToolStripButton rotateTrays = AwesomeFactory.newToolStripButton("exchange-alt", null, null);
+		rotateTrays.addClickHandler(click -> {
+			if (currentTray >= trays.size() - 1)
+				currentTray = 0;
+			else
+				currentTray++;
+			trayPanel.removeMembers(trayPanel.getMembers());
+			trayPanel.addMember(trays.get(currentTray));
 		});
-		searchBox.addClickHandler(event -> {
-			if ((I18N.message(SEARCH) + "...").equals(event.getItem().getValue())) {
-				event.getItem().setValue("");
-			}
-		});
-
-		LinkedHashMap<String, String> valueMap = new LinkedHashMap<>();
-		valueMap.put(FULLTEXT, I18N.message(FULLTEXT));
-		valueMap.put("filename", I18N.message("filename"));
-		valueMap.put("id", I18N.message("id"));
-		valueMap.put("customId", I18N.message("customid"));
-		searchType.setWidth(130);
-		searchType.setShowTitle(false);
-		searchType.setValueMap(valueMap);
-		searchType.setValue(FULLTEXT);
-
-		addFormItem(searchBox);
-
-		if (Feature.enabled(Feature.PARAMETRIC_SEARCHES)) {
-			addFormItem(searchType);
-		}
-
-		ToolStripButton searchButton = AwesomeFactory.newToolStripButton(SEARCH, SEARCH);
-		searchButton.addClickHandler(event -> onSearch());
-
-		addButton(searchButton);
+		if (trays.size() > 1)
+			addButton(rotateTrays);
 	}
 
 	private MenuItem getWebContentMenuItem(GUIFolder folder, final GUIDocument document) {
@@ -265,19 +216,14 @@ public class MainMenu extends ToolStrip implements FolderObserver, DocumentObser
 		menu.setShowShadow(true);
 		menu.setShadowDepth(3);
 
-		final MenuItem edit = new MenuItem(I18N.message("editdoc"));
+		final MenuItem edit = new MenuItem(I18N.message(EDITDOC));
 		edit.addClickHandler(event -> {
 			if (document == null)
 				return;
 
 			if (document.getStatus() == 0) {
 				// Need to checkout first
-				DocumentService.Instance.get().checkout(Arrays.asList(document.getId()), new AsyncCallback<>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				DocumentService.Instance.get().checkout(Arrays.asList(document.getId()), new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Void result) {
 						DocUtil.markCheckedOut(document);
@@ -290,7 +236,7 @@ public class MainMenu extends ToolStrip implements FolderObserver, DocumentObser
 			}
 		});
 
-		final MenuItem create = new MenuItem(I18N.message("createdoc"));
+		final MenuItem create = new MenuItem(I18N.message(CREATEDOC));
 		create.addClickHandler(event -> new WebcontentCreate().show());
 
 		menu.setItems(edit, create);
@@ -311,19 +257,14 @@ public class MainMenu extends ToolStrip implements FolderObserver, DocumentObser
 		menu.setShowShadow(true);
 		menu.setShadowDepth(3);
 
-		final MenuItem edit = new MenuItem(I18N.message("editdoc"));
+		final MenuItem edit = new MenuItem(I18N.message(EDITDOC));
 		edit.addClickHandler(event -> {
 			if (document == null)
 				return;
 
 			if (document.getStatus() == 0) {
 				// Need to checkout first
-				DocumentService.Instance.get().checkout(Arrays.asList(document.getId()), new AsyncCallback<>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				DocumentService.Instance.get().checkout(Arrays.asList(document.getId()), new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Void result) {
 						DocUtil.markCheckedOut(document);
@@ -336,7 +277,7 @@ public class MainMenu extends ToolStrip implements FolderObserver, DocumentObser
 			}
 		});
 
-		final MenuItem create = new MenuItem(I18N.message("createdoc"));
+		final MenuItem create = new MenuItem(I18N.message(CREATEDOC));
 		create.addClickHandler((MenuItemClickEvent event) -> new TextContentCreate().show());
 
 		menu.setItems(edit, create);
@@ -353,70 +294,34 @@ public class MainMenu extends ToolStrip implements FolderObserver, DocumentObser
 
 	private MenuItem getDropboxMenuItem(GUIFolder folder) {
 		final MenuItem exportTo = new MenuItem(I18N.message("exporttodropbox"));
-		exportTo.addClickHandler(event -> DropboxService.Instance.get().isConnected(new AsyncCallback<Boolean>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
+		exportTo.addClickHandler(event -> DropboxService.Instance.get().isConnected(new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(Boolean connected) {
 				if (Boolean.FALSE.equals(connected))
-					DropboxService.Instance.get().startAuthorization(new AsyncCallback<>() {
-
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
-						}
-
-						@Override
-						public void onSuccess(String authorizationUrl) {
-							DropboxAuthorizationWizard wizard = new DropboxAuthorizationWizard(authorizationUrl);
-							wizard.show();
-						}
-					});
-				else {
-					DropboxDialog dialog = new DropboxDialog(true);
-					dialog.show();
-				}
+					DropboxAuthorization.get().show();
+				else
+					new DropboxDialog(true).show();
 			}
 		}));
 
 		final MenuItem importFrom = new MenuItem(I18N.message("importfromdropbox"));
-		importFrom.addClickHandler(event -> DropboxService.Instance.get().isConnected(new AsyncCallback<Boolean>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
+		importFrom.addClickHandler(event -> DropboxService.Instance.get().isConnected(new DefaultAsyncCallback<Boolean>() {
 			@Override
 			public void onSuccess(Boolean connected) {
 				if (Boolean.FALSE.equals(connected))
-					DropboxService.Instance.get().startAuthorization(new AsyncCallback<>() {
-
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
-						}
-
-						@Override
-						public void onSuccess(String authorizationUrl) {
-							DropboxAuthorizationWizard wizard = new DropboxAuthorizationWizard(authorizationUrl);
-							wizard.show();
-						}
-					});
-				else {
+					DropboxAuthorization.get().show();
+				else
 					new DropboxDialog(false).show();
-				}
 			}
 		}));
+
+		final MenuItem authrorize = new MenuItem(I18N.message(AUTHORIZE));
+		authrorize.addClickHandler(event -> DropboxAuthorization.get().show());
 
 		Menu menu = new Menu();
 		menu.setShowShadow(true);
 		menu.setShadowDepth(3);
-		menu.setItems(exportTo, importFrom);
+		menu.setItems(authrorize, exportTo, importFrom);
 
 		exportTo.setEnabled(folder != null && folder.isDownload() && Feature.enabled(Feature.DROPBOX));
 		importFrom.setEnabled(folder != null && folder.isWrite() && Feature.enabled(Feature.DROPBOX)
@@ -428,19 +333,58 @@ public class MainMenu extends ToolStrip implements FolderObserver, DocumentObser
 		return dropboxItem;
 	}
 
+	private MenuItem getChatGPTMenuItem() {
+		final MenuItem settings = new MenuItem(I18N.message("settings"));
+		settings.addClickHandler(click -> ChatGPTService.Instance.get().loadSettings(new DefaultAsyncCallback<>() {
+			@Override
+			public void onSuccess(List<GUIValue> settings) {
+				TextItem apiKey = ItemFactory.newPasswordItem(APIKEY, APIKEY, GUIValue.getValue(APIKEY, settings));
+				apiKey.setWidth(360);
+
+				TextItem model = ItemFactory.newTextItem("model", GUIValue.getValue("model", settings));
+
+				LD.askForValues(I18N.message("chatgpt"), null, Arrays.asList(apiKey, model), 400, new ValuesCallback() {
+					@Override
+					public void execute(Map<String, Object> values) {
+						List<GUIValue> settings = new ArrayList<>();
+						for (Map.Entry<String, Object> val : values.entrySet())
+							settings.add(new GUIValue(val.getKey(), "" + val.getValue()));
+
+						ChatGPTService.Instance.get().saveSettings(settings, new DefaultAsyncCallback<>() {
+							@Override
+							public void onSuccess(Void arg0) {
+								// Nothing to do
+							}
+						});
+					}
+
+					@Override
+					public void execute(String value) {
+						// Ignore
+					}
+				});
+			}
+		})
+
+		);
+
+		Menu menu = new Menu();
+		menu.setShowShadow(true);
+		menu.setShadowDepth(3);
+		menu.setItems(settings);
+
+		MenuItem chatgptItem = new MenuItem(I18N.message("chatgpt"));
+		chatgptItem.setSubmenu(menu);
+
+		return chatgptItem;
+	}
+
 	private MenuItem getShareFileMenuItem(GUIFolder folder) {
 		final MenuItem exportTo = new MenuItem(I18N.message("exporttosharefile"));
 		exportTo.addClickHandler((MenuItemClickEvent event) -> new ShareFileDialog(true).show());
 
 		final MenuItem importFrom = new MenuItem(I18N.message("importfromsharefile"));
-		importFrom.addClickHandler(event -> ShareFileService.Instance.get().isAuthorized(new AsyncCallback<Boolean>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-				LD.clearPrompt();
-			}
-
+		importFrom.addClickHandler(event -> ShareFileService.Instance.get().isAuthorized(new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(Boolean authorized) {
 				LD.clearPrompt();
@@ -455,13 +399,13 @@ public class MainMenu extends ToolStrip implements FolderObserver, DocumentObser
 			}
 		}));
 
-		final MenuItem authorize = new MenuItem(I18N.message("authorize"));
+		final MenuItem authorize = new MenuItem(I18N.message(AUTHORIZE));
 		authorize.addClickHandler(event -> new ShareFileSettings().show());
 
 		Menu menu = new Menu();
 		menu.setShowShadow(true);
 		menu.setShadowDepth(3);
-		menu.setItems(exportTo, importFrom, authorize);
+		menu.setItems(authorize, exportTo, importFrom);
 
 		exportTo.setEnabled(folder != null && folder.isDownload() && Feature.enabled(Feature.SHAREFILE));
 		importFrom.setEnabled(folder != null && folder.isWrite() && Feature.enabled(Feature.SHAREFILE)
@@ -474,20 +418,13 @@ public class MainMenu extends ToolStrip implements FolderObserver, DocumentObser
 	}
 
 	private MenuItem getDocuSignMenuItem(GUIDocument document) {
-		final MenuItem authorize = new MenuItem(I18N.message("authorize"));
-		authorize.addClickHandler((MenuItemClickEvent event) -> new DocuSignSettings().show());
+		final MenuItem authorize = new MenuItem(I18N.message(AUTHORIZE));
+		authorize.addClickHandler(click -> new DocuSignSettings().show());
 
 		final MenuItem sendEnvelope = new MenuItem(I18N.message("sendenvelope"));
 		sendEnvelope.addClickHandler(event -> {
 			LD.contactingServer();
-			DocuSignService.Instance.get().isAuthorized(new AsyncCallback<Boolean>() {
-
-				@Override
-				public void onFailure(Throwable caught) {
-					GuiLog.serverError(caught);
-					LD.clearPrompt();
-				}
-
+			DocuSignService.Instance.get().isAuthorized(new DefaultAsyncCallback<>() {
 				@Override
 				public void onSuccess(Boolean authorized) {
 					LD.clearPrompt();
@@ -506,14 +443,7 @@ public class MainMenu extends ToolStrip implements FolderObserver, DocumentObser
 		final MenuItem envelopes = new MenuItem(I18N.message("envelopes"));
 		envelopes.addClickHandler(event -> {
 			LD.contactingServer();
-			DocuSignService.Instance.get().isAuthorized(new AsyncCallback<Boolean>() {
-
-				@Override
-				public void onFailure(Throwable caught) {
-					GuiLog.serverError(caught);
-					LD.clearPrompt();
-				}
-
+			DocuSignService.Instance.get().isAuthorized(new DefaultAsyncCallback<>() {
 				@Override
 				public void onSuccess(Boolean authorized) {
 					LD.clearPrompt();
@@ -535,7 +465,7 @@ public class MainMenu extends ToolStrip implements FolderObserver, DocumentObser
 		Menu menu = new Menu();
 		menu.setShowShadow(true);
 		menu.setShadowDepth(3);
-		menu.setItems(sendEnvelope, envelopes, authorize);
+		menu.setItems(authorize, sendEnvelope, envelopes);
 
 		MenuItem docuSignItem = new MenuItem(I18N.message("docusign"));
 		docuSignItem.setSubmenu(menu);
@@ -568,12 +498,55 @@ public class MainMenu extends ToolStrip implements FolderObserver, DocumentObser
 		return officeItem;
 	}
 
+	private MenuItem getOnlyOfficeMenuItem(GUIFolder folder, final GUIDocument document) {
+		Menu menu = new Menu();
+		menu.setShowShadow(true);
+		menu.setShadowDepth(3);
+
+		final MenuItem edit = new MenuItem(I18N.message(EDITDOC));
+		edit.addClickHandler(event -> {
+			if (document == null)
+				return;
+			SecurityUtil.checkPermissionsAndRun(Arrays.asList(document.getId()),
+					new String[] { GUIAccessControlEntry.PERMISSION_DOWNLOAD, GUIAccessControlEntry.PERMISSION_WRITE },
+					() -> new OnlyOfficeEditor(document).show());
+		});
+
+		final MenuItem create = new MenuItem(I18N.message(CREATEDOC));
+		create.addClickHandler(event -> new OnlyOfficeCreate().show());
+
+		// This should be enabled only on PDF
+		final MenuItem fillForms = new MenuItem("Fill in PDF forms");
+		fillForms.addClickHandler(click -> {
+			if (document == null)
+				return;
+
+			// Setup something in the document that we will check later in the
+			// editor
+			document.setComment("fillForms");
+			new OnlyOfficeEditor(document).show();
+		});
+
+		menu.setItems(edit, create, fillForms);
+
+		edit.setEnabled(document != null && document.getImmutable() == 0 && folder != null && folder.isDownload()
+				&& folder.isWrite());
+
+		create.setEnabled(folder != null && folder.isDownload() && folder.isWrite());
+
+		// enabled only on PDF
+		fillForms.setEnabled(document != null && document.getImmutable() == 0 && folder != null && folder.isDownload()
+				&& folder.isWrite() && (document.getType().toLowerCase().endsWith("pdf")));
+
+		MenuItem onlyOfficeItem = new MenuItem(I18N.message("onlyoffice"));
+		onlyOfficeItem.setSubmenu(menu);
+
+		return onlyOfficeItem;
+	}
+
 	private void addToolsButton(GUIFolder folder, GUIDocument document) {
 		tools = AwesomeFactory.newToolStripButton("toolbox", I18N.message("tools"), I18N.message("tools"));
-		tools.addClickHandler((com.smartgwt.client.widgets.events.ClickEvent event) -> {
-			Menu menu = buildToolsMenu(folder, document);
-			menu.showContextMenu();
-		});
+		tools.addClickHandler(click -> buildToolsMenu(folder, document).showContextMenu());
 
 		addButton(tools, 2);
 	}
@@ -587,7 +560,7 @@ public class MainMenu extends ToolStrip implements FolderObserver, DocumentObser
 			folder = document.getFolder();
 
 		MenuItem develConsole = new MenuItem(I18N.message("develconsole"));
-		develConsole.addClickHandler((MenuItemClickEvent event) -> SC.showConsole());
+		develConsole.addClickHandler(click -> SC.showConsole());
 
 		if (document != null || folder != null)
 			addItemsWhenFolderOrDocumentSelected(folder, document, menu);
@@ -605,9 +578,13 @@ public class MainMenu extends ToolStrip implements FolderObserver, DocumentObser
 		if (Feature.enabled(Feature.SHAREFILE)
 				&& com.logicaldoc.gui.common.client.Menu.enabled(com.logicaldoc.gui.common.client.Menu.SHAREFILE))
 			menu.addItem(getShareFileMenuItem(folder));
-		if (Feature.enabled(Feature.GDRIVE)
-				&& com.logicaldoc.gui.common.client.Menu.enabled(com.logicaldoc.gui.common.client.Menu.GDOCS))
-			menu.addItem(new GDriveMenuItem(folder, document));
+		if (Feature.enabled(Feature.GOOGLE_DRIVE)
+				&& com.logicaldoc.gui.common.client.Menu.enabled(com.logicaldoc.gui.common.client.Menu.GOOGLEDRIVE))
+			menu.addItem(new DriveMenuItem(folder, document));
+		if (Feature.enabled(Feature.ONLYOFFICE)
+				&& com.logicaldoc.gui.common.client.Menu.enabled(com.logicaldoc.gui.common.client.Menu.ONLYOFFICE)
+				&& Session.get().getConfigAsBoolean("converter.OnlyOfficeConverter.enabled"))
+			menu.addItem(getOnlyOfficeMenuItem(folder, document));
 		if (Feature.enabled(Feature.ZOHO)
 				&& com.logicaldoc.gui.common.client.Menu.enabled(com.logicaldoc.gui.common.client.Menu.ZOHO))
 			menu.addItem(new ZohoMenuItem(folder, document));
@@ -617,6 +594,11 @@ public class MainMenu extends ToolStrip implements FolderObserver, DocumentObser
 		if (Feature.enabled(Feature.OFFICE)
 				&& com.logicaldoc.gui.common.client.Menu.enabled(com.logicaldoc.gui.common.client.Menu.OFFICE))
 			menu.addItem(getOfficeMenuItem(folder, document));
+		addTextAndWebContentItems(menu, document, folder);
+		addChatGPTItem(menu);
+	}
+
+	private void addTextAndWebContentItems(Menu menu, GUIDocument document, GUIFolder folder) {
 		if (Feature.enabled(Feature.WEBCONTENT)
 				&& com.logicaldoc.gui.common.client.Menu.enabled(com.logicaldoc.gui.common.client.Menu.WEBCONTENT))
 			menu.addItem(getWebContentMenuItem(folder, document));
@@ -624,17 +606,18 @@ public class MainMenu extends ToolStrip implements FolderObserver, DocumentObser
 			menu.addItem(getTextContentMenuItem(folder, document));
 	}
 
+	private void addChatGPTItem(Menu menu) {
+		if (Feature.enabled(Feature.CHATGPT)
+				&& com.logicaldoc.gui.common.client.Menu.enabled(com.logicaldoc.gui.common.client.Menu.CHATGPT))
+			menu.addItem(getChatGPTMenuItem());
+	}
+
 	private void addRegistration(Menu menu, MenuItem develConsole) {
 		if (Session.get().getUser().isMemberOf(Constants.GROUP_ADMIN)) {
 			MenuItem registration = new MenuItem(I18N.message("registration"));
 			registration.addClickHandler(registrationClick -> SettingService.Instance.get().loadSettingsByNames(
-					Arrays.asList("reg.name", "reg.email", "reg.organization", "reg.website"), new AsyncCallback<>() {
-
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
-						}
-
+					Arrays.asList("reg.name", "reg.email", "reg.organization", "reg.website"),
+					new DefaultAsyncCallback<>() {
 						@Override
 						public void onSuccess(List<GUIParameter> reg) {
 							new Registration(reg.stream().map(r -> r.getValue()).collect(Collectors.toList())).show();
@@ -890,5 +873,15 @@ public class MainMenu extends ToolStrip implements FolderObserver, DocumentObser
 
 		addToolsButton(folder, document);
 		addMember(tools, 2);
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

@@ -1,6 +1,5 @@
 package com.logicaldoc.core.document;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.Arrays;
@@ -30,7 +29,7 @@ public class HibernateDocumentHistoryDAOTest extends AbstractCoreTestCase {
 	private DocumentHistoryDAO dao;
 
 	@Before
-	public void setUp() throws FileNotFoundException, IOException, SQLException, PluginException {
+	public void setUp() throws IOException, SQLException, PluginException {
 		super.setUp();
 
 		// Retrieve the instance under test from spring context. Make sure that
@@ -150,9 +149,6 @@ public class HibernateDocumentHistoryDAOTest extends AbstractCoreTestCase {
 		Collection<DocumentHistory> histories = (Collection<DocumentHistory>) dao.findByUserId(3);
 		Assert.assertNotNull(histories);
 		Assert.assertFalse(histories.isEmpty());
-		// System.err.println("histories.size(): " + histories.size());
-		// System.err.println("folderHistory.getId(): " +
-		// folderHistory.getId());
 
 		DocumentHistory hStored = null;
 		for (DocumentHistory history2 : histories) {
@@ -200,7 +196,7 @@ public class HibernateDocumentHistoryDAOTest extends AbstractCoreTestCase {
 	@SuppressWarnings("rawtypes")
 	@Test
 	public void testFindByUserIdAndEvent() throws PersistenceException {
-		Collection histories = dao.findByUserIdAndEvent(1, "data test 01", null);
+		Collection histories = dao.findByUserIdAndEvent(1, "event.checkedin", null);
 		Assert.assertNotNull(histories);
 		Assert.assertEquals(1, histories.size());
 

@@ -42,6 +42,7 @@ import org.springframework.jdbc.core.RowMapper;
 import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.PersistentObject;
 import com.logicaldoc.core.automation.Automation;
+import com.logicaldoc.core.automation.AutomationException;
 import com.logicaldoc.core.communication.EMail;
 import com.logicaldoc.core.communication.EMailAttachment;
 import com.logicaldoc.core.communication.EMailSender;
@@ -90,7 +91,7 @@ import com.logicaldoc.core.security.authorization.UnexistingResourceException;
 import com.logicaldoc.core.security.user.Group;
 import com.logicaldoc.core.security.user.User;
 import com.logicaldoc.core.security.user.UserDAO;
-import com.logicaldoc.core.store.Storer;
+import com.logicaldoc.core.store.Store;
 import com.logicaldoc.core.ticket.Ticket;
 import com.logicaldoc.core.ticket.TicketDAO;
 import com.logicaldoc.core.transfer.InMemoryZipImport;
@@ -155,9 +156,9 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 	public void addBookmarks(List<Long> ids, int type) throws ServerException {
 		Session session = validateSession();
 
-		BookmarkDAO bookmarkDao = (BookmarkDAO) Context.get().getBean(BookmarkDAO.class);
-		FolderDAO fdao = (FolderDAO) Context.get().getBean(FolderDAO.class);
-		DocumentDAO dao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		BookmarkDAO bookmarkDao = Context.get(BookmarkDAO.class);
+		FolderDAO fdao = Context.get(FolderDAO.class);
+		DocumentDAO dao = Context.get(DocumentDAO.class);
 		for (Long id : ids) {
 			try {
 				Bookmark bookmark = null;
@@ -196,7 +197,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 			log.info("Indexing documents {}",
 					Stream.of(docIds).map(id -> Long.toString(id)).collect(Collectors.joining(", ")));
 
-		DocumentManager documentManager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+		DocumentManager documentManager = Context.get(DocumentManager.class);
 		for (Long id : docIds) {
 			if (id != null) {
 				DocumentHistory transaction = new DocumentHistory();
@@ -231,7 +232,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 
 		log.info("User {} requested the permanent deletion of docuemnts {}", session.getUsername(), docIds);
 
-		DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+		DocumentManager manager = Context.get(DocumentManager.class);
 
 		executeLongRunningOperation("Destroy Documents", () -> {
 			try {
@@ -282,9 +283,9 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 		Map<String, File> uploadedFilesMap = getUploadedFiles(session.getSid());
 
 		List<Document> docs = new ArrayList<>();
-		DocumentManager documentManager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+		DocumentManager documentManager = Context.get(DocumentManager.class);
 
-		FolderDAO folderDao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+		FolderDAO folderDao = Context.get(FolderDAO.class);
 		Folder parent;
 		parent = folderDao.findFolder(metadata.getFolder().getId());
 
@@ -345,7 +346,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 
 	private void checkWritePermission(final GUIDocument metadata, final Session session)
 			throws PersistenceException, ServerException {
-		FolderDAO fdao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+		FolderDAO fdao = Context.get(FolderDAO.class);
 		if (!fdao.isWriteAllowed(metadata.getFolder().getId(), session.getUserId()))
 			throw new ServerException("The user doesn't have the write permission on the current folder");
 	}
@@ -410,19 +411,19 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 		try {
 			doc = retrieveDocument(document.getId());
 		} catch (PersistenceException e1) {
-			return (GUIDocument) throwServerException(session, log, e1);
+			return throwServerException(session, log, e1);
 		}
 
 		// checkin the document; throws an exception if
 		// something goes wrong
-		DocumentManager documentManager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+		DocumentManager documentManager = Context.get(DocumentManager.class);
 		try (FileInputStream fis = new FileInputStream(file)) {
 			documentManager.checkin(doc.getId(), fis, fileName, major, toDocument(document), transaction);
 		} catch (IOException | PersistenceException e) {
-			return (GUIDocument) throwServerException(session, log, e);
+			return throwServerException(session, log, e);
 		}
 
-		UploadServlet.cleanReceivedFiles(session.getSid());
+		UploadServlet.cleanUploads(session.getSid());
 		GUIDocument checkedInDocument = getById(doc.getId());
 
 		/*
@@ -446,7 +447,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 		}
 
 		try {
-			SystemMessageDAO systemMessageDao = (SystemMessageDAO) Context.get().getBean(SystemMessageDAO.class);
+			SystemMessageDAO systemMessageDao = Context.get(SystemMessageDAO.class);
 
 			Map<Locale, Set<Recipient>> emailRecipientsMap = new HashMap<>();
 			Map<Locale, Set<Recipient>> systemRecipientsMap = new HashMap<>();
@@ -471,7 +472,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 				mail.setUsername(session.getUsername());
 				mail.setRecipients(recipients);
 
-				MessageTemplateDAO tDao = (MessageTemplateDAO) Context.get().getBean(MessageTemplateDAO.class);
+				MessageTemplateDAO tDao = Context.get(MessageTemplateDAO.class);
 				MessageTemplate template = tDao.findByNameAndLanguage(messageTemplate, locale.toString(),
 						mail.getTenantId());
 
@@ -508,20 +509,20 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 
 				systemMessageDao.store(sys);
 			}
-		} catch (PersistenceException | MessagingException e) {
+		} catch (PersistenceException | MessagingException | AutomationException e) {
 			log.warn(e.getMessage(), e);
 		}
 	}
 
 	private Document retrieveDocument(long docId) throws PersistenceException {
-		DocumentDAO dao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO dao = Context.get(DocumentDAO.class);
 		return dao.findDocument(docId);
 	}
 
 	private void prepareRecipients(List<Long> notifyUserids, Map<Locale, Set<Recipient>> emailRecipientsMap,
 			Map<Locale, Set<Recipient>> systemRecipientsMap) throws PersistenceException {
 		String idsString = notifyUserids.stream().map(id -> Long.toString(id)).collect(Collectors.joining(","));
-		UserDAO uDao = (UserDAO) Context.get().getBean(UserDAO.class);
+		UserDAO uDao = Context.get(UserDAO.class);
 		List<User> users = uDao.findByWhere("_entity.id in (" + idsString + ")", null, null);
 
 		for (User user : users) {
@@ -559,12 +560,11 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 		}
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public List<GUIDocument> addDocuments(String language, long folderId, boolean importZip, String charset,
 			boolean immediateIndexing, final Long templateId) throws ServerException {
 		Session session = validateSession();
-		FolderDAO fdao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+		FolderDAO fdao = Context.get(FolderDAO.class);
 		try {
 			if (folderId == fdao.findRoot(session.getTenantId()).getId())
 				throw new PermissionException("Cannot add documents in the root");
@@ -575,7 +575,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 			metadata.setTemplateId(templateId);
 			return addDocuments(importZip, charset, immediateIndexing, metadata);
 		} catch (PermissionException | PersistenceException | ServerException e) {
-			return (List<GUIDocument>) throwServerException(session, log, e);
+			return throwServerException(session, log, e);
 		}
 	}
 
@@ -589,7 +589,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 			if (doc == null)
 				throw new ServerException(UNEXISTING_DOCUMENT);
 
-			FolderDAO fDao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+			FolderDAO fDao = Context.get(FolderDAO.class);
 			if (!fDao.isWriteAllowed(doc.getFolder().getId(), session.getUserId()))
 				throw new PermissionException(session.getUsername(), DOCUMENT_STR + docId, Permission.WRITE);
 
@@ -600,12 +600,12 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 			transaction.setSession(session);
 			transaction.setDocument(doc);
 
-			DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+			DocumentManager manager = Context.get(DocumentManager.class);
 			manager.promoteVersion(doc.getId(), version, transaction);
 
 			return getById(doc.getId());
 		} catch (PersistenceException | ServerException | IOException | PermissionException e) {
-			return (GUIDocument) throwServerException(session, log, e);
+			return throwServerException(session, log, e);
 		}
 	}
 
@@ -615,8 +615,8 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 
 		// Checkout the document; throws an exception if something
 		// goes wrong
-		DocumentManager documentManager = (DocumentManager) Context.get().getBean(DocumentManager.class);
-		DocumentDAO dao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentManager documentManager = Context.get(DocumentManager.class);
+		DocumentDAO dao = Context.get(DocumentDAO.class);
 
 		try {
 			// Create the document history event
@@ -639,8 +639,8 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 
 		// Unlock the document; throws an exception if something
 		// goes wrong
-		DocumentManager documentManager = (DocumentManager) Context.get().getBean(DocumentManager.class);
-		DocumentDAO dao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentManager documentManager = Context.get(DocumentManager.class);
+		DocumentDAO dao = Context.get(DocumentDAO.class);
 
 		// Create the document history event
 		DocumentHistory transaction = new DocumentHistory();
@@ -673,7 +673,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 	}
 
 	private void deleteDocument(long docId, Session session) throws PersistenceException {
-		DocumentDAO dao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO dao = Context.get(DocumentDAO.class);
 		Document doc = dao.findById(docId);
 		if (doc == null)
 			return;
@@ -717,7 +717,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 	@Override
 	public void deleteBookmarks(List<Long> bookmarkIds) throws ServerException {
 		validateSession();
-		BookmarkDAO dao = (BookmarkDAO) Context.get().getBean(BookmarkDAO.class);
+		BookmarkDAO dao = Context.get(BookmarkDAO.class);
 		for (long id : bookmarkIds) {
 			try {
 				dao.delete(id);
@@ -731,7 +731,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 	public void deleteLinks(List<Long> ids) throws ServerException {
 		validateSession();
 
-		DocumentLinkDAO dao = (DocumentLinkDAO) Context.get().getBean(DocumentLinkDAO.class);
+		DocumentLinkDAO dao = Context.get(DocumentLinkDAO.class);
 		for (long id : ids) {
 			try {
 				dao.delete(id);
@@ -748,7 +748,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 		try {
 			return getDocument(session, docId);
 		} catch (InvalidSessionServerException | PermissionException | PersistenceException e) {
-			return (GUIDocument) throwServerException(session, log, e);
+			return throwServerException(session, log, e);
 		}
 	}
 
@@ -757,14 +757,14 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 		if (session != null)
 			validateSession(session.getSid());
 
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
 		Document document = docDao.findById(docId);
 
 		GUIDocument guiDocument = null;
 		GUIFolder folder = null;
 
 		if (document != null) {
-			FolderDAO fDao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+			FolderDAO fDao = Context.get(FolderDAO.class);
 			fDao.initialize(document.getFolder());
 			folder = new FolderServiceImpl().fromFolder(document.getFolder(), false);
 
@@ -778,8 +778,8 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 			setAllowedPermissions(session, docId, guiDocument);
 
 			if (session != null && folder != null) {
-				FolderDAO fdao = (FolderDAO) Context.get().getBean(FolderDAO.class);
-				Set<Permission> permissions = fdao.getEnabledPermissions(document.getFolder().getId(),
+				FolderDAO fdao = Context.get(FolderDAO.class);
+				Set<Permission> permissions = fdao.getAllowedPermissions(document.getFolder().getId(),
 						session.getUserId());
 				List<String> permissionsList = new ArrayList<>();
 				for (Permission permission : permissions)
@@ -793,7 +793,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 
 	public GUIDocument fromDocument(Document doc, GUIFolder folder, User sessionUser) throws PersistenceException {
 		boolean isFolder = doc.getType() != null && doc.getType().startsWith("folder");
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
 		if (doc.getId() != 0L && !isFolder)
 			docDao.initialize(doc);
 
@@ -830,6 +830,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 		guiDocument.setLockUserId(realDoc.getLockUserId());
 		guiDocument.setLockUser(realDoc.getLockUser());
 		guiDocument.setComment(realDoc.getComment());
+		guiDocument.setLastNote(realDoc.getLastNote());
 		guiDocument.setStatus(realDoc.getStatus());
 		guiDocument.setWorkflowStatus(realDoc.getWorkflowStatus());
 		guiDocument.setWorkflowStatusDisplay(realDoc.getWorkflowStatusDisplay());
@@ -882,7 +883,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 			guiDocument.setFolder(f);
 		}
 
-		FolderDAO fdao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+		FolderDAO fdao = Context.get(FolderDAO.class);
 		guiDocument.setPathExtended(fdao.computePathExtended(guiDocument.getFolder().getId()));
 
 		return guiDocument;
@@ -890,27 +891,26 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 
 	private void setBookmarked(GUIDocument document, boolean isFolder, User sessionUser) throws PersistenceException {
 		if (sessionUser != null && !isFolder) {
-			BookmarkDAO bDao = (BookmarkDAO) Context.get().getBean(BookmarkDAO.class);
+			BookmarkDAO bDao = Context.get(BookmarkDAO.class);
 			document.setBookmarked(bDao.isDocBookmarkedByUser(document.getId(), sessionUser.getId()));
 			if (document.getDocRef() != null)
 				document.setBookmarked(bDao.isDocBookmarkedByUser(document.getDocRef(), sessionUser.getId()));
 		}
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public List<GUIVersion> getVersionsById(long id1, long id2) throws ServerException {
 		Session session = validateSession();
 
-		VersionDAO versDao = (VersionDAO) Context.get().getBean(VersionDAO.class);
+		VersionDAO versDao = Context.get(VersionDAO.class);
 		Version docVersion;
 		try {
 			docVersion = versDao.findById(id1);
-		} catch (PersistenceException e) {
-			return (List<GUIVersion>) throwServerException(session, null, e);
+			if (docVersion != null)
+				versDao.initialize(docVersion);
+		} catch (Exception e) {
+			return super.<List<GUIVersion>> throwServerException(session, log, e);
 		}
-		if (docVersion != null)
-			versDao.initialize(docVersion);
 
 		GUIVersion version1 = null;
 		if (docVersion != null) {
@@ -954,11 +954,11 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 
 		try {
 			docVersion = versDao.findById(id2);
-		} catch (PersistenceException e) {
-			return (List<GUIVersion>) throwServerException(session, null, e);
+			if (docVersion != null)
+				versDao.initialize(docVersion);
+		} catch (Exception e) {
+			return super.<List<GUIVersion>> throwServerException(session, log, e);
 		}
-		if (docVersion != null)
-			versDao.initialize(docVersion);
 
 		GUIVersion version2 = null;
 		if (docVersion != null) {
@@ -1012,11 +1012,17 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 		return versions;
 	}
 
-	private void setGUIExtendedAttributes(Version docVersion, GUIVersion guiVersion) {
-		VersionDAO versDao = (VersionDAO) Context.get().getBean(VersionDAO.class);
+	private void setGUIExtendedAttributes(Version docVersion, GUIVersion guiVersion) throws ServerException {
+		VersionDAO versDao = Context.get(VersionDAO.class);
 		guiVersion.setTemplate(docVersion.getTemplateName());
 		guiVersion.setTemplateId(docVersion.getTemplateId());
-		versDao.initialize(docVersion);
+
+		try {
+			versDao.initialize(docVersion);
+		} catch (PersistenceException e) {
+			throw new ServerException(e.getMessage(), e);
+		}
+
 		for (String attrName : docVersion.getAttributeNames()) {
 			Attribute extAttr = docVersion.getAttributes().get(attrName);
 			GUIAttribute att = new GUIAttribute();
@@ -1044,8 +1050,8 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 	public void linkDocuments(List<Long> inDocIds, List<Long> outDocIds) throws ServerException {
 		Session session = validateSession();
 
-		DocumentLinkDAO linkDao = (DocumentLinkDAO) Context.get().getBean(DocumentLinkDAO.class);
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentLinkDAO linkDao = Context.get(DocumentLinkDAO.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
 		for (Long inDocId : inDocIds) {
 			for (Long outDocId : outDocIds) {
 				try {
@@ -1071,8 +1077,8 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 	public void makeImmutable(List<Long> docIds, String comment) throws ServerException {
 		Session session = validateSession();
 
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
-		DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
+		DocumentManager manager = Context.get(DocumentManager.class);
 		try {
 			for (long id : docIds) {
 				Document doc = docDao.findById(id);
@@ -1100,7 +1106,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 	@Override
 	public void markHistoryAsRead(String event) throws ServerException {
 		Session session = validateSession();
-		DocumentHistoryDAO dao = (DocumentHistoryDAO) Context.get().getBean(DocumentHistoryDAO.class);
+		DocumentHistoryDAO dao = Context.get(DocumentHistoryDAO.class);
 		try {
 			dao.markHistoriesAsRead(event, session.getUserId());
 		} catch (PersistenceException e) {
@@ -1112,8 +1118,8 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 	public void markIndexable(List<Long> docIds, int policy) throws ServerException {
 		Session session = validateSession();
 
-		DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentManager manager = Context.get(DocumentManager.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
 		for (long id : docIds)
 			try {
 				manager.changeIndexingStatus(docDao.findById(id), policy);
@@ -1127,8 +1133,8 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 	public void markUnindexable(List<Long> docIds) throws ServerException {
 		Session session = validateSession();
 
-		DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentManager manager = Context.get(DocumentManager.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
 		for (long id : docIds)
 			try {
 				manager.changeIndexingStatus(docDao.findById(id), AbstractDocument.INDEX_SKIP);
@@ -1141,8 +1147,6 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 	public void restore(List<Long> docIds, long folderId) throws ServerException {
 		Session session = validateSession();
 
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
-
 		for (Long docId : docIds) {
 			if (docId == null)
 				continue;
@@ -1150,7 +1154,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 			transaction.setSession(session);
 
 			try {
-				docDao.restore(docId, folderId, transaction);
+				Context.get(DocumentDAO.class).restore(docId, folderId, transaction);
 			} catch (PersistenceException e) {
 				log.error(e.getMessage(), e);
 			}
@@ -1172,7 +1176,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 
 			Validator validator = new Validator();
 			validator.validate(object, object.getTemplate(), transaction);
-		} catch (PersistenceException e) {
+		} catch (PersistenceException | AutomationException e) {
 			throwServerException(session, log, e);
 		}
 
@@ -1185,7 +1189,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 			return null;
 
 		try {
-			DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+			DocumentDAO docDao = Context.get(DocumentDAO.class);
 			Document document = docDao.findById(guiDocument.getId());
 			docDao.initialize(document);
 
@@ -1235,11 +1239,11 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 			transaction.setEvent(DocumentEvent.CHANGED.toString());
 			transaction.setComment(HTMLSanitizer.sanitizeSimpleText(guiDocument.getComment()));
 
-			DocumentManager documentManager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+			DocumentManager documentManager = Context.get(DocumentManager.class);
 			documentManager.update(document, docVO, transaction);
 			return getById(guiDocument.getId());
 		} catch (PersistenceException | ServerException e) {
-			return (GUIDocument) throwServerException(session, log, e);
+			return throwServerException(session, log, e);
 		}
 
 	}
@@ -1247,7 +1251,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 	private static void setAllowedPermissions(Session session, long documentId, GUIDocument guiDocument)
 			throws PersistenceException {
 		if (session != null) {
-			DocumentDAO dao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+			DocumentDAO dao = Context.get(DocumentDAO.class);
 			Set<Permission> permissions = dao.getAllowedPermissions(documentId, session.getUserId());
 			guiDocument.setAllowedPermissions(new GUIAccessControlEntry(
 					permissions.stream().map(p -> p.name().toLowerCase()).toList().toArray(new String[0])));
@@ -1296,7 +1300,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 
 		if (guiDocument.getTemplateId() != null) {
 			docVO.setTemplateId(guiDocument.getTemplateId());
-			TemplateDAO templateDao = (TemplateDAO) Context.get().getBean(TemplateDAO.class);
+			TemplateDAO templateDao = Context.get(TemplateDAO.class);
 			Template template = templateDao.findById(guiDocument.getTemplateId());
 			templateDao.initialize(template);
 			docVO.setTemplate(template);
@@ -1306,7 +1310,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 		}
 
 		docVO.setStatus(guiDocument.getStatus());
-		FolderDAO fdao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+		FolderDAO fdao = Context.get(FolderDAO.class);
 		if (guiDocument.getFolder() != null)
 			docVO.setFolder(fdao.findById(guiDocument.getFolder().getId()));
 		return docVO;
@@ -1447,7 +1451,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 	@Override
 	public String sendAsEmail(GUIEmail guiMail, String locale) throws ServerException {
 		Session session = validateSession();
-		DocumentDAO documentDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO documentDao = Context.get(DocumentDAO.class);
 
 		EMail mail = new EMail();
 		mail.setHtml(1);
@@ -1506,7 +1510,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 			}
 
 			return sendEmail(mail, session, attachedDocs);
-		} catch (PermissionException | PersistenceException | IOException e) {
+		} catch (PermissionException | PersistenceException | IOException | AutomationException e) {
 			log.warn(e.getMessage(), e);
 			return "error";
 		}
@@ -1562,8 +1566,8 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 	private void prepareDownloadTicket(GUIEmail email, String locale, Session session, Map<String, Object> dictionary)
 			throws PersistenceException, PermissionException {
 		if (email.isSendAsTicket()) {
-			DocumentDAO documentDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
-			DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+			DocumentDAO documentDao = Context.get(DocumentDAO.class);
+			DocumentManager manager = Context.get(DocumentManager.class);
 
 			// Prepare a new download ticket
 			DocumentHistory transaction = new DocumentHistory();
@@ -1586,13 +1590,13 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 
 	private String sendEmail(EMail mail, Session session, List<Document> attachedDocs) {
 		try {
-			DocumentDAO documentDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+			DocumentDAO documentDao = Context.get(DocumentDAO.class);
 
 			// Send the message
 			EMailSender sender = getEmailSender(session);
 			sender.send(mail);
 
-			FolderDAO fDao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+			FolderDAO fDao = Context.get(FolderDAO.class);
 			for (Document d : attachedDocs) {
 				Document doc = d;
 				if (doc.getDocRef() != null)
@@ -1615,7 +1619,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 			/*
 			 * Save the recipients in the user's contacts
 			 */
-			ContactDAO cdao = (ContactDAO) Context.get().getBean(ContactDAO.class);
+			ContactDAO cdao = Context.get(ContactDAO.class);
 			for (Recipient recipient : mail.getRecipients()) {
 				List<Contact> contacts = cdao.findByUser(session.getUserId(), recipient.getAddress());
 				if (contacts.isEmpty()) {
@@ -1642,12 +1646,12 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 	}
 
 	private File createTile(Document doc, String sid) throws IOException {
-		Storer storer = (Storer) Context.get().getBean(Storer.class);
-		String tileResource = storer.getResourceName(doc, doc.getFileVersion(), ThumbnailManager.SUFFIX_TILE);
+		Store store = Context.get(Store.class);
+		String tileResource = store.getResourceName(doc, doc.getFileVersion(), ThumbnailManager.SUFFIX_TILE);
 
 		// In any case try to produce the thumbnail
-		if (storer.size(doc.getId(), tileResource) <= 0L) {
-			ThumbnailManager thumbManager = (ThumbnailManager) Context.get().getBean(ThumbnailManager.class);
+		if (store.size(doc.getId(), tileResource) <= 0L) {
+			ThumbnailManager thumbManager = Context.get(ThumbnailManager.class);
 			try {
 				thumbManager.createTile(doc, doc.getFileVersion(), sid);
 			} catch (IOException e) {
@@ -1655,9 +1659,9 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 			}
 		}
 
-		if (storer.exists(doc.getId(), tileResource)) {
+		if (store.exists(doc.getId(), tileResource)) {
 			File file = FileUtil.createTempFile("tile-", ".png");
-			storer.writeToFile(doc.getId(), tileResource, file);
+			store.writeToFile(doc.getId(), tileResource, file);
 			return file;
 		}
 
@@ -1666,10 +1670,10 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 
 	private void createAttachment(EMail email, long docId, boolean pdfConversion, String sid)
 			throws IOException, PersistenceException {
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
-		Storer storer = (Storer) Context.get().getBean(Storer.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
+		Store store = Context.get(Store.class);
 		Document doc = docDao.findDocument(docId);
-		String resource = storer.getResourceName(doc, null, null);
+		String resource = store.getResourceName(doc, null, null);
 
 		boolean convertToPdf = pdfConversion;
 		if ((doc.getDocRef() != null) && ("pdf".equals(doc.getDocRefType()))) {
@@ -1686,16 +1690,15 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 
 		if (convertToPdf) {
 			if (!"pdf".equals(FileUtil.getExtension(doc.getFileName().toLowerCase()))) {
-				FormatConverterManager manager = (FormatConverterManager) Context.get()
-						.getBean(FormatConverterManager.class);
+				FormatConverterManager manager = Context.get(FormatConverterManager.class);
 				manager.convertToPdf(doc, sid);
-				resource = storer.getResourceName(doc, null, "conversion.pdf");
+				resource = store.getResourceName(doc, null, "conversion.pdf");
 			}
 			att.setMimeType(MimeType.get("pdf"));
 			att.setFileName(FileUtil.getBaseName(doc.getFileName()) + ".pdf");
 		}
 
-		att.setData(storer.getBytes(doc.getId(), resource));
+		att.setData(store.getBytes(doc.getId(), resource));
 
 		email.addAttachment(2 + email.getAttachments().size(), att);
 	}
@@ -1721,7 +1724,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 		try {
 			// Unlock the document; throws an exception if something
 			// goes wrong
-			DocumentManager documentManager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+			DocumentManager documentManager = Context.get(DocumentManager.class);
 			for (long id : docIds) {
 				documentManager.unlock(id, transaction);
 			}
@@ -1734,7 +1737,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 	public void updateBookmark(GUIBookmark bookmark) throws ServerException {
 		Session session = validateSession();
 
-		BookmarkDAO bookmarkDao = (BookmarkDAO) Context.get().getBean(BookmarkDAO.class);
+		BookmarkDAO bookmarkDao = Context.get(BookmarkDAO.class);
 		Bookmark bk;
 		try {
 			if (bookmark.getId() != 0) {
@@ -1758,7 +1761,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 	public void updateLink(long id, String type) throws ServerException {
 		Session session = validateSession();
 
-		DocumentLinkDAO dao = (DocumentLinkDAO) Context.get().getBean(DocumentLinkDAO.class);
+		DocumentLinkDAO dao = Context.get(DocumentLinkDAO.class);
 		try {
 			DocumentLink link = dao.findById(id);
 			dao.initialize(link);
@@ -1772,7 +1775,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 	@Override
 	public void cleanUploadedFileFolder() throws ServerException {
 		Session session = validateSession();
-		UploadServlet.cleanReceivedFiles(session.getSid());
+		UploadServlet.cleanUploads(session.getSid());
 
 		File dir = new File(System.getProperty("java.io.tmpdir") + "/upload/" + session.getSid());
 		if (dir.exists())
@@ -1783,7 +1786,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 	public GUIRating getRating(long docId) throws ServerException {
 		Session session = validateSession();
 
-		RatingDAO ratingDao = (RatingDAO) Context.get().getBean(RatingDAO.class);
+		RatingDAO ratingDao = Context.get(RatingDAO.class);
 		try {
 			GUIRating rating = new GUIRating();
 			Rating rat = ratingDao.findVotesByDocId(docId);
@@ -1806,7 +1809,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 
 			return rating;
 		} catch (PersistenceException e) {
-			return (GUIRating) throwServerException(session, log, e);
+			return throwServerException(session, log, e);
 		}
 	}
 
@@ -1814,7 +1817,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 	public int saveRating(GUIRating rating) throws ServerException {
 		Session session = validateSession();
 
-		RatingDAO ratingDao = (RatingDAO) Context.get().getBean(RatingDAO.class);
+		RatingDAO ratingDao = Context.get(RatingDAO.class);
 		try {
 			Rating rat = ratingDao.findByDocIdAndUserId(rating.getDocId(), rating.getUserId());
 			if (rat == null) {
@@ -1831,11 +1834,11 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 
 			ratingDao.store(rat, transaction);
 
-			DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+			DocumentDAO docDao = Context.get(DocumentDAO.class);
 			Document doc = docDao.findById(rating.getDocId());
 			return doc.getRating();
 		} catch (PersistenceException e) {
-			return (Integer) throwServerException(session, log, e);
+			return throwServerException(session, log, e);
 		}
 	}
 
@@ -1844,7 +1847,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 		Session session = validateSession();
 
 		try {
-			DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+			DocumentDAO docDao = Context.get(DocumentDAO.class);
 			Document document = docDao.findDocument(docId);
 			if (document == null)
 				throw new ServerException(UNEXISTING_DOCUMENT + " " + docId);
@@ -1862,16 +1865,15 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 			DocumentHistory transaction = new DocumentHistory();
 			transaction.setSession(session);
 
-			DocumentNoteDAO dao = (DocumentNoteDAO) Context.get().getBean(DocumentNoteDAO.class);
+			DocumentNoteDAO dao = Context.get(DocumentNoteDAO.class);
 			dao.store(note, transaction);
 
 			return note.getId();
 		} catch (PersistenceException | ServerException e) {
-			return (Long) throwServerException(session, log, e);
+			return throwServerException(session, log, e);
 		}
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public List<GUIDocumentNote> getNotes(long docId, String fileVersion, Collection<String> types)
 			throws ServerException {
@@ -1884,7 +1886,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 				throw new ServerException(UNEXISTING_DOCUMENT + " " + docId);
 
 			List<GUIDocumentNote> guiNotes = new ArrayList<>();
-			DocumentNoteDAO dao = (DocumentNoteDAO) Context.get().getBean(DocumentNoteDAO.class);
+			DocumentNoteDAO dao = Context.get(DocumentNoteDAO.class);
 
 			List<DocumentNote> notes = dao.findByDocIdAndTypes(document.getId(),
 					fileVersion != null ? fileVersion : document.getFileVersion(), types);
@@ -1917,7 +1919,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 			}
 			return guiNotes;
 		} catch (PersistenceException e) {
-			return (List<GUIDocumentNote>) throwServerException(session, log, e);
+			return throwServerException(session, log, e);
 		}
 
 	}
@@ -1927,7 +1929,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 			throws ServerException {
 		Session session = validateSession();
 
-		DocumentNoteDAO dao = (DocumentNoteDAO) Context.get().getBean(DocumentNoteDAO.class);
+		DocumentNoteDAO dao = Context.get(DocumentNoteDAO.class);
 		Document document = null;
 		try {
 			document = retrieveDocument(docId);
@@ -1959,7 +1961,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 	private void saveNote(Session session, Document document, GUIDocumentNote guiNote)
 			throws ServerException, PersistenceException {
 
-		DocumentNoteDAO dao = (DocumentNoteDAO) Context.get().getBean(DocumentNoteDAO.class);
+		DocumentNoteDAO dao = Context.get(DocumentNoteDAO.class);
 
 		DocumentNote note = null;
 		try {
@@ -2002,7 +2004,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 		 * If the note specifies a recipient, update the user's address book
 		 */
 		if (StringUtils.isNotEmpty(note.getRecipientEmail())) {
-			ContactDAO cDao = (ContactDAO) Context.get().getBean(ContactDAO.class);
+			ContactDAO cDao = Context.get(ContactDAO.class);
 			List<Contact> contacts = cDao.findByUser(session.getUserId(), note.getRecipientEmail());
 			if (contacts.isEmpty()) {
 				String firstName = note.getRecipient();
@@ -2024,7 +2026,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 
 	private void saveNote(DocumentNote note, Session session) throws ServerException {
 		try {
-			DocumentNoteDAO dao = (DocumentNoteDAO) Context.get().getBean(DocumentNoteDAO.class);
+			DocumentNoteDAO dao = Context.get(DocumentNoteDAO.class);
 			if (note.getId() == 0L) {
 				DocumentHistory transaction = new DocumentHistory();
 				transaction.setSession(session);
@@ -2039,7 +2041,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 
 	private void saveContact(Contact contact) {
 		try {
-			ContactDAO cDao = (ContactDAO) Context.get().getBean(ContactDAO.class);
+			ContactDAO cDao = Context.get(ContactDAO.class);
 			cDao.store(contact);
 		} catch (PersistenceException e) {
 			log.warn("Error storing new contact {}", contact.getEmail(), e);
@@ -2050,7 +2052,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 	public void deleteNotes(List<Long> ids) throws ServerException {
 		validateSession();
 
-		DocumentNoteDAO dao = (DocumentNoteDAO) Context.get().getBean(DocumentNoteDAO.class);
+		DocumentNoteDAO dao = Context.get(DocumentNoteDAO.class);
 		for (long id : ids)
 			try {
 				dao.delete(id);
@@ -2163,12 +2165,12 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 		Session session = validateSession();
 
 		try {
-			DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+			DocumentDAO docDao = Context.get(DocumentDAO.class);
 			Document document = docDao.findDocument(docId);
 			if (document == null)
 				throw new ServerException(UNEXISTING_DOCUMENT + " " + docId);
 
-			DocumentNoteDAO dao = (DocumentNoteDAO) Context.get().getBean(DocumentNoteDAO.class);
+			DocumentNoteDAO dao = Context.get(DocumentNoteDAO.class);
 			DocumentNote note = dao.findById(noteId);
 			if (note == null) {
 				note = new DocumentNote();
@@ -2197,7 +2199,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 		Session session = validateSession();
 
 		long docId = 0;
-		DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+		DocumentManager manager = Context.get(DocumentManager.class);
 		for (long id : ids) {
 			DocumentHistory transaction = new DocumentHistory();
 			transaction.setSession(session);
@@ -2205,7 +2207,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 			try {
 				version = manager.deleteVersion(id, transaction);
 			} catch (Exception e) {
-				return (GUIDocument) throwServerException(session, log, e);
+				return throwServerException(session, log, e);
 			}
 			docId = version.getDocId();
 		}
@@ -2218,8 +2220,8 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 		Session session = validateSession();
 
 		try {
-			DocumentManager documentManager = (DocumentManager) Context.get().getBean(DocumentManager.class);
-			FolderDAO fdao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+			DocumentManager documentManager = Context.get(DocumentManager.class);
+			FolderDAO fdao = Context.get(FolderDAO.class);
 
 			if (!fdao.isWriteAllowed(vo.getFolder().getId(), session.getUserId()))
 				throw new PermissionException(session.getUsername(), "Folder " + vo.getFolder().getId(),
@@ -2247,7 +2249,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 
 			return fromDocument(document, vo.getFolder(), null);
 		} catch (PermissionException | PersistenceException e) {
-			return (GUIDocument) throwServerException(session, log, e);
+			return throwServerException(session, log, e);
 		}
 	}
 
@@ -2258,9 +2260,9 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 			return;
 
 		String idsStr = Arrays.asList(ids).toString().replace('[', '(').replace(']', ')');
-		DocumentDAO dao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
 		try {
-			dao.bulkUpdate("set ld_deleted=2 where ld_id in " + idsStr, (Map<String, Object>) null);
+			Context.get(DocumentDAO.class)
+					.jdbcUpdate("update ld_document set ld_deleted=2 where ld_id in " + idsStr);
 		} catch (PersistenceException e) {
 			throwServerException(session, log, e);
 		}
@@ -2272,13 +2274,12 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 		Session session = validateSession();
 
 		try {
-			DocumentDAO dao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
-			dao.bulkUpdate("set ld_deleted=2 where ld_deleted=1 and  ld_deleteuserid=" + session.getUserId(),
-					(Map<String, Object>) null);
+			Context.get(DocumentDAO.class)
+					.jdbcUpdate("update ld_document set ld_deleted=2 where ld_deleted=1 and  ld_deleteuserid="
+							+ session.getUserId());
 
-			FolderDAO fdao = (FolderDAO) Context.get().getBean(FolderDAO.class);
-			fdao.bulkUpdate("set ld_deleted=2 where ld_deleted=1 and  ld_deleteuserid=" + session.getUserId(),
-					(Map<String, Object>) null);
+			Context.get(FolderDAO.class).jdbcUpdate(
+					"update ld_folder set ld_deleted=2 where ld_deleted=1 and  ld_deleteuserid=" + session.getUserId());
 		} catch (PersistenceException e) {
 			throwServerException(session, log, e);
 		}
@@ -2289,7 +2290,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 	public void archiveDocuments(List<Long> docIds, String comment) throws ServerException {
 		Session session = validateSession();
 
-		DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+		DocumentManager manager = Context.get(DocumentManager.class);
 		DocumentHistory transaction = new DocumentHistory();
 		transaction.setSession(session);
 		try {
@@ -2303,14 +2304,14 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 	public long archiveFolder(long folderId, String comment) throws ServerException {
 		Session session = validateSession();
 
-		DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+		DocumentManager manager = Context.get(DocumentManager.class);
 		DocumentHistory transaction = new DocumentHistory();
 		transaction.setSession(session);
 		transaction.setComment(HTMLSanitizer.sanitizeSimpleText(comment));
 		try {
 			return manager.archiveFolder(folderId, transaction);
 		} catch (PersistenceException e) {
-			return (Long) throwServerException(session, log, e);
+			return throwServerException(session, log, e);
 		}
 	}
 
@@ -2318,7 +2319,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 	public void unarchiveDocuments(List<Long> docIds) throws ServerException {
 		Session session = validateSession();
 
-		DocumentDAO dao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO dao = Context.get(DocumentDAO.class);
 
 		for (long id : docIds) {
 			// Create the document history event
@@ -2343,8 +2344,8 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 	}
 
 	private long countDocuments(long folderId, int status) {
-		DocumentDAO dao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
-		FolderDAO fdao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+		DocumentDAO dao = Context.get(DocumentDAO.class);
+		FolderDAO fdao = Context.get(FolderDAO.class);
 
 		List<Long> childrenFolderIds = fdao.findIdsByParentId(folderId);
 		childrenFolderIds = new ArrayList<>(childrenFolderIds);
@@ -2362,7 +2363,6 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 		}
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public List<String> createDownloadTicket(long docId, int type, String suffix, Integer expireHours, Date expireDate,
 			Integer maxDownloads, Integer maxViews) throws ServerException {
@@ -2374,7 +2374,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 			urlPrefix = request.getScheme() + "://" + request.getServerName() + ":" + request.getServerPort()
 					+ request.getContextPath();
 
-		DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+		DocumentManager manager = Context.get(DocumentManager.class);
 		DocumentHistory transaction = new DocumentHistory();
 		transaction.setSession(session);
 		try {
@@ -2398,7 +2398,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 							.normalize().toString());
 			return result;
 		} catch (PermissionException | PersistenceException | URISyntaxException e) {
-			return (List<String>) throwServerException(session, log, e);
+			return throwServerException(session, log, e);
 		}
 	}
 
@@ -2406,7 +2406,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 	public void setPassword(long docId, String password) throws ServerException {
 		Session session = validateSession();
 
-		DocumentDAO dao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO dao = Context.get(DocumentDAO.class);
 
 		// Create the document history event
 		DocumentHistory transaction = new DocumentHistory();
@@ -2432,7 +2432,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 		transaction.setSession(session);
 		transaction.setComment("");
 
-		DocumentDAO dao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO dao = Context.get(DocumentDAO.class);
 
 		try {
 			Document doc = dao.findDocument(docId);
@@ -2449,7 +2449,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 	public boolean unprotect(long docId, String password) throws ServerException {
 		Session session = validateSession();
 
-		DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+		DocumentManager manager = Context.get(DocumentManager.class);
 		return manager.unprotect(session.getSid(), docId, password);
 	}
 
@@ -2458,12 +2458,12 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 		Session session = validateSession();
 
 		try {
-			DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+			DocumentDAO docDao = Context.get(DocumentDAO.class);
 			Document doc = docDao.findById(docId);
 			if (doc == null)
 				throw new ServerException(UNEXISTING_DOCUMENT);
 
-			FolderDAO fDao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+			FolderDAO fDao = Context.get(FolderDAO.class);
 			if (!fDao.isDownloadllowed(doc.getFolder().getId(), session.getUserId()))
 				throw new IOException("You don't have the DOWNLOAD permission");
 
@@ -2474,12 +2474,12 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 				doc = docDao.findById(doc.getDocRef());
 
 			// Obtain the document's file stream
-			Storer storer = (Storer) Context.get().getBean(Storer.class);
-			String resource = storer.getResourceName(doc, null, null);
+			Store store = Context.get(Store.class);
+			String resource = store.getResourceName(doc, null, null);
 
-			return storer.getString(doc.getId(), resource);
+			return store.getString(doc.getId(), resource);
 		} catch (PersistenceException | ServerException | IOException e) {
-			return (String) throwServerException(session, log, e);
+			return throwServerException(session, log, e);
 		}
 
 	}
@@ -2489,12 +2489,12 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 		Session session = validateSession();
 
 		try {
-			DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+			DocumentDAO docDao = Context.get(DocumentDAO.class);
 			Document doc = docDao.findById(docId);
 			if (doc == null)
 				throw new ServerException(UNEXISTING_DOCUMENT);
 
-			FolderDAO fDao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+			FolderDAO fDao = Context.get(FolderDAO.class);
 			if (!fDao.isWriteAllowed(doc.getFolder().getId(), session.getUserId()))
 				throw new PermissionException(session.getUsername(), DOCUMENT_STR + docId, Permission.WRITE);
 
@@ -2505,13 +2505,13 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 			transaction.setComment("Text content editing");
 			transaction.setSession(session);
 
-			DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+			DocumentManager manager = Context.get(DocumentManager.class);
 			manager.checkin(docId, IOUtils.toInputStream(content, StandardCharsets.UTF_8), doc.getFileName(), false,
 					null, transaction);
 
 			return getById(docId);
 		} catch (PermissionException | PersistenceException | ServerException | IOException e) {
-			return (GUIDocument) throwServerException(session, log, e);
+			return throwServerException(session, log, e);
 		}
 
 	}
@@ -2526,12 +2526,12 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 			return;
 
 		try {
-			DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+			DocumentDAO docDao = Context.get(DocumentDAO.class);
 			Document doc = docDao.findById(docId);
 			if (doc == null)
 				throw new ServerException(UNEXISTING_DOCUMENT);
 
-			FolderDAO fDao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+			FolderDAO fDao = Context.get(FolderDAO.class);
 			if (!fDao.isWriteAllowed(doc.getFolder().getId(), session.getUserId()))
 				throw new IOException("You don't have the WRITE permission");
 
@@ -2544,10 +2544,10 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 			transaction.setComment(HTMLSanitizer.sanitizeSimpleText(comment));
 			transaction.setSession(session);
 
-			DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+			DocumentManager manager = Context.get(DocumentManager.class);
 			manager.replaceFile(doc.getId(), fileVersion, file, transaction);
 
-			UploadServlet.cleanReceivedFiles(session.getSid());
+			UploadServlet.cleanUploads(session.getSid());
 		} catch (PersistenceException | ServerException | IOException e) {
 			throwServerException(session, log, e);
 		}
@@ -2558,7 +2558,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 		Session session = validateSession();
 
 		try {
-			FolderDAO fDao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+			FolderDAO fDao = Context.get(FolderDAO.class);
 			if (!fDao.isWriteAllowed(document.getFolder().getId(), session.getUserId()))
 				throw new IOException("You don't have the WRITE permission");
 
@@ -2566,13 +2566,13 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 			transaction.setComment("Text content creation");
 			transaction.setSession(session);
 
-			DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+			DocumentManager manager = Context.get(DocumentManager.class);
 			Document doc = manager.create(IOUtils.toInputStream(content, StandardCharsets.UTF_8), toDocument(document),
 					transaction);
 
 			return getById(doc.getId());
 		} catch (PersistenceException | IOException | ServerException e) {
-			return (GUIDocument) throwServerException(session, log, e);
+			return throwServerException(session, log, e);
 		}
 	}
 
@@ -2580,7 +2580,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 	public GUIRating getUserRating(long docId) throws ServerException {
 		Session session = validateSession();
 
-		RatingDAO rDao = (RatingDAO) Context.get().getBean(RatingDAO.class);
+		RatingDAO rDao = Context.get(RatingDAO.class);
 		try {
 			GUIRating rating = null;
 			Rating rat = rDao.findByDocIdAndUserId(docId, session.getUserId());
@@ -2597,7 +2597,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 
 			return rating;
 		} catch (PersistenceException e) {
-			return (GUIRating) throwServerException(session, log, e);
+			return throwServerException(session, log, e);
 		}
 
 	}
@@ -2607,7 +2607,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 		Session session = validateSession();
 
 		try {
-			RatingDAO rDao = (RatingDAO) Context.get().getBean(RatingDAO.class);
+			RatingDAO rDao = Context.get(RatingDAO.class);
 			Rating rat = rDao.findById(id);
 			if (rat == null)
 				return 0;
@@ -2617,11 +2617,11 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 
 			rDao.delete(id);
 
-			DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+			DocumentDAO docDao = Context.get(DocumentDAO.class);
 			Document doc = docDao.findById(rat.getDocId());
 			return doc.getRating();
 		} catch (PersistenceException | ServerException e) {
-			return (Integer) throwServerException(session, log, e);
+			return throwServerException(session, log, e);
 		}
 	}
 
@@ -2630,25 +2630,24 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 		Session session = validateSession();
 
 		try {
-			DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+			DocumentDAO docDao = Context.get(DocumentDAO.class);
 			Document doc = docDao.findById(docId);
 			if (doc == null)
 				throw new ServerException(UNEXISTING_DOCUMENT);
 
-			FolderDAO fDao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+			FolderDAO fDao = Context.get(FolderDAO.class);
 			if (!fDao.isWriteAllowed(doc.getFolder().getId(), session.getUserId()))
 				throw new PermissionException(session.getUsername(), DOCUMENT_STR + doc.getId(), Permission.WRITE);
 			DocumentHistory transaction = new DocumentHistory();
 			transaction.setSession(session);
 
-			FormatConverterManager manager = (FormatConverterManager) Context.get()
-					.getBean(FormatConverterManager.class);
+			FormatConverterManager manager = Context.get(FormatConverterManager.class);
 			Document conversion = manager.convert(doc, fileVersion, format, transaction);
 			if (conversion == null)
 				throw new ServerException("Unable to convert");
 			return getById(conversion.getId());
 		} catch (Exception e) {
-			return (GUIDocument) throwServerException(session, log, e);
+			return throwServerException(session, log, e);
 		}
 
 	}
@@ -2657,7 +2656,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 	public GUIEmail extractEmail(long docId, String fileVersion) throws ServerException {
 		Session session = validateSession();
 
-		DocumentDAO dao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO dao = Context.get(DocumentDAO.class);
 		Document emailDocument = null;
 		try {
 			emailDocument = dao.findDocument(docId);
@@ -2665,15 +2664,15 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 					&& !emailDocument.getFileName().toLowerCase().endsWith(".msg"))
 				throw new ServerException("Not an email file");
 		} catch (PersistenceException e1) {
-			return (GUIEmail) throwServerException(session, log, e1);
+			return throwServerException(session, log, e1);
 		}
 
-		Storer storer = (Storer) Context.get().getBean(Storer.class);
-		String resource = storer.getResourceName(docId, fileVersion, null);
+		Store store = Context.get(Store.class);
+		String resource = store.getResourceName(docId, fileVersion, null);
 
 		GUIDocument guiDocument = getById(docId);
 
-		try (InputStream is = storer.getStream(emailDocument.getId(), resource)) {
+		try (InputStream is = store.getStream(emailDocument.getId(), resource)) {
 			GUIEmail guiMail = new GUIEmail();
 			EMail email = readEmail(is, emailDocument.getId(), guiDocument);
 			if (email != null) {
@@ -2686,6 +2685,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 				guiMail.setSubject(email.getSubject());
 				guiMail.setMessage(
 						email.isHtml() ? HTMLSanitizer.sanitize(email.getMessageText()) : email.getMessageText());
+
 				guiMail.setSigned(email.isSigned());
 
 				setEmailRecipients(email, guiMail);
@@ -2694,7 +2694,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 			}
 			return guiMail;
 		} catch (IOException e1) {
-			return (GUIEmail) throwServerException(session, log, e1);
+			return throwServerException(session, log, e1);
 		}
 	}
 
@@ -2765,9 +2765,9 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 				throw new ServerException("Not an email file");
 			checkPermission(Permission.WRITE, session.getUser(), doc.getFolder().getId());
 
-			Storer storer = (Storer) Context.get().getBean(Storer.class);
-			String resource = storer.getResourceName(docId, fileVersion, null);
-			is = storer.getStream(docId, resource);
+			Store store = Context.get(Store.class);
+			String resource = store.getResourceName(docId, fileVersion, null);
+			is = store.getStream(docId, resource);
 
 			EMail email = MailUtil.messageToMail(is, true);
 			EMailAttachment attachment = null;
@@ -2784,8 +2784,8 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 				throw new IOException("Attachment not found");
 
 			FileUtils.writeByteArrayToFile(tmp, attachment.getData());
-			DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
-			FolderDAO fDao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+			DocumentManager manager = Context.get(DocumentManager.class);
+			FolderDAO fDao = Context.get(FolderDAO.class);
 
 			Document docVO = new Document();
 			docVO.setFileName(attachmentFileName);
@@ -2797,7 +2797,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 			Document d = manager.create(tmp, docVO, transaction);
 			return getById(d.getId());
 		} catch (IOException | PersistenceException | MessagingException e) {
-			return (GUIDocument) throwServerException(session, log, e);
+			return throwServerException(session, log, e);
 		} finally {
 			IOUtils.closeQuietly(is);
 			FileUtil.delete(tmp);
@@ -2808,14 +2808,14 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 	public GUIDocument replaceAlias(long aliasId) throws ServerException {
 		Session session = validateSession();
 
-		DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+		DocumentManager manager = Context.get(DocumentManager.class);
 		DocumentHistory transaction = new DocumentHistory();
 		transaction.setSession(session);
 		try {
 			Document doc = manager.replaceAlias(aliasId, transaction);
 			return getDocument(session, doc.getId());
 		} catch (InvalidSessionServerException | PermissionException | PersistenceException e) {
-			return (GUIDocument) throwServerException(session, log, e);
+			return throwServerException(session, log, e);
 		}
 	}
 
@@ -2826,7 +2826,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 
 		try {
 			// First of all, find all duplicates digests
-			DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+			DocumentDAO docDao = Context.get(DocumentDAO.class);
 			List<String> digests = docDao.findDuplicatedDigests(session.getTenantId(), folderId);
 			log.info("Found {} duplicated digests", digests.size());
 
@@ -2842,9 +2842,8 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 			else
 				duplicationsQuery.append(" asc ");
 
-			FolderDAO folderDao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+			FolderDAO folderDao = Context.get(FolderDAO.class);
 
-			@SuppressWarnings("unchecked")
 			List<Document> duplications = docDao.query(duplicationsQuery.toString(), new RowMapper<Document>() {
 				public Document mapRow(ResultSet rs, int rowNum) throws SQLException {
 					Document doc = new Document();
@@ -2887,7 +2886,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 	}
 
 	private void deduplicateDocuments(Session session, List<Document> duplications) throws PersistenceException {
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
 		Document maintainedDoc = docDao.findById(duplications.get(0).getId());
 		log.info("Process digest {}, retain document {} dated {}", maintainedDoc.getDigest(), maintainedDoc,
 				maintainedDoc.getDate());
@@ -2937,8 +2936,8 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 		}
 
 		// Create the aliases
-		FolderDAO fDao = (FolderDAO) Context.get().getBean(FolderDAO.class);
-		DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+		FolderDAO fDao = Context.get(FolderDAO.class);
+		DocumentManager manager = Context.get(DocumentManager.class);
 		for (Document duplicate : duplications) {
 			DocumentHistory transaction = new DocumentHistory();
 			transaction.setSession(session);
@@ -2955,7 +2954,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 	public void deleteTicket(long ticketId) throws ServerException {
 		Session session = validateSession();
 
-		TicketDAO dao = (TicketDAO) Context.get().getBean(TicketDAO.class);
+		TicketDAO dao = Context.get(TicketDAO.class);
 		try {
 			dao.delete(ticketId);
 		} catch (PersistenceException e) {
@@ -2967,7 +2966,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 	public void enableTicket(long ticketId) throws ServerException {
 		Session session = validateSession();
 
-		TicketDAO dao = (TicketDAO) Context.get().getBean(TicketDAO.class);
+		TicketDAO dao = Context.get(TicketDAO.class);
 		try {
 			Ticket ticket = dao.findById(ticketId);
 			ticket.setEnabled(1);
@@ -2981,7 +2980,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 	public void disableTicket(long ticketId) throws ServerException {
 		Session session = validateSession();
 
-		TicketDAO dao = (TicketDAO) Context.get().getBean(TicketDAO.class);
+		TicketDAO dao = Context.get(TicketDAO.class);
 		try {
 			Ticket ticket = dao.findById(ticketId);
 			ticket.setEnabled(0);
@@ -2992,28 +2991,28 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 	}
 
 	@Override
-	public void enforceFilesIntoFolderStorage(long folderId) throws ServerException {
+	public void enforceFilesIntoFolderStore(long folderId) throws ServerException {
 		Session session = validateSession();
-		executeLongRunningOperation("Enforce Files Into Folder Storage", () -> {
+		executeLongRunningOperation("Enforce Files Into Folder Store", () -> {
 			User user = session.getUser();
-			DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+			DocumentManager manager = Context.get(DocumentManager.class);
 			int movedFiles = 0;
 
-			FolderDAO fDao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+			FolderDAO fDao = Context.get(FolderDAO.class);
 			String treePath = null;
 			try {
 				treePath = fDao.computePathExtended(folderId);
 				DocumentHistory transaction = new DocumentHistory();
 				transaction.setSession(session);
-				movedFiles = manager.enforceFilesIntoFolderStorage(folderId, transaction);
+				movedFiles = manager.enforceFilesIntoFolderStore(folderId, transaction);
 
-				log.info("Notify the move of {} files to the right storage in the tree {}", movedFiles, treePath);
+				log.info("Notify the move of {} files to the right store in the tree {}", movedFiles, treePath);
 
 				notifyEnforcement(session, I18N.message("enforcementofstoragereport", user.getLocale(),
 						new Object[] { movedFiles, treePath }));
 
 			} catch (Exception t) {
-				log.error("Error enforcing files storage into tree {}", treePath);
+				log.error("Error enforcing files store into tree {}", treePath);
 				log.error(t.getMessage(), t);
 				try {
 					notifyEnforcement(session, I18N.message("enforcementofstorageerror", user.getLocale(),
@@ -3047,7 +3046,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 		sys.setSubject(I18N.message("enforcementofstorage", user.getLocale()));
 
 		try {
-			SystemMessageDAO sDao = (SystemMessageDAO) Context.get().getBean(SystemMessageDAO.class);
+			SystemMessageDAO sDao = Context.get(SystemMessageDAO.class);
 			sDao.store(sys);
 
 			// Prepare the email
@@ -3082,12 +3081,12 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 	public GUIDocument merge(List<Long> docIds, long targetFolderId, String fileName) throws ServerException {
 		final Session session = validateSession();
 
-		DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+		DocumentManager manager = Context.get(DocumentManager.class);
 		DocumentHistory transaction = new DocumentHistory();
 		transaction.setSession(session);
 
 		try {
-			DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+			DocumentDAO docDao = Context.get(DocumentDAO.class);
 			List<Document> docs = new ArrayList<>();
 			for (long docId : docIds)
 				docs.add(docDao.findDocument(docId));
@@ -3096,7 +3095,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 					fileName.toLowerCase().endsWith(".pdf") ? fileName : fileName + ".pdf", transaction);
 			return getDocument(session, doc.getId());
 		} catch (InvalidSessionServerException | PermissionException | PersistenceException | IOException e) {
-			return (GUIDocument) throwServerException(session, log, e);
+			return throwServerException(session, log, e);
 		}
 	}
 
@@ -3104,8 +3103,8 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 	public int updatePages(long docId) throws ServerException {
 		final Session session = validateSession();
 
-		DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentManager manager = Context.get(DocumentManager.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
 		try {
 			Document doc = docDao.findDocument(docId);
 			if (doc != null) {
@@ -3116,7 +3115,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 			}
 			return 1;
 		} catch (PersistenceException e) {
-			return (Integer) throwServerException(session, log, e);
+			return throwServerException(session, log, e);
 		}
 
 	}
@@ -3126,13 +3125,13 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 		final Session session = validateSession();
 
 		User user = session.getUser();
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
 		try {
 			Document doc = docDao.findById(documentId);
 			checkPermission(Permission.RENAME, user, doc.getFolder().getId());
 			checkPublished(user, doc);
 
-			DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+			DocumentManager manager = Context.get(DocumentManager.class);
 
 			DocumentHistory transaction = new DocumentHistory();
 			transaction.setSession(session);
@@ -3141,7 +3140,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 
 			return getDocument(session, documentId);
 		} catch (AccessDeniedException | PermissionException | InvalidSessionServerException | PersistenceException e) {
-			return (GUIDocument) throwServerException(session, log, e);
+			return throwServerException(session, log, e);
 		}
 	}
 
@@ -3178,7 +3177,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 	public void saveACL(GUIDocument guiDocument) throws ServerException {
 		Session session = validateSession();
 
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
 		try {
 			Document document = docDao.findById(guiDocument.getId());
 			docDao.initialize(document);
@@ -3230,7 +3229,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 	public void applyParentFolderSecurity(long docId) throws ServerException {
 		Session session = validateSession();
 
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
 		try {
 			DocumentHistory transaction = new DocumentHistory();
 			transaction.setSession(session);
@@ -3247,7 +3246,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 		try {
 			Set<Permission> commonPermissions = Permission.all();
 			if (!session.getUser().isAdmin()) {
-				DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+				DocumentDAO docDao = Context.get(DocumentDAO.class);
 				for (long docId : docIds) {
 					Set<Permission> docPermissions = docDao.getAllowedPermissions(docId, session.getUserId());
 					for (Permission permission : Permission.all()) {
@@ -3260,7 +3259,7 @@ public class DocumentServiceImpl extends AbstractRemoteService implements Docume
 			return new GUIAccessControlEntry(commonPermissions.stream().map(p -> p.name().toLowerCase())
 					.collect(Collectors.toSet()).toArray(new String[0]));
 		} catch (PersistenceException e) {
-			return (GUIAccessControlEntry) throwServerException(session, log, e);
+			return throwServerException(session, log, e);
 		}
 	}
 }

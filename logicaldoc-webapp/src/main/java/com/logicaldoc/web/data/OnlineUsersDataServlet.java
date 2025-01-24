@@ -32,8 +32,8 @@ public class OnlineUsersDataServlet extends AbstractDataServlet {
 	protected void service(HttpServletRequest request, HttpServletResponse response, Session session, Integer max,
 			Locale locale) throws PersistenceException, IOException {
 
-		UserDAO userDao = (UserDAO) Context.get().getBean(UserDAO.class);
-		SessionDAO sessionDao = (SessionDAO) Context.get().getBean(SessionDAO.class);
+		UserDAO userDao = Context.get(UserDAO.class);
+		SessionDAO sessionDao = Context.get(SessionDAO.class);
 		Session currentSession = ServletUtil.validateSession(request);
 		String tenant = currentSession.getTenantName();
 
@@ -48,14 +48,14 @@ public class OnlineUsersDataServlet extends AbstractDataServlet {
 				users.add(user);
 			}
 		}
-
+		
 		PrintWriter writer = response.getWriter();
 		writer.print("<list>");
 		for (User user : users) {
 			writer.print("<user>");
 			writer.print("<id>" + user.getId() + "</id>");
 			writer.print("<username><![CDATA[" + user.getUsername() + "]]></username>");
-			writer.print("<avatar>" + user.getId() + "</avatar>");
+			writer.print("<user><![CDATA[" + user.getFullName() + "]]></user>");
 			writer.print("</user>");
 		}
 		writer.print("</list>");

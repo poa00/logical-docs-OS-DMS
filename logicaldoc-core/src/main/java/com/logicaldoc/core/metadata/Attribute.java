@@ -3,6 +3,8 @@ package com.logicaldoc.core.metadata;
 import java.io.Serializable;
 import java.util.Date;
 
+import javax.annotation.Nullable;
+
 import com.logicaldoc.core.document.Document;
 import com.logicaldoc.core.folder.Folder;
 import com.logicaldoc.core.security.user.User;
@@ -157,7 +159,8 @@ public class Attribute implements Comparable<Attribute>, Serializable {
 	public void setDateValue(Date dateValue) {
 		this.dateValue = dateValue;
 	}
-
+	
+	@Nullable
 	public Boolean getBooleanValue() {
 		if (intValue != null)
 			return intValue.intValue() == 1;
@@ -235,38 +238,56 @@ public class Attribute implements Comparable<Attribute>, Serializable {
 			return;
 		}
 
-		if (value instanceof String string) {
+		switch (value) {
+		case String string -> {
 			this.type = TYPE_STRING;
 			setStringValue(string);
-		} else if (value instanceof Integer integer) {
+		}
+
+		case Integer integer -> {
 			this.type = TYPE_INT;
 			setIntValue(Long.valueOf(integer));
-		} else if (value instanceof Long longVal) {
+		}
+
+		case Long longVal -> {
 			this.type = TYPE_INT;
 			setIntValue(longVal);
-		} else if (value instanceof Double doubleVal) {
+		}
+
+		case Double doubleVal -> {
 			this.type = TYPE_DOUBLE;
 			setDoubleValue(doubleVal);
-		} else if (value instanceof Date date) {
+		}
+
+		case Date date -> {
 			this.type = TYPE_DATE;
 			setDateValue(date);
-		} else if (value instanceof User user) {
+		}
+
+		case User user -> {
 			this.type = TYPE_USER;
 			this.intValue = user.getId();
 			this.stringValue = user.getUsername();
-		} else if (value instanceof Folder folder) {
+		}
+
+		case Folder folder -> {
 			this.type = TYPE_FOLDER;
 			this.intValue = folder.getId();
 			this.stringValue = folder.getName();
-		} else if (value instanceof Document document) {
+		}
+
+		case Document document -> {
 			this.type = TYPE_DOCUMENT;
 			this.intValue = document.getId();
 			this.stringValue = document.getFileName();
-		} else if (value instanceof Boolean bool) {
+		}
+
+		case Boolean bool -> {
 			this.type = TYPE_BOOLEAN;
 			this.intValue = bool.booleanValue() ? 1L : 0L;
-		} else {
-			throw new IllegalArgumentException("Not a String, Long, Double, Date, Boolean, User, Folder value");
+		}
+
+		default -> throw new IllegalArgumentException("Not a String, Long, Double, Date, Boolean, User, Folder value");
 		}
 	}
 

@@ -10,6 +10,7 @@ import java.util.Locale;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,7 +50,8 @@ public class SessionsDataServlet extends AbstractDataServlet {
 		if (request.getParameter("kill") != null) {
 			// Kill a specific session
 			SessionManager.get().kill(request.getParameter("kill"));
-			log.debug("Killed session {}", request.getParameter("kill"));
+			if (log.isDebugEnabled())
+				log.debug("Killed session {}", request.getParameter("kill"));
 			PrintWriter writer = response.getWriter();
 			writer.println("ok");
 		} else {
@@ -58,7 +60,7 @@ public class SessionsDataServlet extends AbstractDataServlet {
 					: null;
 
 			// Just listing the sessions
-			SessionDAO sessionDao = (SessionDAO) Context.get().getBean(SessionDAO.class);
+			SessionDAO sessionDao = Context.get(SessionDAO.class);
 			List<Session> sessions = sessionDao.findByNode(node);
 
 			boolean csvFormat = "true".equals(request.getParameter("csv"));
@@ -81,7 +83,7 @@ public class SessionsDataServlet extends AbstractDataServlet {
 			/*
 			 * The current user must be enabled to see the sessions.
 			 */
-			MenuDAO mDao = (MenuDAO) Context.get().getBean(MenuDAO.class);
+			MenuDAO mDao = Context.get(MenuDAO.class);
 			boolean showSid = currentUser == null || mDao.isReadEnable(Menu.ADMIN_SESSIONS, currentUser.getId());
 
 			PrintWriter writer = response.getWriter();
@@ -140,6 +142,8 @@ public class SessionsDataServlet extends AbstractDataServlet {
 		}
 
 		writer.print(",");
+		writer.print(StringUtils.defaultString(session.getKeyLabel()));
+		writer.print(",");
 		if (showSid)
 			writer.print(session.getNode());
 		writer.print("\n");
@@ -163,7 +167,7 @@ public class SessionsDataServlet extends AbstractDataServlet {
 
 		writer.print("<session>");
 		writer.print("<sid><![CDATA[" + (showSid ? session.getSid() : "--") + "]]></sid>");
-
+		writer.print("<key><![CDATA[" + StringUtils.defaultString(session.getKeyLabel()) + "]]></key>");
 		printSessionStatusXml(session, locale, showSid, writer);
 
 		writer.print("<username><![CDATA[" + (showSid ? session.getUsername() : "") + "]]></username>");

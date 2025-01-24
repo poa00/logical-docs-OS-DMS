@@ -5,7 +5,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.net.URL;
+import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -36,6 +36,7 @@ import org.slf4j.LoggerFactory;
 
 import com.logicaldoc.core.document.Document;
 import com.logicaldoc.util.Context;
+import com.logicaldoc.util.http.UrlUtil;
 import com.logicaldoc.util.io.FileUtil;
 
 /**
@@ -96,8 +97,7 @@ public class XMLConverter extends AbstractFormatConverter {
 	private void convert(String sid, Document document, File dest, String destExt, File xslt, File xml,
 			String xsltOutFormat) throws TransformerFactoryConfigurationError, IOException {
 		try {
-			FormatConverterManager manager = (FormatConverterManager) Context.get()
-					.getBean(FormatConverterManager.class);
+			FormatConverterManager manager = Context.get(FormatConverterManager.class);
 
 			// Create transformer factory
 			TransformerFactory factory = TransformerFactory.newInstance();
@@ -173,7 +173,7 @@ public class XMLConverter extends AbstractFormatConverter {
 	}
 
 	private void convertFromTxt(String sid, Document document, File dest, String destExt, File xml) throws IOException {
-		FormatConverterManager manager = (FormatConverterManager) Context.get().getBean(FormatConverterManager.class);
+		FormatConverterManager manager = Context.get(FormatConverterManager.class);
 		FormatConverter converter = manager.getConverter("txt", destExt);
 		if (converter == null)
 			throw new IOException(String.format("Unable to find a converter from txt to %s", destExt));
@@ -181,7 +181,7 @@ public class XMLConverter extends AbstractFormatConverter {
 	}
 
 	private String getXsltOutputFormat(Document document, File xslt, File xml, SAXBuilder builder,
-			org.jdom2.Document domDocument) throws IOException, JDOMException {
+			org.jdom2.Document domDocument) throws IOException, JDOMException, URISyntaxException {
 
 		/*
 		 * Search for the XSL declaration
@@ -204,7 +204,7 @@ public class XMLConverter extends AbstractFormatConverter {
 		if (StringUtils.isNotEmpty(style)) {
 			log.debug("Force the stylesheet {} for converting xml file {}", style, document.getFileName());
 			try {
-				FileUtils.copyURLToFile(new URL(style), xslt);
+				FileUtils.copyURLToFile(UrlUtil.toURL(style), xslt);
 				xsltOutFormat = "html";
 				String newStyleSpec = "<?xml-stylesheet type=\"text/xsl\" href=\"" + style + "\" ?>";
 				if (containsStyleReference) {
@@ -233,12 +233,13 @@ public class XMLConverter extends AbstractFormatConverter {
 	 * 
 	 * @throws IOException Generic I/O error
 	 * @throws JDOMException JDOM parsing error
+	 * @throws URISyntaxException URL not valid
 	 */
 	private String chectStyleSheet(File xslt, SAXBuilder builder, ProcessingInstruction pi)
-			throws IOException, JDOMException {
+			throws IOException, JDOMException, URISyntaxException {
 		String xsltOutFormat = null;
 		try {
-			FileUtils.copyURLToFile(new URL(pi.getPseudoAttributeValue("href")), xslt);
+			FileUtils.copyURLToFile(UrlUtil.toURL(pi.getPseudoAttributeValue("href")), xslt);
 			org.jdom2.Document xsltDoc = builder.build(xslt);
 			Element root = xsltDoc.getRootElement();
 			Element outputElem = root.getChild("output", root.getNamespace());

@@ -9,8 +9,8 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.security.NoSuchAlgorithmException;
 import java.sql.SQLException;
 import java.util.Date;
 import java.util.HashMap;
@@ -23,11 +23,14 @@ import org.junit.Test;
 import org.springframework.beans.BeanUtils;
 
 import com.logicaldoc.core.PersistenceException;
+import com.logicaldoc.core.security.Client;
 import com.logicaldoc.core.security.Device;
 import com.logicaldoc.core.security.DeviceDAO;
 import com.logicaldoc.core.security.Session;
 import com.logicaldoc.core.security.SessionManager;
 import com.logicaldoc.core.security.Tenant;
+import com.logicaldoc.core.security.apikey.ApiKey;
+import com.logicaldoc.core.security.apikey.ApiKeyDAO;
 import com.logicaldoc.core.security.user.Group;
 import com.logicaldoc.core.security.user.GroupDAO;
 import com.logicaldoc.core.security.user.User;
@@ -58,7 +61,7 @@ public class SecurityServiceImplTest extends AbstractWebappTestCase {
 	private GroupDAO groupDAO;
 
 	@Before
-	public void setUp() throws FileNotFoundException, IOException, SQLException, PluginException {
+	public void setUp() throws IOException, SQLException, PluginException {
 		super.setUp();
 
 		userDAO = (UserDAO) context.getBean("UserDAO");
@@ -227,7 +230,7 @@ public class SecurityServiceImplTest extends AbstractWebappTestCase {
 	public void testSaveProfile() throws ServerException {
 		GUIUser user = testSubject.getUser(3);
 		user.setCity("Carpi");
-		user = testSubject.saveProfile(user);
+		testSubject.saveProfile(user);
 
 		user = testSubject.getUser(3);
 		assertEquals("Carpi", user.getCity());
@@ -237,7 +240,7 @@ public class SecurityServiceImplTest extends AbstractWebappTestCase {
 	public void testSaveInterfaceSettings() throws ServerException {
 		GUIUser user = testSubject.getUser(3);
 		user.setDefaultWorkspace(99L);
-		user = testSubject.saveInterfaceSettings(user);
+		testSubject.saveInterfaceSettings(user);
 
 		user = testSubject.getUser(3);
 		assertEquals(99L, user.getDefaultWorkspace().longValue());
@@ -292,9 +295,9 @@ public class SecurityServiceImplTest extends AbstractWebappTestCase {
 	public void testKill() {
 		SessionManager sm = SessionManager.get();
 		sm.clear();
-		Session session1 = sm.newSession("admin", "admin", null);
+		Session session1 = sm.newSession("admin", "admin", (Client) null);
 		assertNotNull(session1);
-		Session session2 = sm.newSession("admin", "admin", null);
+		Session session2 = sm.newSession("admin", "admin", (Client) null);
 		assertNotNull(session2);
 		assertNotSame(session1, session2);
 		assertEquals(2, sm.getSessions().size());
@@ -306,21 +309,16 @@ public class SecurityServiceImplTest extends AbstractWebappTestCase {
 	}
 
 	@Test
-	public void testSaveSettings() {
+	public void testSaveSettings() throws ServerException {
 		GUISecuritySettings securitySettings = new GUISecuritySettings();
 		securitySettings.setPwdExpiration(30);
 		securitySettings.setPwdSize(6);
 		securitySettings.setAnonymousKey("xxx");
-
-		String notThrownTest = null;
-		try {
-			testSubject.saveSettings(securitySettings);
-			notThrownTest = "ok";
-		} catch (Exception t) {
-			t.printStackTrace();
-			// Nothing to do
-		}
-		assertEquals("ok", notThrownTest);
+		securitySettings.setContentSecurityPolicy("xyz");
+		testSubject.saveSettings(securitySettings);
+		
+		GUISecuritySettings settings = testSubject.loadSettings();
+		assertEquals("xxx", settings.getAnonymousKey());
 	}
 
 	@Test
@@ -393,7 +391,7 @@ public class SecurityServiceImplTest extends AbstractWebappTestCase {
 		String deviceId = testSubject.trustDevice("myLabel");
 		assertTrue(testSubject.isTrustedDevice(deviceId));
 
-		DeviceDAO dDao = (DeviceDAO) Context.get().getBean(DeviceDAO.class);
+		DeviceDAO dDao = Context.get(DeviceDAO.class);
 		Device device = dDao.findByDeviceId(deviceId);
 		testSubject.deleteTrustedDevices(List.of(device.getId()));
 		assertFalse(testSubject.isTrustedDevice(deviceId));
@@ -403,7 +401,7 @@ public class SecurityServiceImplTest extends AbstractWebappTestCase {
 	public void testDeviceLabel() throws ServerException {
 		String deviceId = testSubject.trustDevice("myLabel");
 		assertTrue(testSubject.isTrustedDevice(deviceId));
-		DeviceDAO dDao = (DeviceDAO) Context.get().getBean(DeviceDAO.class);
+		DeviceDAO dDao = Context.get(DeviceDAO.class);
 		Device device = dDao.findByDeviceId(deviceId);
 		assertNotNull(device);
 		assertEquals("myLabel", device.getLabel());
@@ -424,7 +422,7 @@ public class SecurityServiceImplTest extends AbstractWebappTestCase {
 		try {
 			Map<String, File> uploadedFilesMap = new HashMap<>();
 			uploadedFilesMap.put(avatarFile.getName(), avatarFile);
-			session.getDictionary().put(UploadServlet.RECEIVED_FILES, uploadedFilesMap);
+			session.getDictionary().put(UploadServlet.UPLOADS, uploadedFilesMap);
 
 			testSubject.saveAvatar(1L);
 			user = userDAO.findById(1L);
@@ -447,7 +445,7 @@ public class SecurityServiceImplTest extends AbstractWebappTestCase {
 	}
 
 	@Test
-	public void testCloneWorkTimes() throws ServerException, PersistenceException {
+	public void testCloneWorkTimes() throws ServerException {
 		GUIUser user = testSubject.getUser(3L);
 		assertTrue(user.getWorkingTimes().isEmpty());
 
@@ -486,10 +484,10 @@ public class SecurityServiceImplTest extends AbstractWebappTestCase {
 	}
 
 	@Test
-	public void testGenerateAndValidatePassword() throws ServerException, PersistenceException {
+	public void testGenerateAndValidatePassword() throws ServerException {
 		ContextProperties config = Context.get().getProperties();
 		String password = testSubject.generatePassword();
-		
+
 		final int pwdSize = config.getInt("default" + SecurityServiceImpl.PASSWORD_SIZE, 8);
 		final int pwdUpperCase = config.getInt("default" + SecurityServiceImpl.PASSWORD_UPPERCASE, 2);
 		final int pwdLowerCase = config.getInt("default" + SecurityServiceImpl.PASSWORD_LOWERCASE, 2);
@@ -497,7 +495,7 @@ public class SecurityServiceImplTest extends AbstractWebappTestCase {
 		final int pwdSpecial = config.getInt("default" + SecurityServiceImpl.PASSWORD_SPECIAL, 1);
 		final int pwdSequence = config.getInt("default" + SecurityServiceImpl.PASSWORD_SEQUENCE, 4);
 		final int pwdOccurrence = config.getInt("default" + SecurityServiceImpl.PASSWORD_OCCURRENCE, 3);
-		
+
 		List<String> errors = testSubject.validatePassword(password, pwdSize, pwdUpperCase, pwdLowerCase, pwdDigit,
 				pwdSpecial, pwdSequence, pwdOccurrence);
 		assertTrue(errors.isEmpty());
@@ -508,4 +506,27 @@ public class SecurityServiceImplTest extends AbstractWebappTestCase {
 				pwdSequence, pwdOccurrence);
 		assertTrue(errors.isEmpty());
 	}
+
+	@Test
+	public void testCreateApiKey() throws ServerException, PersistenceException, NoSuchAlgorithmException {
+		String key = testSubject.createApiKey("Test");
+		assertNotNull(key);
+
+		ApiKeyDAO dao = Context.get(ApiKeyDAO.class);
+		ApiKey apiKey = dao.findByKey(key);
+
+		// try to recreate with same name
+		try {
+			testSubject.createApiKey("Test");
+			fail("cannot admit two keys with same name");
+		} catch (ServerException e) {
+			// All ok
+		}
+
+		// recreate with same name
+		testSubject.deleteApiKey(apiKey.getId());
+		key = testSubject.createApiKey("Test");
+		assertNotNull(key);
+	}
+
 }

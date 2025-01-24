@@ -22,7 +22,7 @@ import com.logicaldoc.util.plugin.PluginRegistry;
  * @author Marco Meschieri - LogicalDOC
  * @since 8.7.4
  */
-@Component("FolderListenerManager")
+@Component("folderListenerManager")
 public class FolderListenerManager {
 
 	private static final String POSITION = "position";
@@ -73,7 +73,7 @@ public class FolderListenerManager {
 					log.info("Added new folder listener {} position {}", className,
 							ext.getParameter(POSITION).valueAsString());
 			} catch (ClassNotFoundException | InstantiationException | IllegalAccessException | IllegalArgumentException
-					| InvocationTargetException | NoSuchMethodException | SecurityException e) {
+					| InvocationTargetException | NoSuchMethodException e) {
 				log.error(e.getMessage());
 			}
 

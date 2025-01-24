@@ -1,7 +1,6 @@
 package com.logicaldoc.gui.frontend.client.impex.syndication;
 
 import java.util.Date;
-import java.util.Map;
 
 import com.logicaldoc.gui.common.client.beans.GUIFolder;
 import com.logicaldoc.gui.common.client.beans.GUISyndication;
@@ -13,9 +12,9 @@ import com.smartgwt.client.types.TitleOrientation;
 import com.smartgwt.client.widgets.form.DynamicForm;
 import com.smartgwt.client.widgets.form.fields.DateItem;
 import com.smartgwt.client.widgets.form.fields.FormItem;
-import com.smartgwt.client.widgets.form.fields.RadioGroupItem;
 import com.smartgwt.client.widgets.form.fields.SpinnerItem;
 import com.smartgwt.client.widgets.form.fields.TextItem;
+import com.smartgwt.client.widgets.form.fields.ToggleItem;
 import com.smartgwt.client.widgets.form.fields.events.ChangedHandler;
 import com.smartgwt.client.widgets.layout.HLayout;
 
@@ -26,6 +25,10 @@ import com.smartgwt.client.widgets.layout.HLayout;
  * @since 8.1.2
  */
 public class SyndicationStandardProperties extends SyndicationDetailsTab {
+	private static final String NODISPLAY = "nodisplay";
+
+	private static final String APIKEY = "apikey";
+
 	private static final String REPLICATECUSTOMID = "replicatecustomid";
 
 	private static final String TIMEOUT = "timeout";
@@ -96,13 +99,20 @@ public class SyndicationStandardProperties extends SyndicationDetailsTab {
 		 * and prevent it to auto-fill the username and password we really use.
 		 */
 		TextItem fakeUsername = ItemFactory.newTextItem("prevent_autofill", syndication.getUsername());
-		fakeUsername.setCellStyle("nodisplay");
+		fakeUsername.setCellStyle(NODISPLAY);
 		TextItem hiddenPassword = ItemFactory.newTextItem("password_hidden", syndication.getPassword());
-		hiddenPassword.setCellStyle("nodisplay");
+		hiddenPassword.setCellStyle(NODISPLAY);
 		hiddenPassword.addChangedHandler(changedHandler);
 		FormItem password = ItemFactory.newSafePasswordItem(PASSWORD, I18N.message(PASSWORD), syndication.getPassword(),
 				hiddenPassword, changedHandler);
 		password.addChangedHandler(changedHandler);
+
+		TextItem hiddenApiKey = ItemFactory.newTextItem("apikey_hidden", syndication.getApiKey());
+		hiddenApiKey.setCellStyle(NODISPLAY);
+		hiddenApiKey.addChangedHandler(changedHandler);
+		FormItem apiKey = ItemFactory.newSafePasswordItem(APIKEY, I18N.message(APIKEY), syndication.getApiKey(),
+				hiddenApiKey, changedHandler);
+		apiKey.addChangedHandler(changedHandler);
 
 		TextItem include = ItemFactory.newTextItem("include", syndication.getIncludes());
 		include.addChangedHandler(changedHandler);
@@ -149,51 +159,58 @@ public class SyndicationStandardProperties extends SyndicationDetailsTab {
 			}
 		});
 
-		RadioGroupItem replicateCustomId = ItemFactory.newBooleanSelector(REPLICATECUSTOMID, REPLICATECUSTOMID);
+		ToggleItem replicateCustomId = ItemFactory.newToggleItem(REPLICATECUSTOMID,
+				syndication.getReplicateCustomId() == 1);
 		replicateCustomId.setRequired(true);
-		replicateCustomId.setValue(syndication.getReplicateCustomId() == 1 ? "yes" : "no");
 		replicateCustomId.addChangedHandler(changedHandler);
 
 		form.setItems(name, sourceSelector, remoteUrl, targetPath, fakeUsername, hiddenPassword, username, password,
-				include, exclude, maxPacketSize, batch, timeout, startDate, replicateCustomId);
+				hiddenApiKey, apiKey, replicateCustomId, include, exclude, maxPacketSize, batch, timeout, startDate);
 
 		formsContainer.addMember(form);
 
 	}
 
-	@SuppressWarnings("unchecked")
 	boolean validate() {
-		Map<String, Object> values = form.getValues();
-		form.validate();
-		if (Boolean.FALSE.equals(form.hasErrors())) {
-			syndication.setName((String) values.get("name"));
-			syndication.setUsername((String) values.get(USERNAME));
-			syndication.setPassword((String) values.get(PASSWORD));
-			syndication.setTargetPath((String) values.get("targetpath"));
-			syndication.setUrl((String) values.get("url"));
+		if (form.validate()) {
+			syndication.setName(form.getValueAsString("name"));
+			syndication.setUsername(form.getValueAsString(USERNAME));
+			syndication.setTargetPath(form.getValueAsString("targetpath"));
+			syndication.setUrl(form.getValueAsString("url"));
 			syndication.setSourceFolder(sourceSelector.getFolder());
-			syndication.setIncludes((String) values.get("include"));
-			syndication.setExcludes((String) values.get("exclude"));
-			syndication.setPassword((String) values.get("password_hidden"));
+			syndication.setIncludes(form.getValueAsString("include"));
+			syndication.setExcludes(form.getValueAsString("exclude"));
+			syndication.setPassword(form.getValueAsString("password_hidden"));
+			syndication.setApiKey(form.getValueAsString("apikey_hidden"));
 
-			if (values.get(MAX_PACKET_SIZE) instanceof Long)
-				syndication.setMaxPacketSize((Long) values.get(MAX_PACKET_SIZE));
+			if (form.getValue(MAX_PACKET_SIZE) instanceof Long longVal)
+				syndication.setMaxPacketSize(longVal);
 			else
-				syndication.setMaxPacketSize(Long.parseLong(values.get(MAX_PACKET_SIZE).toString()));
+				syndication.setMaxPacketSize(Long.parseLong(form.getValueAsString(MAX_PACKET_SIZE)));
 
-			if (values.get(BATCH) instanceof Long)
-				syndication.setBatch((Long) values.get(BATCH));
+			if (form.getValue(BATCH) instanceof Long longVal)
+				syndication.setBatch(longVal);
 			else
-				syndication.setBatch(Long.parseLong(values.get(BATCH).toString()));
+				syndication.setBatch(Long.parseLong(form.getValueAsString(BATCH)));
 
-			if (values.get(TIMEOUT) instanceof Integer)
-				syndication.setTimeout((Integer) values.get(TIMEOUT));
+			if (form.getValue(TIMEOUT) instanceof Integer intVal)
+				syndication.setTimeout(intVal);
 			else
-				syndication.setTimeout(Integer.parseInt(values.get(TIMEOUT).toString()));
+				syndication.setTimeout(Integer.parseInt(form.getValueAsString(TIMEOUT)));
 
-			syndication.setStartDate((Date) values.get("startdate"));
-			syndication.setReplicateCustomId("yes".equals(values.get(REPLICATECUSTOMID)) ? 1 : 0);
+			syndication.setStartDate((Date) form.getValue("startdate"));
+			syndication.setReplicateCustomId(Boolean.parseBoolean(form.getValueAsString(REPLICATECUSTOMID)) ? 1 : 0);
 		}
 		return !form.hasErrors();
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

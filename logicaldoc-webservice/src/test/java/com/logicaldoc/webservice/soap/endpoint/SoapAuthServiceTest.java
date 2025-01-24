@@ -6,7 +6,6 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.SQLException;
 
@@ -38,7 +37,7 @@ public class SoapAuthServiceTest extends AbstractWebserviceTestCase {
 	private SoapAuthService soapAuthServiceImpl;
 
 	@Before
-	public void setUp() throws FileNotFoundException, IOException, SQLException, PluginException {
+	public void setUp() throws IOException, SQLException, PluginException {
 		super.setUp();
 
 		currentMessage = mock(Message.class, Answers.RETURNS_DEEP_STUBS);
@@ -54,17 +53,23 @@ public class SoapAuthServiceTest extends AbstractWebserviceTestCase {
 		String sid = soapAuthServiceImpl.login("author", "admin");
 		assertNotNull(sid);
 	}
+	
+	@Test
+	public void testLoginApiKey() {
+		String sid = soapAuthServiceImpl.loginApiKey(apiKey.getDecodedKey());
+		assertNotNull(sid);
+	}
 
 	@Test
 	public void testLogout() {
-		String sid = soapAuthServiceImpl.login("author", "admin");
+		String sid = soapAuthServiceImpl.loginApiKey(apiKey.getDecodedKey());
 		assertNotNull(sid);
 		soapAuthServiceImpl.logout(sid);
 	}
 
 	@Test
 	public void testValid() {
-		String sid = soapAuthServiceImpl.login("author", "admin");
+		String sid = soapAuthServiceImpl.loginApiKey(apiKey.getDecodedKey());
 		assertNotNull(sid);
 		boolean isValid = soapAuthServiceImpl.valid(sid);
 		assertTrue(isValid);
@@ -83,7 +88,7 @@ public class SoapAuthServiceTest extends AbstractWebserviceTestCase {
 
 	@Test
 	public void testRenew() throws InterruptedException {
-		String sid = soapAuthServiceImpl.login("author", "admin");
+		String sid = soapAuthServiceImpl.loginApiKey(apiKey.getDecodedKey());
 		System.err.println(sid);
 		assertNotNull(sid);
 		waiting();

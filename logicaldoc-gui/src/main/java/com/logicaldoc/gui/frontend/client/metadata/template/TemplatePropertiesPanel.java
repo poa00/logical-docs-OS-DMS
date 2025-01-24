@@ -6,12 +6,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIAttribute;
 import com.logicaldoc.gui.common.client.beans.GUIAttributeSet;
 import com.logicaldoc.gui.common.client.beans.GUITemplate;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.common.client.util.Util;
@@ -116,10 +115,10 @@ public class TemplatePropertiesPanel extends HLayout {
 			att.setLabel(rec.getAttributeAsString(LABEL));
 			att.setType(rec.getAttributeAsInt("type"));
 			att.setSet(rec.getAttributeAsString("set"));
-			att.setMandatory(rec.getAttributeAsBoolean(MANDATORY));
-			att.setHidden(rec.getAttributeAsBoolean(HIDDEN));
-			att.setReadonly(rec.getAttributeAsBoolean(READONLY));
-			att.setMultiple(rec.getAttributeAsBoolean(MULTIPLE));
+			att.setMandatory(Boolean.TRUE.equals(rec.getAttributeAsBoolean(MANDATORY)));
+			att.setHidden(Boolean.TRUE.equals(rec.getAttributeAsBoolean(HIDDEN)));
+			att.setReadonly(Boolean.TRUE.equals(rec.getAttributeAsBoolean(READONLY)));
+			att.setMultiple(Boolean.TRUE.equals(rec.getAttributeAsBoolean(MULTIPLE)));
 			att.setSetId(rec.getAttributeAsLong(SET_ID));
 			att.setEditor(rec.getAttributeAsInt(EDITOR));
 			att.setValidation(rec.getAttributeAsString(VALIDATION));
@@ -395,14 +394,7 @@ public class TemplatePropertiesPanel extends HLayout {
 		ListGridRecord[] selection = attributesList.getSelectedRecords();
 
 		LD.contactingServer();
-		AttributeSetService.Instance.get().getAttributeSets(new AsyncCallback<>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				LD.clearPrompt();
-				GuiLog.serverError(caught);
-			}
-
+		AttributeSetService.Instance.get().getAttributeSets(new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(List<GUIAttributeSet> sets) {
 				LD.clearPrompt();
@@ -445,14 +437,7 @@ public class TemplatePropertiesPanel extends HLayout {
 		ListGridRecord[] selection = attributesList.getSelectedRecords();
 
 		LD.contactingServer();
-		AttributeSetService.Instance.get().getAttributeSets(new AsyncCallback<>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				LD.clearPrompt();
-				GuiLog.serverError(caught);
-			}
-
+		AttributeSetService.Instance.get().getAttributeSets(new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(List<GUIAttributeSet> sets) {
 				LD.clearPrompt();
@@ -787,13 +772,7 @@ public class TemplatePropertiesPanel extends HLayout {
 
 		PickerIcon computeStat = new PickerIcon(PickerIconName.REFRESH, event -> {
 			event.getItem().setValue(I18N.message("computing") + "...");
-			TemplateService.Instance.get().countDocuments(template.getId(), new AsyncCallback<Long>() {
-
-				@Override
-				public void onFailure(Throwable caught) {
-					GuiLog.serverError(caught);
-				}
-
+			TemplateService.Instance.get().countDocuments(template.getId(), new DefaultAsyncCallback<>() {
 				@Override
 				public void onSuccess(Long count) {
 					event.getItem().setValue(Util.formatLong(count));
@@ -844,10 +823,10 @@ public class TemplatePropertiesPanel extends HLayout {
 					att.setSetId(Long.parseLong(rec.getAttributeAsString(SET_ID)));
 					att.setEditor(Integer.parseInt(rec.getAttributeAsString(EDITOR)));
 					att.setDependsOn(rec.getAttributeAsString(DEPENDSON));
-					att.setMandatory(rec.getAttributeAsBoolean(MANDATORY));
-					att.setHidden(rec.getAttributeAsBoolean(HIDDEN));
-					att.setReadonly(rec.getAttributeAsBoolean(READONLY));
-					att.setMultiple(rec.getAttributeAsBoolean(MULTIPLE));
+					att.setMandatory(Boolean.TRUE.equals(rec.getAttributeAsBoolean(MANDATORY)));
+					att.setHidden(Boolean.TRUE.equals(rec.getAttributeAsBoolean(HIDDEN)));
+					att.setReadonly(Boolean.TRUE.equals(rec.getAttributeAsBoolean(READONLY)));
+					att.setMultiple(Boolean.TRUE.equals(rec.getAttributeAsBoolean(MULTIPLE)));
 					att.setValidation(rec.getAttributeAsString(VALIDATION));
 					att.setInitialization(rec.getAttributeAsString(INITIALIZATION));
 					template.appendAttribute(att);
@@ -865,14 +844,7 @@ public class TemplatePropertiesPanel extends HLayout {
 	private void resetValidation() {
 		ListGridRecord[] selection = attributesList.getSelectedRecords();
 		LD.contactingServer();
-		AttributeSetService.Instance.get().getAttributeSets(new AsyncCallback<>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				LD.clearPrompt();
-				GuiLog.serverError(caught);
-			}
-
+		AttributeSetService.Instance.get().getAttributeSets(new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(List<GUIAttributeSet> sets) {
 				LD.clearPrompt();
@@ -900,5 +872,15 @@ public class TemplatePropertiesPanel extends HLayout {
 					changedHandler.onChanged(null);
 			}
 		});
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

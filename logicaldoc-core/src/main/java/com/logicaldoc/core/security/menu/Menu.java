@@ -48,6 +48,8 @@ public class Menu extends SecurablePersistentObject implements Comparable<Menu> 
 	public static final long RATING = 1610;
 
 	public static final long PARAMETERS = 100;
+	
+	public static final long AUDITING = 106;
 
 	public static final long ADMIN_SESSIONS = 71;
 
@@ -70,7 +72,7 @@ public class Menu extends SecurablePersistentObject implements Comparable<Menu> 
 	public static final int TYPE_CUSTOM_ACTION = 2;
 
 	public static final long DESTROY_DOCUMENTS = -9;
-	
+
 	private String name = "";
 
 	private long parentId = 0;
@@ -172,23 +174,39 @@ public class Menu extends SecurablePersistentObject implements Comparable<Menu> 
 	}
 
 	@Override
-	public int compareTo(Menu o) {
-		int comparison = Integer.compare(this.position, o.position);
+	public int compareTo(Menu other) {
+		if (this.equals(other))
+			return 0;
+
+		int comparison = Integer.compare(this.position, other.position);
 		if (comparison != 0)
 			return comparison;
-		return this.name.compareTo(o.name);
+		return this.name.compareTo(other.name);
+	}
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = super.hashCode();
+		result = prime * result + ((name == null) ? 0 : name.hashCode());
+		result = prime * result + (int) (parentId ^ (parentId >>> 32));
+		return result;
 	}
 
 	@Override
 	public boolean equals(Object obj) {
-		if (obj instanceof Menu other)
-			return other.getId() == this.getId();
-		else
+		if (this == obj)
+			return true;
+		if (!super.equals(obj))
 			return false;
-	}
-	
-	@Override
-	public int hashCode() {
-		return super.hashCode();
+		if (getClass() != obj.getClass())
+			return false;
+		Menu other = (Menu) obj;
+		if (name == null) {
+			if (other.name != null)
+				return false;
+		} else if (!name.equals(other.name))
+			return false;
+		return parentId == other.parentId;
 	}
 }

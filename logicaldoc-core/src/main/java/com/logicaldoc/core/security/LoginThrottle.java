@@ -13,6 +13,7 @@ import org.slf4j.LoggerFactory;
 
 import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.automation.Automation;
+import com.logicaldoc.core.automation.AutomationException;
 import com.logicaldoc.core.communication.EMail;
 import com.logicaldoc.core.communication.EMailSender;
 import com.logicaldoc.core.communication.Message;
@@ -21,6 +22,7 @@ import com.logicaldoc.core.communication.MessageTemplateDAO;
 import com.logicaldoc.core.communication.Recipient;
 import com.logicaldoc.core.communication.SystemMessage;
 import com.logicaldoc.core.communication.SystemMessageDAO;
+import com.logicaldoc.core.security.authentication.ApiKeyBlockedException;
 import com.logicaldoc.core.security.authentication.AuthenticationException;
 import com.logicaldoc.core.security.authentication.IPBlockedException;
 import com.logicaldoc.core.security.authentication.UsernameBlockedException;
@@ -44,6 +46,8 @@ import com.logicaldoc.util.config.ContextProperties;
 public class LoginThrottle {
 	private static final String THROTTLE_ENABLED = "throttle.enabled";
 
+	public static final String LOGINFAIL_APIKEY = "loginfail-apikey-";
+
 	public static final String LOGINFAIL_IP = "loginfail-ip-";
 
 	public static final String LOGINFAIL_USERNAME = "loginfail-username-";
@@ -61,7 +65,7 @@ public class LoginThrottle {
 	 */
 	public static void clearFailures(String username, String ip) {
 		if (Context.get().getProperties().getBoolean(THROTTLE_ENABLED)) {
-			SequenceDAO sDao = (SequenceDAO) Context.get().getBean(SequenceDAO.class);
+			SequenceDAO sDao = Context.get(SequenceDAO.class);
 			if (StringUtils.isNotEmpty(username))
 				try {
 					sDao.delete(LOGINFAIL_USERNAME + username, 0L, Tenant.SYSTEM_ID);
@@ -81,25 +85,27 @@ public class LoginThrottle {
 	 * Saves the login failure in the database
 	 * 
 	 * @param username the username
+	 * @param apiKey the API Key
 	 * @param client the client address from which the login intent comes from
 	 * @param exception the authentication exception
 	 */
-	public static void recordFailure(String username, Client client, AuthenticationException exception) {
+	public static void recordFailure(String username, String apiKey, Client client, AuthenticationException exception) {
 		if (exception == null || !exception.mustRecordFailure())
 			return;
 
 		// Update the failed login counters
 		if (Context.get().getProperties().getBoolean(THROTTLE_ENABLED)) {
-			SequenceDAO sDao = (SequenceDAO) Context.get().getBean(SequenceDAO.class);
-			if (StringUtils.isNotEmpty(username)) {
+			SequenceDAO sDao = Context.get(SequenceDAO.class);
+			if (StringUtils.isNotEmpty(username))
 				sDao.next(LOGINFAIL_USERNAME + username, 0L, Tenant.SYSTEM_ID);
-			}
 			if (StringUtils.isNotEmpty(client.getAddress()))
 				sDao.next(LOGINFAIL_IP + client.getAddress(), 0L, Tenant.SYSTEM_ID);
+			if (StringUtils.isNotEmpty(apiKey))
+				sDao.next(LOGINFAIL_APIKEY + apiKey, 0L, Tenant.SYSTEM_ID);
 		}
 
 		// Record the failed login attempt
-		UserDAO uDao = (UserDAO) Context.get().getBean(UserDAO.class);
+		UserDAO uDao = Context.get(UserDAO.class);
 		try {
 			User user = uDao.findByUsername(username);
 			if (user == null) {
@@ -107,7 +113,7 @@ public class LoginThrottle {
 				user.setUsername(username);
 				user.setName(username);
 			}
-			UserHistoryDAO dao = (UserHistoryDAO) Context.get().getBean(UserHistoryDAO.class);
+			UserHistoryDAO dao = Context.get(UserHistoryDAO.class);
 			dao.createUserHistory(user, UserEvent.LOGIN_FAILED.toString(), exception.getMessage(), null, client);
 		} catch (PersistenceException e) {
 			log.warn(e.getMessage(), e);
@@ -118,11 +124,12 @@ public class LoginThrottle {
 	 * Performs anti brute force attack checks
 	 * 
 	 * @param username the username
+	 * @param apikey the API Key
 	 * @param ip the IP address from which the login intent comes from
 	 * 
 	 * @throws AuthenticationException if the authentication fails
 	 */
-	public static void checkLoginThrottle(String username, String ip) throws AuthenticationException {
+	public static void checkLoginThrottle(String username, String apikey, String ip) throws AuthenticationException {
 		if (!Context.get().getProperties().getBoolean(THROTTLE_ENABLED))
 			return;
 
@@ -136,10 +143,13 @@ public class LoginThrottle {
 
 		// Check if the IP is temporarily blocked
 		checkIp(ip);
+
+		// Check if the IP is temporarily blocked
+		checkApikey(apikey);
 	}
 
 	private static void checkIp(String ip) throws IPBlockedException {
-		SequenceDAO sDao = (SequenceDAO) Context.get().getBean(SequenceDAO.class);
+		SequenceDAO sDao = Context.get(SequenceDAO.class);
 		Calendar cal = Calendar.getInstance();
 
 		ContextProperties config = Context.get().getProperties();
@@ -168,7 +178,7 @@ public class LoginThrottle {
 	}
 
 	private static void checkUsername(String username) throws UsernameBlockedException {
-		SequenceDAO sDao = (SequenceDAO) Context.get().getBean(SequenceDAO.class);
+		SequenceDAO sDao = Context.get(SequenceDAO.class);
 		Calendar cal = Calendar.getInstance();
 
 		ContextProperties config = Context.get().getProperties();
@@ -199,10 +209,42 @@ public class LoginThrottle {
 		}
 	}
 
+	private static void checkApikey(String apikey) throws ApiKeyBlockedException {
+		if (StringUtils.isEmpty(apikey))
+			return;
+
+		SequenceDAO sDao = Context.get(SequenceDAO.class);
+		Calendar cal = Calendar.getInstance();
+
+		ContextProperties config = Context.get().getProperties();
+		int wait = config.getInt("throttle.apikey.wait", 0);
+		int maxTrials = config.getInt("throttle.apikey.max", 0);
+
+		if (maxTrials > 0 && wait > 0) {
+			String counterName = LOGINFAIL_APIKEY + apikey;
+			Sequence seq = sDao.findByAlternateKey(counterName, 0L, Tenant.SYSTEM_ID);
+			if (seq != null) {
+				long count = seq.getValue();
+				if (count >= maxTrials) {
+					cal.add(Calendar.MINUTE, -wait);
+					Date oldestDate = cal.getTime();
+					if (oldestDate.before(seq.getLastModified())) {
+						log.warn("Possible brute force attack detected for ApiKey {}", apikey);
+						notifyBruteForceAttack(null, apikey);
+						throw new ApiKeyBlockedException();
+					} else {
+						log.info("Login block for ApiKey {} expired", apikey);
+						deleteSequence(seq);
+					}
+				}
+			}
+		}
+	}
+
 	protected static void disableUser(String username) {
 		if (Context.get().getProperties().getBoolean("throttle.username.disableuser", false)) {
 			try {
-				UserDAO userDao = (UserDAO) Context.get().getBean(UserDAO.class);
+				UserDAO userDao = Context.get(UserDAO.class);
 				User user = userDao.findByUsername(username);
 				if (user != null && user.getEnabled() == 1) {
 					user.setEnabled(0);
@@ -234,8 +276,7 @@ public class LoginThrottle {
 					dictionary.put("date", date);
 					dictionary.put(Automation.LOCALE, user.getLocale());
 
-					MessageTemplateDAO templateDAO = (MessageTemplateDAO) Context.get()
-							.getBean(MessageTemplateDAO.class);
+					MessageTemplateDAO templateDAO = Context.get(MessageTemplateDAO.class);
 					MessageTemplate template = templateDAO.findByNameAndLanguage("bfa.alert", user.getLanguage(),
 							Tenant.DEFAULT_ID);
 					if (template == null)
@@ -262,7 +303,7 @@ public class LoginThrottle {
 					recipient.setType(Recipient.TYPE_SYSTEM);
 					message.getRecipients().add(recipient);
 
-					SystemMessageDAO messageDAO = (SystemMessageDAO) Context.get().getBean(SystemMessageDAO.class);
+					SystemMessageDAO messageDAO = Context.get(SystemMessageDAO.class);
 					messageDAO.store(message);
 
 					/*
@@ -281,10 +322,10 @@ public class LoginThrottle {
 					recipient.setMode(Recipient.MODE_EMAIL_TO);
 					email.getRecipients().add(recipient);
 
-					EMailSender sender = (EMailSender) Context.get().getBean(EMailSender.class);
+					EMailSender sender = Context.get(EMailSender.class);
 					sender.sendAsync(email);
 				}
-			} catch (PersistenceException e) {
+			} catch (PersistenceException | AutomationException e) {
 				log.warn(e.getMessage(), e);
 			}
 		}, "BruteForceAttack", 500);
@@ -294,7 +335,7 @@ public class LoginThrottle {
 		List<User> recipients = new ArrayList<>();
 		String setting = Context.get().getProperties().getProperty("throttle.alert.recipients", "");
 		if (StringUtils.isNotEmpty(setting)) {
-			UserDAO uDao = (UserDAO) Context.get().getBean(UserDAO.class);
+			UserDAO uDao = Context.get(UserDAO.class);
 			String[] usernames = setting.split(",");
 			for (String username : usernames) {
 				User user = uDao.findByUsername(username);
@@ -309,7 +350,7 @@ public class LoginThrottle {
 
 	private static void deleteSequence(Sequence seq) {
 		try {
-			SequenceDAO sDao = (SequenceDAO) Context.get().getBean(SequenceDAO.class);
+			SequenceDAO sDao = Context.get(SequenceDAO.class);
 			sDao.delete(seq.getId());
 		} catch (PersistenceException e) {
 			log.warn(e.getMessage(), e);

@@ -1,8 +1,14 @@
 package com.logicaldoc.gui.frontend.client.metadata.zonalocr;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.data.DocumentsDS;
 import com.logicaldoc.gui.common.client.data.DocumentsDSParameters;
+import com.logicaldoc.gui.common.client.grid.ColoredListGridField;
+import com.logicaldoc.gui.common.client.grid.DateListGridField;
+import com.logicaldoc.gui.common.client.grid.FileNameListGridField;
+import com.logicaldoc.gui.common.client.grid.FileSizeListGridField;
+import com.logicaldoc.gui.common.client.grid.RefreshableListGrid;
+import com.logicaldoc.gui.common.client.grid.VersionListGridField;
 import com.logicaldoc.gui.common.client.i18n.I18N;
 import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.GridUtil;
@@ -10,12 +16,6 @@ import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.common.client.util.Util;
 import com.logicaldoc.gui.common.client.widgets.InfoPanel;
-import com.logicaldoc.gui.common.client.widgets.grid.ColoredListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.FileNameListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.FileSizeListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.RefreshableListGrid;
-import com.logicaldoc.gui.common.client.widgets.grid.VersionListGridField;
 import com.logicaldoc.gui.frontend.client.document.DocumentsPanel;
 import com.logicaldoc.gui.frontend.client.services.ZonalOCRService;
 import com.smartgwt.client.types.Alignment;
@@ -84,13 +84,7 @@ public class ZonalOCRQueuePanel extends VLayout {
 		reschedule.addClickHandler(event -> LD.ask(I18N.message("rescheduleallprocessing"),
 				I18N.message("rescheduleallprocessingask"), confirm -> {
 					if (Boolean.TRUE.equals(confirm))
-						ZonalOCRService.Instance.get().rescheduleAll(new AsyncCallback<>() {
-
-							@Override
-							public void onFailure(Throwable caught) {
-								GuiLog.serverError(caught);
-							}
-
+						ZonalOCRService.Instance.get().rescheduleAll(new DefaultAsyncCallback<>() {
 							@Override
 							public void onSuccess(Void ret) {
 								GuiLog.info(I18N.message("docsrescheduledprocessing"), null);
@@ -218,12 +212,7 @@ public class ZonalOCRQueuePanel extends VLayout {
 		markUnprocessable.addClickHandler(event -> {
 			if (selection == null || selection.length < 1)
 				return;
-			ZonalOCRService.Instance.get().markUnprocessable(GridUtil.getIds(selection), new AsyncCallback<>() {
-				@Override
-				public void onFailure(Throwable caught) {
-					GuiLog.serverError(caught);
-				}
-
+			ZonalOCRService.Instance.get().markUnprocessable(GridUtil.getIds(selection), new DefaultAsyncCallback<>() {
 				@Override
 				public void onSuccess(Void result) {
 					for (ListGridRecord rec : selection) {
@@ -245,5 +234,15 @@ public class ZonalOCRQueuePanel extends VLayout {
 
 		contextMenu.setItems(markUnprocessable, openInFolder);
 		contextMenu.showContextMenu();
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

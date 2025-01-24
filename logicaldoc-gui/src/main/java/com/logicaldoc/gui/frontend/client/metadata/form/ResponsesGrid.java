@@ -4,21 +4,22 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIAttribute;
 import com.logicaldoc.gui.common.client.beans.GUIDocument;
 import com.logicaldoc.gui.common.client.beans.GUIForm;
+import com.logicaldoc.gui.common.client.grid.DateListGridField;
+import com.logicaldoc.gui.common.client.grid.FileNameListGridField;
+import com.logicaldoc.gui.common.client.grid.FileSizeListGridField;
+import com.logicaldoc.gui.common.client.grid.IdListGridField;
+import com.logicaldoc.gui.common.client.grid.RefreshableListGrid;
+import com.logicaldoc.gui.common.client.grid.UserListGridField;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.FileNameListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.FileSizeListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.RefreshableListGrid;
-import com.logicaldoc.gui.common.client.widgets.grid.UserListGridField;
-import com.logicaldoc.gui.common.client.widgets.preview.PreviewPopup;
+import com.logicaldoc.gui.common.client.preview.PreviewPopup;
 import com.logicaldoc.gui.frontend.client.document.DocumentsPanel;
 import com.logicaldoc.gui.frontend.client.document.grid.DocumentGridUtil;
+import com.logicaldoc.gui.frontend.client.menu.QuickSearchTray;
 import com.logicaldoc.gui.frontend.client.services.DocumentService;
 import com.smartgwt.client.types.Alignment;
 import com.smartgwt.client.types.DateDisplayFormat;
@@ -69,8 +70,7 @@ public class ResponsesGrid extends RefreshableListGrid {
 		filename.setHidden(true);
 		filename.setCanFilter(true);
 
-		ListGridField id = new ListGridField("id", I18N.getAttributeLabel("id"), 60);
-		id.setHidden(true);
+		ListGridField id = new IdListGridField(I18N.getAttributeLabel("id"));
 
 		ListGridField size = new FileSizeListGridField("size", I18N.getAttributeLabel("size"));
 		size.setHidden(true);
@@ -132,7 +132,7 @@ public class ResponsesGrid extends RefreshableListGrid {
 							Session.get().getInfo().getAttributeLabel(name));
 					ext.setTitle(Session.get().getInfo().getAttributeLabel(name));
 				}
-				
+
 				if (!attDef.isSection()) {
 					ext.setCanFilter(true);
 					ext.setCanSort(true);
@@ -195,13 +195,7 @@ public class ResponsesGrid extends RefreshableListGrid {
 		MenuItem delete = new MenuItem();
 		delete.setTitle(I18N.message("ddelete"));
 		delete.addClickHandler((MenuItemClickEvent event) -> DocumentService.Instance.get()
-				.delete(DocumentGridUtil.getIds(selection), new AsyncCallback<>() {
-
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				.delete(DocumentGridUtil.getIds(selection), new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Void arg0) {
 						refresh(getDataSource());
@@ -220,5 +214,18 @@ public class ResponsesGrid extends RefreshableListGrid {
 	@Override
 	public DateDisplayFormat getDatetimeFormatter() {
 		return I18N.getDateDisplayFormat(true);
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (obj instanceof QuickSearchTray)
+			return super.equals(obj);
+		else
+			return false;
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.google.gwt.core.client.GWT;
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIAccessControlEntry;
 import com.logicaldoc.gui.common.client.beans.GUIDocument;
@@ -12,14 +12,13 @@ import com.logicaldoc.gui.common.client.beans.GUIFolder;
 import com.logicaldoc.gui.common.client.controllers.DocumentController;
 import com.logicaldoc.gui.common.client.controllers.FolderController;
 import com.logicaldoc.gui.common.client.data.LinksDS;
+import com.logicaldoc.gui.common.client.grid.ColoredListGridField;
+import com.logicaldoc.gui.common.client.grid.FileNameListGridField;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
+import com.logicaldoc.gui.common.client.preview.PreviewPopup;
 import com.logicaldoc.gui.common.client.util.DocUtil;
 import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.common.client.util.Util;
-import com.logicaldoc.gui.common.client.widgets.grid.ColoredListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.FileNameListGridField;
-import com.logicaldoc.gui.common.client.widgets.preview.PreviewPopup;
 import com.logicaldoc.gui.frontend.client.services.DocumentService;
 import com.logicaldoc.gui.frontend.client.services.FolderService;
 import com.smartgwt.client.data.Record;
@@ -87,13 +86,7 @@ public class LinksPanel extends DocumentDetailTab {
 			final ListGridRecord rec = evnt.getRecord();
 
 			FolderService.Instance.get().getFolder(rec.getAttributeAsLong("folderId"), false, false, false,
-					new AsyncCallback<>() {
-
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
-						}
-
+					new DefaultAsyncCallback<>() {
 						@Override
 						public void onSuccess(GUIFolder fld) {
 							if (fld.isDownload()
@@ -146,13 +139,7 @@ public class LinksPanel extends DocumentDetailTab {
 			if (document.getFolder().getId() == folderId)
 				folderId = selection[0].getAttributeAsLong("folderId2");
 
-			FolderService.Instance.get().getFolder(folderId, false, false, false, new AsyncCallback<>() {
-
-				@Override
-				public void onFailure(Throwable caught) {
-					GuiLog.serverError(caught);
-				}
-
+			FolderService.Instance.get().getFolder(folderId, false, false, false, new DefaultAsyncCallback<>() {
 				@Override
 				public void onSuccess(GUIFolder fld) {
 					if (fld == null)
@@ -178,12 +165,7 @@ public class LinksPanel extends DocumentDetailTab {
 
 		LD.ask(I18N.message("question"), I18N.message("confirmdelete"), answer -> {
 			if (Boolean.TRUE.equals(answer)) {
-				DocumentService.Instance.get().deleteLinks(selectedIds, new AsyncCallback<>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				DocumentService.Instance.get().deleteLinks(selectedIds, new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Void result) {
 						TreeNode parent = treeGrid.getTree().getParent(treeGrid.getSelectedRecord());
@@ -232,13 +214,7 @@ public class LinksPanel extends DocumentDetailTab {
 				} else {
 					long id = Long.parseLong(event.getOldValues().getAttribute("linkId"));
 					final String typ = (String) event.getNewValues().get("type");
-					DocumentService.Instance.get().updateLink(id, typ, new AsyncCallback<>() {
-
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
-						}
-
+					DocumentService.Instance.get().updateLink(id, typ, new DefaultAsyncCallback<>() {
 						@Override
 						public void onSuccess(Void result) {
 							treeGrid.getSelectedRecord().setAttribute("type", typ);
@@ -253,13 +229,7 @@ public class LinksPanel extends DocumentDetailTab {
 	protected void onOpenInFolder(ListGridRecord rec) {
 		String documentId = rec.getAttributeAsString(DOCUMENT_ID);
 		long docId = Long.parseLong(documentId.substring(documentId.lastIndexOf('-') + 1));
-		DocumentService.Instance.get().getById(docId, new AsyncCallback<>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught.getMessage(), caught);
-			}
-
+		DocumentService.Instance.get().getById(docId, new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(GUIDocument document) {
 				DocumentsPanel.get().openInFolder(document.getFolder().getId(), document.getId());
@@ -302,18 +272,22 @@ public class LinksPanel extends DocumentDetailTab {
 	protected void onPreview(ListGridRecord rec) {
 		String documentId = rec.getAttributeAsString(DOCUMENT_ID);
 		long docId = Long.parseLong(documentId.substring(documentId.lastIndexOf('-') + 1));
-		DocumentService.Instance.get().getById(docId, new AsyncCallback<>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught.getMessage(), caught);
-			}
-
+		DocumentService.Instance.get().getById(docId, new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(GUIDocument document) {
 				PreviewPopup iv = new PreviewPopup(document);
 				iv.show();
 			}
 		});
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+	
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

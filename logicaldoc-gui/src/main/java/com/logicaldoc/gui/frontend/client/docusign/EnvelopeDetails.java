@@ -5,11 +5,10 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIDocuSignSettings;
 import com.logicaldoc.gui.common.client.beans.GUIDocument;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.frontend.client.document.DocumentsPanel;
@@ -120,14 +119,7 @@ public class EnvelopeDetails extends Window {
 			docIds.add(document.getId());
 
 		LD.contactingServer();
-		DocuSignService.Instance.get().validateEnvelope(docIds, new AsyncCallback<>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				LD.clearPrompt();
-				GuiLog.serverError(caught);
-			}
-
+		DocuSignService.Instance.get().validateEnvelope(docIds, new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(Collection<GUIDocument> docs) {
 				LD.clearPrompt();
@@ -148,14 +140,7 @@ public class EnvelopeDetails extends Window {
 					settings.setSubject(form.getValueAsString("subject"));
 
 					LD.contactingServer();
-					DocuSignService.Instance.get().sendEnvelope(settings, new AsyncCallback<>() {
-
-						@Override
-						public void onFailure(Throwable caught) {
-							LD.clearPrompt();
-							GuiLog.serverError(caught);
-						}
-
+					DocuSignService.Instance.get().sendEnvelope(settings, new DefaultAsyncCallback<>() {
 						@Override
 						public void onSuccess(String envelopeId) {
 							LD.clearPrompt();
@@ -167,5 +152,15 @@ public class EnvelopeDetails extends Window {
 
 			}
 		});
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

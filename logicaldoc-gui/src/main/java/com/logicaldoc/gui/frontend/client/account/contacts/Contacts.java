@@ -3,12 +3,12 @@ package com.logicaldoc.gui.frontend.client.account.contacts;
 import java.util.Arrays;
 import java.util.Map;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Feature;
 import com.logicaldoc.gui.common.client.beans.GUIContact;
 import com.logicaldoc.gui.common.client.data.ContactsDS;
+import com.logicaldoc.gui.common.client.grid.IdListGridField;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.GridUtil;
 import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.common.client.util.ValuesCallback;
@@ -85,12 +85,7 @@ public class Contacts extends com.smartgwt.client.widgets.Window {
 		importCsv.setTitle(I18N.message("iimport"));
 		importCsv.setTooltip(I18N.message("importfromcsv"));
 		importCsv.addClickHandler(
-				event -> DocumentService.Instance.get().cleanUploadedFileFolder(new AsyncCallback<>() {
-
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
+				click -> DocumentService.Instance.get().cleanUploadedFileFolder(new DefaultAsyncCallback<>() {
 
 					@Override
 					public void onSuccess(Void arg0) {
@@ -123,8 +118,7 @@ public class Contacts extends com.smartgwt.client.widgets.Window {
 	}
 
 	private void prepareGrid() {
-		ListGridField id = new ListGridField("id", 50);
-		id.setHidden(true);
+		ListGridField id = new IdListGridField();
 
 		ListGridField email = new ListGridField(EMAIL, I18N.message(EMAIL));
 		email.setWidth("*");
@@ -197,12 +191,7 @@ public class Contacts extends com.smartgwt.client.widgets.Window {
 		delete.setTitle(I18N.message("ddelete"));
 		delete.addClickHandler(event -> LD.ask(I18N.message("question"), I18N.message("confirmdelete"), confirm -> {
 			if (Boolean.TRUE.equals(confirm))
-				ContactService.Instance.get().delete(GridUtil.getIds(selection), new AsyncCallback<>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				ContactService.Instance.get().delete(GridUtil.getIds(selection), new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Void result) {
 						list.removeSelectedData();
@@ -238,12 +227,12 @@ public class Contacts extends com.smartgwt.client.widgets.Window {
 			public void execute(Map<String, Object> values) {
 				LD.contactingServer();
 				ContactService.Instance.get().shareContacts(GridUtil.getIds(list.getSelectedRecords()),
-						usersSelector.getUserIds(), groupsSelector.getGroupIds(), new AsyncCallback<>() {
+						usersSelector.getUserIds(), groupsSelector.getGroupIds(), new DefaultAsyncCallback<>() {
 
 							@Override
 							public void onFailure(Throwable caught) {
 								LD.clearPrompt();
-								GuiLog.serverError(caught);
+								super.onFailure(caught);
 							}
 
 							@Override
@@ -257,24 +246,28 @@ public class Contacts extends com.smartgwt.client.widgets.Window {
 
 	private void onEdit() {
 		final ListGridRecord[] selection = list.getSelectedRecords();
-		ContactService.Instance.get().load(Long.parseLong(selection[0].getAttribute("id")),
-				new AsyncCallback<>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
-					@Override
-					public void onSuccess(GUIContact result) {
-						if (result != null) {
-							new ContactDetails(result, Contacts.this).show();
-						}
-					}
-				});
+		ContactService.Instance.get().load(Long.parseLong(selection[0].getAttribute("id")), new DefaultAsyncCallback<>() {
+			@Override
+			public void onSuccess(GUIContact result) {
+				if (result != null) {
+					new ContactDetails(result, Contacts.this).show();
+				}
+			}
+		});
 	}
 
 	@Override
 	protected void onDraw() {
 		GridUtil.scrollGrid(list, null);
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+	
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

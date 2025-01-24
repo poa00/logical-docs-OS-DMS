@@ -3,6 +3,7 @@ package com.logicaldoc.gui.frontend.client.services;
 import java.util.List;
 
 import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.beans.GUIAccessControlEntry;
 import com.logicaldoc.gui.common.client.beans.GUIFolder;
 import com.logicaldoc.gui.common.client.beans.GUIValue;
 
@@ -57,9 +58,11 @@ public interface FolderServiceAsync {
 
 	void applyOCR(long parentId, AsyncCallback<Void> callback);
 
-	void applyStorage(long parentId, AsyncCallback<Void> callback);
+	void applyStore(long parentId, AsyncCallback<Void> callback);
 
 	void merge(List<Long> folderIds, long targetId, AsyncCallback<Void> callback);
 
 	void readImage(AsyncCallback<String> callback);
+	
+	void getAllowedPermissions(List<Long> folderIds, AsyncCallback<GUIAccessControlEntry> callback);
 }

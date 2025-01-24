@@ -60,13 +60,11 @@ public class LoginServiceImpl extends RemoteServiceServlet implements LoginServi
 	@Override
 	public GUIUser getUser(String username) {
 		try {
-			UserDAO userDao = (UserDAO) Context.get().getBean(UserDAO.class);
-			UserHistoryDAO userHistoryDao = (UserHistoryDAO) Context.get().getBean(UserHistoryDAO.class);
-			TenantDAO tenantDao = (TenantDAO) Context.get().getBean(TenantDAO.class);
+			UserDAO userDao = Context.get(UserDAO.class);
+			UserHistoryDAO userHistoryDao = Context.get(UserHistoryDAO.class);
+			TenantDAO tenantDao = Context.get(TenantDAO.class);
 
-			User user = userDao.findByUsername(username);
-			if (user == null)
-				return null;
+			User user = pickUser(username);
 
 			// Get just a few informations needed by the login
 			GUIUser usr = new GUIUser();
@@ -120,7 +118,7 @@ public class LoginServiceImpl extends RemoteServiceServlet implements LoginServi
 			ticket.setExpired(cal.getTime());
 
 			// Store the ticket
-			TicketDAO ticketDao = (TicketDAO) Context.get().getBean(TicketDAO.class);
+			TicketDAO ticketDao = Context.get(TicketDAO.class);
 			ticketDao.store(ticket);
 
 			// Try to clean the DB from old tickets
@@ -163,7 +161,7 @@ public class LoginServiceImpl extends RemoteServiceServlet implements LoginServi
 	}
 
 	private User pickUser(String username) throws ServerException {
-		UserDAO userDao = (UserDAO) Context.get().getBean(UserDAO.class);
+		UserDAO userDao = Context.get(UserDAO.class);
 		User user;
 		try {
 			user = userDao.getUser(username);
@@ -177,20 +175,20 @@ public class LoginServiceImpl extends RemoteServiceServlet implements LoginServi
 
 	@Override
 	public boolean isSecretKeyRequired(String username, String deviceId) throws ServerException {
-		UserDAO userDao = (UserDAO) Context.get().getBean(UserDAO.class);
+		UserDAO userDao = Context.get(UserDAO.class);
 		User user;
 		try {
 			user = pickUser(username);
-		} catch (ServerException e) {
+			userDao.initialize(user);
+		} catch (PersistenceException | ServerException e) {
+			log.warn(e.getMessage(), e);
 			return false;
 		}
-
-		userDao.initialize(user);
 
 		if (StringUtils.isEmpty(user.getSecondFactor()))
 			return false;
 
-		TenantDAO tDao = (TenantDAO) Context.get().getBean(TenantDAO.class);
+		TenantDAO tDao = Context.get(TenantDAO.class);
 		String tenant = Tenant.SYSTEM_NAME;
 		try {
 			tenant = tDao.getTenantName(user.getTenantId());
@@ -207,9 +205,9 @@ public class LoginServiceImpl extends RemoteServiceServlet implements LoginServi
 			HttpServletRequest request = getThreadLocalRequest();
 			request.setAttribute(Device.PARAM_DEVICE, deviceId);
 
-			DeviceDAO deviceDao = (DeviceDAO) Context.get().getBean(DeviceDAO.class);
+			DeviceDAO deviceDao = Context.get(DeviceDAO.class);
 			try {
-				return !deviceDao.isTrustedDevice(username, request);
+				return !deviceDao.isTrustedDevice(user.getUsername(), request);
 			} catch (PersistenceException e) {
 				log.warn(e.getMessage(), e);
 				return false;
@@ -228,7 +226,7 @@ public class LoginServiceImpl extends RemoteServiceServlet implements LoginServi
 			return "";
 		}
 
-		TenantDAO tDao = (TenantDAO) Context.get().getBean(TenantDAO.class);
+		TenantDAO tDao = Context.get(TenantDAO.class);
 		String tenant = Tenant.DEFAULT_NAME;
 		try {
 			tenant = tDao.getTenantName(user.getTenantId());

@@ -20,6 +20,7 @@ import com.logicaldoc.core.security.Session;
 import com.logicaldoc.core.security.user.User;
 import com.logicaldoc.core.util.IconSelector;
 import com.logicaldoc.util.io.FileUtil;
+import com.logicaldoc.util.security.StringEncrypter.EncryptionException;
 
 /**
  * This servlet is responsible for retrieving Dropbox entries.
@@ -76,20 +77,18 @@ public class DropboxDataServlet extends HttpServlet {
 	private void printEntries(Dropbox dbox, boolean folders, String parent, PrintWriter writer) throws DbxException {
 		Metadata ent = dbox.get(parent);
 		if ((ent == null && "/".equals(parent)) || ent instanceof FolderMetadata) {
-			printEntries(dbox, folders, parent, writer);
-		}
-
-		List<Metadata> entries = dbox.list(parent);
-		for (Metadata entry : entries) {
-			if (folders && entry instanceof FileMetadata)
-				continue;
-			writer.print("<entry>");
-			writer.print("<path><![CDATA[" + entry.getPathDisplay() + "]]></path>");
-			writer.print("<parent><![CDATA[" + parent + "]]></parent>");
-			writer.print("<name><![CDATA[" + entry.getName() + "]]></name>");
-			writer.print("<type>" + ((entry instanceof FileMetadata) ? "file" : "folder") + "</type>");
-			printIcon(writer, entry);
-			writer.print("</entry>");
+			List<Metadata> entries = dbox.list(parent);
+			for (Metadata entry : entries) {
+				if (folders && entry instanceof FileMetadata)
+					continue;
+				writer.print("<entry>");
+				writer.print("<path><![CDATA[" + entry.getPathDisplay() + "]]></path>");
+				writer.print("<parent><![CDATA[" + parent + "]]></parent>");
+				writer.print("<name><![CDATA[" + entry.getName() + "]]></name>");
+				writer.print("<type>" + ((entry instanceof FileMetadata) ? "file" : "folder") + "</type>");
+				printIcon(writer, entry);
+				writer.print("</entry>");
+			}
 		}
 	}
 
@@ -120,9 +119,9 @@ public class DropboxDataServlet extends HttpServlet {
 		}
 	}
 
-	private Dropbox connectDropBox(User user) throws IOException, PersistenceException {
-		Dropbox dbox = new Dropbox();
-		boolean connected = dbox.login(DropboxServiceImpl.loadAccessToken(user));
+	private Dropbox connectDropBox(User user) throws IOException, PersistenceException, EncryptionException {
+		Dropbox dbox = new Dropbox(user.getId());
+		boolean connected = dbox.login();
 		if (!connected)
 			throw new IOException("Unable to connect to Dropbox");
 		return dbox;

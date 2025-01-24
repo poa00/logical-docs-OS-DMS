@@ -2,18 +2,17 @@ package com.logicaldoc.gui.frontend.client.document;
 
 import java.util.Arrays;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.logicaldoc.gui.common.client.Constants;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIDocument;
 import com.logicaldoc.gui.common.client.data.SubscriptionsDS;
+import com.logicaldoc.gui.common.client.grid.DateListGridField;
+import com.logicaldoc.gui.common.client.grid.EventsListGridField;
+import com.logicaldoc.gui.common.client.grid.UserListGridField;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.GridUtil;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.LD;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.EventsListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.UserListGridField;
 import com.logicaldoc.gui.frontend.client.services.AuditService;
 import com.logicaldoc.gui.frontend.client.subscription.SubscriptionDialog;
 import com.smartgwt.client.types.SelectionStyle;
@@ -104,13 +103,7 @@ public class DocumentSubscriptionsPanel extends DocumentDetailTab {
 				return;
 			long groupId = Long.parseLong(selectedRecord.getAttributeAsString("id"));
 			AuditService.Instance.get().subscribeDocuments(Arrays.asList(document.getId()),
-					Constants.getAuditDefaultEvents(), null, groupId, new AsyncCallback<>() {
-
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
-						}
-
+					Constants.getAuditDefaultEvents(), null, groupId, new DefaultAsyncCallback<>() {
 						@Override
 						public void onSuccess(Void arg0) {
 							refreshList();
@@ -128,13 +121,7 @@ public class DocumentSubscriptionsPanel extends DocumentDetailTab {
 				return;
 			long userId = Long.parseLong(selectedRecord.getAttributeAsString("id"));
 			AuditService.Instance.get().subscribeDocuments(Arrays.asList(document.getId()),
-					Constants.getAuditDefaultEvents(), userId, null, new AsyncCallback<>() {
-
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
-						}
-
+					Constants.getAuditDefaultEvents(), userId, null, new DefaultAsyncCallback<>() {
 						@Override
 						public void onSuccess(Void arg0) {
 							refreshList();
@@ -156,12 +143,7 @@ public class DocumentSubscriptionsPanel extends DocumentDetailTab {
 		delete.setTitle(I18N.message("ddelete"));
 		delete.addClickHandler(event -> LD.ask(I18N.message("question"), I18N.message("confirmdelete"), answer -> {
 			if (Boolean.TRUE.equals(answer)) {
-				AuditService.Instance.get().deleteSubscriptions(GridUtil.getIds(selection), new AsyncCallback<>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				AuditService.Instance.get().deleteSubscriptions(GridUtil.getIds(selection), new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Void result) {
 						list.removeSelectedData();
@@ -180,5 +162,15 @@ public class DocumentSubscriptionsPanel extends DocumentDetailTab {
 
 		contextMenu.setItems(edit, delete);
 		contextMenu.showContextMenu();
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+	
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

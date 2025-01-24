@@ -128,7 +128,7 @@ public abstract class ExtensibleObject extends PersistentObject {
 	public List<String> getAttributeNames() {
 		List<String> names = new ArrayList<>();
 		if (attributes != null)
-			names.addAll(attributes.keySet());
+			names = attributes.keySet().stream().toList();
 		return names;
 	}
 
@@ -177,10 +177,11 @@ public abstract class ExtensibleObject extends PersistentObject {
 			removeAttribute(n);
 		}
 
-		if (CollectionUtils.isEmpty(values))
-			throw new IllegalArgumentException("no values have been specified");
-
 		List<Attribute> attrs = new ArrayList<>();
+		
+		if (CollectionUtils.isEmpty(values))
+			return attrs;
+
 		Attribute master = setValue(name, values.get(0));
 		attrs.add(master);
 
@@ -240,5 +241,30 @@ public abstract class ExtensibleObject extends PersistentObject {
 			}
 
 		return position;
+	}
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = super.hashCode();
+		result = prime * result + ((templateId == null) ? 0 : templateId.hashCode());
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (!super.equals(obj))
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		ExtensibleObject other = (ExtensibleObject) obj;
+		if (templateId == null) {
+			if (other.templateId != null)
+				return false;
+		} else if (!templateId.equals(other.templateId))
+			return false;
+		return true;
 	}
 }

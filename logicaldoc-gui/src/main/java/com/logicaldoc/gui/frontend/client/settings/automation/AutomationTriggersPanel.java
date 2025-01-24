@@ -2,20 +2,21 @@ package com.logicaldoc.gui.frontend.client.settings.automation;
 
 import java.util.Arrays;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIAutomationTrigger;
 import com.logicaldoc.gui.common.client.beans.GUIFolder;
 import com.logicaldoc.gui.common.client.data.AutomationTriggersDS;
+import com.logicaldoc.gui.common.client.grid.EventsListGridField;
+import com.logicaldoc.gui.common.client.grid.IdListGridField;
+import com.logicaldoc.gui.common.client.grid.RefreshableListGrid;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
+import com.logicaldoc.gui.common.client.util.EventSelectorOptions;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.common.client.widgets.FolderChangeListener;
 import com.logicaldoc.gui.common.client.widgets.FolderSelector;
 import com.logicaldoc.gui.common.client.widgets.HTMLPanel;
 import com.logicaldoc.gui.common.client.widgets.InfoPanel;
-import com.logicaldoc.gui.common.client.widgets.grid.EventsListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.RefreshableListGrid;
 import com.logicaldoc.gui.frontend.client.services.AutomationService;
 import com.smartgwt.client.data.AdvancedCriteria;
 import com.smartgwt.client.data.Record;
@@ -70,8 +71,7 @@ public class AutomationTriggersPanel extends VLayout implements FolderChangeList
 		listing.setHeight("45%");
 		listing.setShowResizeBar(true);
 
-		ListGridField id = new ListGridField("id", 50);
-		id.setHidden(true);
+		ListGridField id = new IdListGridField();
 
 		ListGridField triggeron = new EventsListGridField("events", "triggeron");
 		triggeron.setCanFilter(true);
@@ -119,7 +119,8 @@ public class AutomationTriggersPanel extends VLayout implements FolderChangeList
 		folderSelector.addFolderChangeListener(this);
 		toolStrip.addFormItem(folderSelector);
 
-		event = ItemFactory.newEventSelector("event", "event", evnt -> refresh(), true, true, true, true, true);
+		event = ItemFactory.newEventSelector("event", "event", evnt -> refresh(),
+				new EventSelectorOptions(true, true, true, true, true, true, false));
 		toolStrip.addFormItem(event);
 
 		toolStrip.addSeparator();
@@ -140,19 +141,12 @@ public class AutomationTriggersPanel extends VLayout implements FolderChangeList
 		list.addSelectionChangedHandler(evnt -> {
 			Record rec = list.getSelectedRecord();
 			if (rec != null)
-				AutomationService.Instance.get().getTrigger(rec.getAttributeAsLong("id"),
-						new AsyncCallback<>() {
-
-							@Override
-							public void onFailure(Throwable caught) {
-								GuiLog.serverError(caught);
-							}
-
-							@Override
-							public void onSuccess(GUIAutomationTrigger trigger) {
-								showTriggerDetails(trigger);
-							}
-						});
+				AutomationService.Instance.get().getTrigger(rec.getAttributeAsLong("id"), new DefaultAsyncCallback<>() {
+					@Override
+					public void onSuccess(GUIAutomationTrigger trigger) {
+						showTriggerDetails(trigger);
+					}
+				});
 		});
 
 		list.addDataArrivedHandler(
@@ -183,12 +177,7 @@ public class AutomationTriggersPanel extends VLayout implements FolderChangeList
 		delete.setTitle(I18N.message("ddelete"));
 		delete.addClickHandler(evnt -> LD.ask(I18N.message("question"), I18N.message("confirmdelete"), value -> {
 			if (Boolean.TRUE.equals(value)) {
-				AutomationService.Instance.get().deleteTriggers(Arrays.asList(id), new AsyncCallback<>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				AutomationService.Instance.get().deleteTriggers(Arrays.asList(id), new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Void result) {
 						list.removeSelectedData();
@@ -259,5 +248,15 @@ public class AutomationTriggersPanel extends VLayout implements FolderChangeList
 	@Override
 	public void onChanged(GUIFolder folder) {
 		refresh();
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

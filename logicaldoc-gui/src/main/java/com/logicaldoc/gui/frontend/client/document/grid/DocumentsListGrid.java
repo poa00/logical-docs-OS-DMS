@@ -6,7 +6,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIAttribute;
 import com.logicaldoc.gui.common.client.beans.GUIDocument;
@@ -15,22 +15,22 @@ import com.logicaldoc.gui.common.client.beans.GUIRating;
 import com.logicaldoc.gui.common.client.controllers.DocumentController;
 import com.logicaldoc.gui.common.client.controllers.DocumentObserver;
 import com.logicaldoc.gui.common.client.data.DocumentsDS;
+import com.logicaldoc.gui.common.client.grid.ColoredListGridField;
+import com.logicaldoc.gui.common.client.grid.DateListGridField;
+import com.logicaldoc.gui.common.client.grid.DateListGridField.DateCellFormatter;
+import com.logicaldoc.gui.common.client.grid.FileNameListGridField;
+import com.logicaldoc.gui.common.client.grid.FileSizeListGridField;
+import com.logicaldoc.gui.common.client.grid.IdListGridField;
+import com.logicaldoc.gui.common.client.grid.IntegerListGridField;
+import com.logicaldoc.gui.common.client.grid.RatingListGridField;
+import com.logicaldoc.gui.common.client.grid.RefreshableListGrid;
+import com.logicaldoc.gui.common.client.grid.StatusIconsListGridField;
+import com.logicaldoc.gui.common.client.grid.TypeIconGridField;
+import com.logicaldoc.gui.common.client.grid.UserListGridField;
+import com.logicaldoc.gui.common.client.grid.VersionListGridField;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.DocumentProtectionManager;
 import com.logicaldoc.gui.common.client.util.Util;
-import com.logicaldoc.gui.common.client.widgets.grid.ColoredListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.FileNameListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.FileSizeListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.IconGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.IntegerListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.RatingListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.RefreshableListGrid;
-import com.logicaldoc.gui.common.client.widgets.grid.StatusIconsListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.UserListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.VersionListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField.DateCellFormatter;
 import com.logicaldoc.gui.frontend.client.clipboard.Clipboard;
 import com.logicaldoc.gui.frontend.client.document.RatingDialog;
 import com.logicaldoc.gui.frontend.client.folder.browser.FolderCursor;
@@ -50,7 +50,6 @@ import com.smartgwt.client.widgets.Canvas;
 import com.smartgwt.client.widgets.HTMLFlow;
 import com.smartgwt.client.widgets.events.DoubleClickEvent;
 import com.smartgwt.client.widgets.events.DoubleClickHandler;
-import com.smartgwt.client.widgets.events.KeyPressEvent;
 import com.smartgwt.client.widgets.grid.ListGridField;
 import com.smartgwt.client.widgets.grid.ListGridRecord;
 import com.smartgwt.client.widgets.grid.events.CellClickEvent;
@@ -68,6 +67,8 @@ import com.smartgwt.client.widgets.grid.events.SelectionEvent;
  * @since 6.5
  */
 public class DocumentsListGrid extends RefreshableListGrid implements DocumentsGrid, DocumentObserver {
+
+	private static final String LAST_NOTE = "lastNote";
 
 	private static final String GROUP_FIELD_NAME = "group:[{fieldName:";
 
@@ -157,6 +158,8 @@ public class DocumentsListGrid extends RefreshableListGrid implements DocumentsG
 
 		addDataArrivedHandler(this::onDataArrived);
 
+		addSelectionChangedHandler(selection -> DocumentController.get().setCurrentSelection(getSelectedDocuments()));
+
 		DocumentController.get().addObserver(this);
 	}
 
@@ -187,12 +190,7 @@ public class DocumentsListGrid extends RefreshableListGrid implements DocumentsG
 			long id = Long.parseLong(getSelectedRecord().getAttribute("id"));
 			String ratingImageName = getSelectedRecord().getAttribute(RATING);
 			final int docRating = Integer.parseInt(ratingImageName.replace(RATING, ""));
-			DocumentService.Instance.get().getRating(id, new AsyncCallback<>() {
-				@Override
-				public void onFailure(Throwable caught) {
-					GuiLog.serverError(caught);
-				}
-
+			DocumentService.Instance.get().getRating(id, new DefaultAsyncCallback<>() {
 				@Override
 				public void onSuccess(GUIRating rating) {
 					if (rating != null) {
@@ -221,8 +219,7 @@ public class DocumentsListGrid extends RefreshableListGrid implements DocumentsG
 	 * Prepares the map that contains all the possible fields we can use
 	 */
 	protected void prepareFieldsMap() {
-		ListGridField id = new ListGridField("id", I18N.getAttributeLabel("id"), 60);
-		id.setHidden(true);
+		ListGridField id =new IdListGridField();
 		fieldsMap.put(id.getName(), id);
 
 		ListGridField size = new FileSizeListGridField("size", I18N.getAttributeLabel("size"));
@@ -232,7 +229,7 @@ public class DocumentsListGrid extends RefreshableListGrid implements DocumentsG
 		pages.setHidden(true);
 		fieldsMap.put(pages.getName(), pages);
 
-		ListGridField icon = new IconGridField();
+		ListGridField icon = new TypeIconGridField();
 		fieldsMap.put(icon.getName(), icon);
 
 		ListGridField version = new VersionListGridField();
@@ -322,6 +319,12 @@ public class DocumentsListGrid extends RefreshableListGrid implements DocumentsG
 		comment.setCanSort(true);
 		fieldsMap.put(comment.getName(), comment);
 
+		ListGridField lastNote = new ColoredListGridField(LAST_NOTE, 300);
+		lastNote.setHidden(true);
+		lastNote.setCanFilter(true);
+		lastNote.setCanSort(true);
+		fieldsMap.put(lastNote.getName(), lastNote);
+
 		ListGridField tags = new ColoredListGridField("tags", 200);
 		tags.setHidden(true);
 		tags.setCanFilter(true);
@@ -332,11 +335,13 @@ public class DocumentsListGrid extends RefreshableListGrid implements DocumentsG
 		wfStatus.setHidden(true);
 		fieldsMap.put(wfStatus.getName(), wfStatus);
 
-		ListGridField startPublishing = new DateListGridField(START_PUBLISHING, "startpublishing", DateCellFormatter.FORMAT_SHORT);
+		ListGridField startPublishing = new DateListGridField(START_PUBLISHING, "startpublishing",
+				DateCellFormatter.FORMAT_SHORT);
 		startPublishing.setHidden(true);
 		fieldsMap.put(startPublishing.getName(), startPublishing);
 
-		ListGridField stopPublishing = new DateListGridField(STOP_PUBLISHING, "stoppublishing", DateCellFormatter.FORMAT_SHORT);
+		ListGridField stopPublishing = new DateListGridField(STOP_PUBLISHING, "stoppublishing",
+				DateCellFormatter.FORMAT_SHORT);
 		stopPublishing.setHidden(true);
 		fieldsMap.put(stopPublishing.getName(), stopPublishing);
 
@@ -358,7 +363,6 @@ public class DocumentsListGrid extends RefreshableListGrid implements DocumentsG
 		 * when filters are activated and the user selects a record so we do not
 		 * put the thumbnail image cell
 		 */
-
 		ListGridField folderId = new ColoredListGridField("folderId", 80);
 		folderId.setHidden(true);
 		folderId.setCanSort(false);
@@ -379,7 +383,7 @@ public class DocumentsListGrid extends RefreshableListGrid implements DocumentsG
 		ListGridField score = new ColoredListGridField("score", 120);
 		score.setCanFilter(false);
 		score.setHidden(true);
-		score.setCellFormatter((Object value, ListGridRecord rec, int rowNum, int colNum) -> {
+		score.setCellFormatter((value, rec, rowNum, colNum) -> {
 			try {
 				int scoreValue = rec.getAttributeAsInt("score");
 				int red = 100 - scoreValue > 0 ? 100 - scoreValue : 0;
@@ -394,7 +398,7 @@ public class DocumentsListGrid extends RefreshableListGrid implements DocumentsG
 
 		addExtendedAttributesFields();
 
-		addKeyPressHandler((KeyPressEvent keyPress) -> {
+		addKeyPressHandler(keyPress -> {
 			if (keyPress.isCtrlKeyDown()) {
 				List<GUIDocument> selection = getSelectedDocuments();
 				if ("C".equalsIgnoreCase(keyPress.getKeyName())) {
@@ -428,7 +432,8 @@ public class DocumentsListGrid extends RefreshableListGrid implements DocumentsG
 				GUIAttribute attDef = Session.get().getInfo().getAttributeDefinition(name);
 				if (attDef != null) {
 					if (attDef.getType() == GUIAttribute.TYPE_DATE) {
-						ext = new DateListGridField("ext_" + name, Session.get().getInfo().getAttributeLabel(name), DateCellFormatter.FORMAT_SHORT);
+						ext = new DateListGridField("ext_" + name, Session.get().getInfo().getAttributeLabel(name),
+								DateCellFormatter.FORMAT_SHORT);
 						ext.setTitle(Session.get().getInfo().getAttributeLabel(name));
 					} else if (attDef.getType() == GUIAttribute.TYPE_INT) {
 						ext.setAlign(Alignment.RIGHT);
@@ -497,6 +502,10 @@ public class DocumentsListGrid extends RefreshableListGrid implements DocumentsG
 		if (!fields.contains(fieldsMap.get(COMMENT))) {
 			fieldsMap.get(COMMENT).setHidden(true);
 			fields.add(fieldsMap.get(COMMENT));
+		}
+		if (!fields.contains(fieldsMap.get(LAST_NOTE))) {
+			fieldsMap.get(LAST_NOTE).setHidden(true);
+			fields.add(fieldsMap.get(LAST_NOTE));
 		}
 		if (!fields.contains(fieldsMap.get(WORKFLOW_STATUS))) {
 			fieldsMap.get(WORKFLOW_STATUS).setHidden(true);
@@ -966,5 +975,15 @@ public class DocumentsListGrid extends RefreshableListGrid implements DocumentsG
 
 	public Map<String, ListGridField> getFieldsMap() {
 		return fieldsMap;
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

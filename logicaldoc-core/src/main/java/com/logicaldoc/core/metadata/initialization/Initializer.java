@@ -9,10 +9,11 @@ import org.hibernate.LazyInitializationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.logicaldoc.core.History;
 import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.RunLevel;
 import com.logicaldoc.core.automation.Automation;
+import com.logicaldoc.core.automation.AutomationException;
+import com.logicaldoc.core.history.History;
 import com.logicaldoc.core.metadata.Attribute;
 import com.logicaldoc.core.metadata.ExtensibleObject;
 import com.logicaldoc.core.metadata.Template;
@@ -80,7 +81,7 @@ public class Initializer {
 			// If an error happens here it means that the collection could not
 			// be loaded, so load the bean again and initialize it.
 			log.debug("Got error {} trying to reload the template {}", e.getMessage(), template.getId());
-			TemplateDAO tDao = (TemplateDAO) Context.get().getBean(TemplateDAO.class);
+			TemplateDAO tDao = Context.get(TemplateDAO.class);
 			try {
 				template = tDao.findById(template.getId());
 				tDao.initialize(template);
@@ -92,7 +93,7 @@ public class Initializer {
 	}
 
 	private void executeInitialization(ExtensibleObject object, History transaction, String attributeName,
-			Attribute attribute, Attribute templateAttribute) {
+			Attribute attribute, Attribute templateAttribute) throws AutomationException {
 		Map<String, Object> fieldValidationDictionary = new HashMap<>();
 		fieldValidationDictionary.put("object", object);
 		fieldValidationDictionary.put("event", transaction);
@@ -109,7 +110,7 @@ public class Initializer {
 	private void setUser(History transaction) {
 		User user = transaction != null && transaction.getUser() != null ? transaction.getUser() : null;
 		if (user == null && transaction != null && transaction.getUserId() != null) {
-			UserDAO uDao = (UserDAO) Context.get().getBean(UserDAO.class);
+			UserDAO uDao = Context.get(UserDAO.class);
 			try {
 				user = uDao.findById(transaction.getUserId());
 				transaction.setUser(user);

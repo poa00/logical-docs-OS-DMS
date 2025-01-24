@@ -13,11 +13,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import com.logicaldoc.core.History;
 import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.RunLevel;
 import com.logicaldoc.core.document.Document;
 import com.logicaldoc.core.document.DocumentDAO;
+import com.logicaldoc.core.history.History;
 import com.logicaldoc.core.threading.ThreadPools;
 import com.logicaldoc.util.Context;
 import com.logicaldoc.util.config.ContextProperties;
@@ -28,7 +28,7 @@ import com.logicaldoc.util.config.ContextProperties;
  * @author Marco Meschieri - LogicalDOC
  * @since 7.7.1
  */
-@Component("EventCollector")
+@Component("eventCollector")
 public class EventCollector {
 
 	private static final int FIFO_SIZE = 1000;
@@ -41,13 +41,18 @@ public class EventCollector {
 
 	@Resource(name = "ContextProperties")
 	private ContextProperties config;
+	
+	public EventCollector(ContextProperties config) {
+		super();
+		this.config = config;
+	}
 
 	// Maintain a fifos for the history IDs. Key is the class name, value is a
 	// FIFO queue
 	private Map<String, Queue<Long>> fifos = new HashMap<>();
 
 	public static EventCollector get() {
-		return (EventCollector) Context.get().getBean(EventCollector.class);
+		return Context.get(EventCollector.class);
 	}
 
 	public void addListener(EventListener listener) {
@@ -98,18 +103,18 @@ public class EventCollector {
 			return;
 
 		if (history.getDocId() != null && history.getDocument() == null) {
-			DocumentDAO docDao = (DocumentDAO) com.logicaldoc.util.Context.get().getBean(DocumentDAO.class);
+			DocumentDAO docDao = com.logicaldoc.util.Context.get(DocumentDAO.class);
 			try {
 				history.setDocument(docDao.findById(history.getDocId()));
 			} catch (PersistenceException e) {
 				log.error(e.getMessage(), e);
 			}
-		} else if (history.getDocument() != null) {
+		} else if (history.getDocument() != null && history.getDocument() instanceof Document doc) {
 			/*
 			 * Do not use the original document because to avoid interactions
 			 * with Hibernate session.
 			 */
-			Document clone = new Document(history.getDocument());
+			Document clone = new Document(doc);
 			// Restore some attributes skipped by the clone method
 			clone.setCustomId(history.getDocument().getCustomId());
 			clone.setStatus(history.getDocument().getStatus());
@@ -124,16 +129,12 @@ public class EventCollector {
 			log.debug("Finished notification of history {}", history);
 		};
 
-		ThreadPools pools = (ThreadPools) Context.get().getBean(ThreadPools.class);
+		ThreadPools pools = Context.get(ThreadPools.class);
 		pools.execute(notifier, "EventCollector");
 	}
 
 	public ContextProperties getConfig() {
 		return config;
-	}
-
-	public void setConfig(ContextProperties config) {
-		this.config = config;
 	}
 
 	public static boolean isEnabled() {

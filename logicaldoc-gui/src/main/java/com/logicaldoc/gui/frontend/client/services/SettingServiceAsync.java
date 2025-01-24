@@ -17,6 +17,8 @@ public interface SettingServiceAsync {
 	void saveEmailSettings(GUIEmailSettings settings, AsyncCallback<Void> callback);
 
 	void loadGUISettings(AsyncCallback<List<GUIParameter>> callback);
+	
+	void loadAuditingSettings(AsyncCallback<List<GUIParameter>> callback);
 
 	void loadSettingsByNames(List<String> names, AsyncCallback<List<GUIParameter>> callback);
 
@@ -26,15 +28,15 @@ public interface SettingServiceAsync {
 
 	void saveRegistration(String name, String email, String company, String website, AsyncCallback<Void> callback);
 
-	void testStorage(int id, AsyncCallback<Boolean> callback);
+	void testStore(int id, AsyncCallback<Boolean> callback);
 
 	void loadConverterParameters(String converter, AsyncCallback<List<GUIParameter>> callback);
 
-	void saveStorageSettings(List<GUIParameter> settings, AsyncCallback<Void> callback);
+	void saveStoreSettings(List<GUIParameter> settings, AsyncCallback<Void> callback);
 
 	void saveExtensionAliases(String extension, String aliases, AsyncCallback<Void> callback);
 
-	void removeStorage(int storageId, AsyncCallback<List<String>> callback);
+	void removeStore(int storeId, AsyncCallback<List<String>> callback);
 
 	void loadWebserviceStats(Long tenantId, AsyncCallback<List<GUIParameter>> callback);
 

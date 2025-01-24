@@ -13,6 +13,7 @@ import org.springframework.jdbc.core.RowMapper;
 
 import com.logicaldoc.core.HibernatePersistentObjectDAO;
 import com.logicaldoc.core.PersistenceException;
+import com.logicaldoc.core.RunLevel;
 import com.logicaldoc.core.security.user.User;
 import com.logicaldoc.core.security.user.UserDAO;
 import com.logicaldoc.core.security.user.UserEvent;
@@ -27,7 +28,6 @@ import com.logicaldoc.util.sql.SqlUtil;
  * @author Marco Meschieri - LogicalDOC
  * @since 3.0
  */
-@SuppressWarnings("unchecked")
 public class HibernateSystemMessageDAO extends HibernatePersistentObjectDAO<SystemMessage> implements SystemMessageDAO {
 	private static final String SELECT = "select ld_lastmodified, ld_author, ld_messagetext, ld_subject, ld_sentdate, ld_datescope, ld_prio, ld_confirmation, ld_lastnotified, ld_status, ld_trials, ld_type, ld_id, ld_html, ld_author, ld_tenantid ";
 
@@ -176,8 +176,8 @@ public class HibernateSystemMessageDAO extends HibernatePersistentObjectDAO<Syst
 		 * message
 		 */
 		if (originalId == 0L && message.getType() == Message.TYPE_SYSTEM) {
-			UserHistoryDAO hDao = (UserHistoryDAO) Context.get().getBean(UserHistoryDAO.class);
-			UserDAO uDao = (UserDAO) Context.get().getBean(UserDAO.class);
+			UserHistoryDAO hDao = Context.get(UserHistoryDAO.class);
+			UserDAO uDao = Context.get(UserDAO.class);
 			for (Recipient rec : message.getRecipients()) {
 				if (rec.getType() == Recipient.TYPE_EMAIL)
 					continue;
@@ -187,7 +187,7 @@ public class HibernateSystemMessageDAO extends HibernatePersistentObjectDAO<Syst
 				history.setComment(message.getMessageText());
 				history.setEvent(UserEvent.MESSAGE_RECEIVED.toString());
 				history.setAuthor(message.getAuthor());
-				history.setNotifyEvent(message.isNotify());
+				history.setNotifyEvent(message.isNotify() && RunLevel.current().aspectEnabled("sendingMessages"));
 
 				User recipient = uDao.findByUsername(rec.getName());
 				if (recipient != null)

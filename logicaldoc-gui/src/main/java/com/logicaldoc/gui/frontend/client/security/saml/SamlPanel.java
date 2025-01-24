@@ -1,6 +1,6 @@
 package com.logicaldoc.gui.frontend.client.security.saml;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.i18n.I18N;
 import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
@@ -12,10 +12,10 @@ import com.smartgwt.client.widgets.IButton;
 import com.smartgwt.client.widgets.form.DynamicForm;
 import com.smartgwt.client.widgets.form.ValuesManager;
 import com.smartgwt.client.widgets.form.fields.LinkItem;
-import com.smartgwt.client.widgets.form.fields.RadioGroupItem;
 import com.smartgwt.client.widgets.form.fields.SelectItem;
 import com.smartgwt.client.widgets.form.fields.TextAreaItem;
 import com.smartgwt.client.widgets.form.fields.TextItem;
+import com.smartgwt.client.widgets.form.fields.ToggleItem;
 import com.smartgwt.client.widgets.layout.HLayout;
 import com.smartgwt.client.widgets.layout.VLayout;
 import com.smartgwt.client.widgets.tab.Tab;
@@ -28,8 +28,6 @@ import com.smartgwt.client.widgets.tab.TabSet;
  * @since 8.1
  */
 public class SamlPanel extends VLayout {
-
-	private static final String YES = "yes";
 
 	private static final String LOGOUTRESPONSE_SIGNED = "logoutresponsesigned";
 
@@ -79,12 +77,7 @@ public class SamlPanel extends VLayout {
 
 	@Override
 	protected void onDraw() {
-		SamlService.Instance.get().loadSettings(new AsyncCallback<>() {
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
+		SamlService.Instance.get().loadSettings(new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(GUISamlSettings settings) {
 				initGUI(settings);
@@ -95,35 +88,34 @@ public class SamlPanel extends VLayout {
 	private void initGUI(GUISamlSettings settings) {
 		ValuesManager vm = new ValuesManager();
 
-		RadioGroupItem enabled = ItemFactory.newBooleanSelector(ENABLED);
+		ToggleItem enabled = ItemFactory.newToggleItem(ENABLED, settings.isEnabled());
 		enabled.setWrapTitle(false);
 		enabled.setRequired(true);
-		enabled.setValue(settings.isEnabled() ? YES : "no");
 
-		RadioGroupItem sloEnabled = ItemFactory.newBooleanSelector(SLO_ENABLED);
+		ToggleItem sloEnabled = ItemFactory.newToggleItem(SLO_ENABLED, settings.isSingleLogOut());
 		sloEnabled.setWrapTitle(false);
 		sloEnabled.setRequired(true);
 		sloEnabled.setRedrawOnChange(true);
-		sloEnabled.setValue(settings.isSingleLogOut() ? YES : "no");
-		
-		RadioGroupItem logoutRequestSigned = ItemFactory.newBooleanSelector(LOGOUTREQUEST_SIGNED);
+
+		ToggleItem logoutRequestSigned = ItemFactory.newToggleItem(LOGOUTREQUEST_SIGNED,
+				settings.isLogoutRequestSigned());
 		logoutRequestSigned.setWrapTitle(true);
 		logoutRequestSigned.setRequired(true);
 		logoutRequestSigned.setRedrawOnChange(true);
 		logoutRequestSigned.setTitleOrientation(TitleOrientation.TOP);
-		logoutRequestSigned.setValue(settings.isLogoutRequestSigned() ? YES : "no");
 		logoutRequestSigned.setVisible(settings.isSingleLogOut());
-		logoutRequestSigned.setShowIfCondition((item, value, form) -> YES.equals(form.getValueAsString(SLO_ENABLED)));
+		logoutRequestSigned
+				.setShowIfCondition((item, value, form) -> Boolean.valueOf(form.getValueAsString(SLO_ENABLED)));
 
-		RadioGroupItem logoutResponseSigned = ItemFactory.newBooleanSelector(LOGOUTRESPONSE_SIGNED);
+		ToggleItem logoutResponseSigned = ItemFactory.newToggleItem(LOGOUTRESPONSE_SIGNED,
+				settings.isLogoutResponseSigned());
 		logoutResponseSigned.setWrapTitle(true);
 		logoutResponseSigned.setRequired(true);
 		logoutResponseSigned.setRedrawOnChange(true);
 		logoutResponseSigned.setVisible(settings.isSingleLogOut());
 		logoutResponseSigned.setTitleOrientation(TitleOrientation.TOP);
-		logoutResponseSigned.setValue(settings.isLogoutResponseSigned() ? YES : "no");
 		logoutResponseSigned
-				.setShowIfCondition((item, value, form) -> YES.equals(form.getValueAsString(SLO_ENABLED)));
+				.setShowIfCondition((item, value, form) -> Boolean.valueOf(form.getValueAsString(SLO_ENABLED)));
 
 		TextItem id = ItemFactory.newTextItem(SP_ENTITYID, SP_ENTITYID, settings.getEntityId());
 		id.setWidth(220);
@@ -145,36 +137,34 @@ public class SamlPanel extends VLayout {
 		TextItem groups = ItemFactory.newTextItem(GROUPS, GROUPS, settings.getGroup());
 		groups.setWrapTitle(false);
 
-		RadioGroupItem keepMembership = ItemFactory.newBooleanSelector(KEEPMEMBERSHIP, "keepmembershiplocalgroups");
-		keepMembership.setValue(settings.isKeepLocalMemberships() ? YES : "no");
+		ToggleItem keepMembership = ItemFactory.newToggleItem(KEEPMEMBERSHIP, "keepmembershiplocalgroups",
+				settings.isKeepLocalMemberships());
 		keepMembership.setRequired(true);
 
-		RadioGroupItem authnRequestSigned = ItemFactory.newBooleanSelector(AUTHNREQUEST_SIGNED);
+		ToggleItem authnRequestSigned = ItemFactory.newToggleItem(AUTHNREQUEST_SIGNED, settings.isAuthnRequestSigned());
 		authnRequestSigned.setWrapTitle(true);
 		authnRequestSigned.setRequired(true);
 		authnRequestSigned.setRedrawOnChange(true);
 		authnRequestSigned.setTitleOrientation(TitleOrientation.TOP);
-		authnRequestSigned.setValue(settings.isAuthnRequestSigned() ? YES : "no");
 
 		SelectItem signatureAlgorithm = ItemFactory.newSelectItem(SIGNATURE_ALGORITHM);
 		signatureAlgorithm.setValueMap("SHA-1", "SHA-256");
 		signatureAlgorithm.setValue(settings.getSignatureAlgorithm());
 		signatureAlgorithm
-				.setShowIfCondition((item, value, form) -> YES.equals(form.getValueAsString(AUTHNREQUEST_SIGNED)));
+				.setShowIfCondition((item, value, form) -> Boolean.valueOf(form.getValueAsString(AUTHNREQUEST_SIGNED)));
 
-		RadioGroupItem assertionsEncrypted = ItemFactory.newBooleanSelector(ASSERTIONS_ENCRYPTED);
+		ToggleItem assertionsEncrypted = ItemFactory.newToggleItem(ASSERTIONS_ENCRYPTED,
+				settings.isWantAssertionsEncrypted());
 		assertionsEncrypted.setWrapTitle(true);
 		assertionsEncrypted.setRequired(true);
 		assertionsEncrypted.setRedrawOnChange(true);
 		assertionsEncrypted.setTitleOrientation(TitleOrientation.TOP);
-		assertionsEncrypted.setValue(settings.isWantAssertionsEncrypted() ? YES : "no");
 
-		RadioGroupItem nameIdEncrypted = ItemFactory.newBooleanSelector(NAMEID_ENCRYPTED);
+		ToggleItem nameIdEncrypted = ItemFactory.newToggleItem(NAMEID_ENCRYPTED, settings.isWantNameIdEncrypted());
 		nameIdEncrypted.setWrapTitle(true);
 		nameIdEncrypted.setRequired(true);
 		nameIdEncrypted.setRedrawOnChange(true);
 		nameIdEncrypted.setTitleOrientation(TitleOrientation.TOP);
-		nameIdEncrypted.setValue(settings.isWantNameIdEncrypted() ? YES : "no");
 
 		TextAreaItem spCertificate = ItemFactory.newTextAreaItem(SP_CERTIFICATE, "spcertificate",
 				settings.getCertificate());
@@ -186,11 +176,11 @@ public class SamlPanel extends VLayout {
 				new DownloadFormItemIcon(Util.contextPath() + "saml/spcertificate"),
 				new UploadFormItemIcon("uploadspcertificate"));
 		spCertificate
-				.setShowIfCondition((item, value, form) -> YES.equals(form.getValueAsString(ASSERTIONS_ENCRYPTED))
-						|| YES.equals(form.getValueAsString(NAMEID_ENCRYPTED))
-						|| YES.equals(form.getValueAsString(AUTHNREQUEST_SIGNED))
-						|| YES.equals(form.getValueAsString(LOGOUTREQUEST_SIGNED))
-						|| YES.equals(form.getValueAsString(LOGOUTRESPONSE_SIGNED)));
+				.setShowIfCondition((item, value, form) -> Boolean.valueOf(form.getValueAsString(ASSERTIONS_ENCRYPTED))
+						|| Boolean.valueOf(form.getValueAsString(NAMEID_ENCRYPTED))
+						|| Boolean.valueOf(form.getValueAsString(AUTHNREQUEST_SIGNED))
+						|| Boolean.valueOf(form.getValueAsString(LOGOUTREQUEST_SIGNED))
+						|| Boolean.valueOf(form.getValueAsString(LOGOUTRESPONSE_SIGNED)));
 
 		TextAreaItem spPrivateKey = ItemFactory.newTextAreaItem(SP_PRIVATEKEY, "spprivatekey",
 				settings.getPrivateKey());
@@ -201,11 +191,12 @@ public class SamlPanel extends VLayout {
 		spPrivateKey.setIcons(new CopyTextFormItemIcon(),
 				new DownloadFormItemIcon(Util.contextPath() + "saml/spprivatekey"),
 				new UploadFormItemIcon("uploadspprivatekey"));
-		spPrivateKey.setShowIfCondition((item, value, form) -> YES.equals(form.getValueAsString(ASSERTIONS_ENCRYPTED))
-				|| YES.equals(form.getValueAsString(NAMEID_ENCRYPTED))
-				|| YES.equals(form.getValueAsString(AUTHNREQUEST_SIGNED))
-				|| YES.equals(form.getValueAsString(LOGOUTREQUEST_SIGNED))
-				|| YES.equals(form.getValueAsString(LOGOUTRESPONSE_SIGNED)));
+		spPrivateKey
+				.setShowIfCondition((item, value, form) -> Boolean.valueOf(form.getValueAsString(ASSERTIONS_ENCRYPTED))
+						|| Boolean.valueOf(form.getValueAsString(NAMEID_ENCRYPTED))
+						|| Boolean.valueOf(form.getValueAsString(AUTHNREQUEST_SIGNED))
+						|| Boolean.valueOf(form.getValueAsString(LOGOUTREQUEST_SIGNED))
+						|| Boolean.valueOf(form.getValueAsString(LOGOUTRESPONSE_SIGNED)));
 
 		TextAreaItem idpMetadata = ItemFactory.newTextAreaItem(IDP_METADATA, "idpmetadata", settings.getIdpMetadata());
 		idpMetadata.setWrapTitle(false);
@@ -225,6 +216,16 @@ public class SamlPanel extends VLayout {
 		LinkItem login = ItemFactory.newLinkItem("login", "login", loginUrl, loginUrl);
 		login.setWrapTitle(false);
 		login.setWrap(false);
+
+		SelectItem userType = ItemFactory.newUserTypeSelector("usertype", settings.getUserType());
+		userType.setEndRow(true);
+
+		TextAreaItem validation = ItemFactory.newTextAreaItemForAutomation("validation", settings.getValidation(), null,
+				false);
+		validation.setHeight(150);
+		validation.setWidth(400);
+		validation.setWrapTitle(false);
+		validation.setColSpan(2);
 
 		DynamicForm generalForm = new DynamicForm();
 		generalForm.setValuesManager(vm);
@@ -247,7 +248,8 @@ public class SamlPanel extends VLayout {
 		attributeMappingsForm.setAlign(Alignment.LEFT);
 		attributeMappingsForm.setHeight(1);
 		attributeMappingsForm.setWidth(1);
-		attributeMappingsForm.setFields(username, firstName, lastName, email, groups, keepMembership);
+		attributeMappingsForm.setFields(username, firstName, lastName, email, groups, keepMembership, userType,
+				validation);
 
 		HLayout forms = new HLayout();
 		forms.setMembersMargin(10);
@@ -270,36 +272,32 @@ public class SamlPanel extends VLayout {
 		IButton save = new IButton();
 		save.setTitle(I18N.message("save"));
 		save.addClickHandler(event -> {
-			if (!Boolean.TRUE.equals(form.validate()))
+			if (Boolean.FALSE.equals(form.validate()))
 				return;
 
 			GUISamlSettings settings = new GUISamlSettings();
-			settings.setEnabled(YES.equals(form.getValue(ENABLED)));
+			settings.setEnabled(Boolean.valueOf(form.getValueAsString(ENABLED)));
 			settings.setEntityId(form.getValueAsString(SP_ENTITYID));
 			settings.setUsername(form.getValueAsString(USERNAME));
 			settings.setFirstName(form.getValueAsString(FIRSTNAME));
 			settings.setLastName(form.getValueAsString(LASTNAME));
 			settings.setEmail(form.getValueAsString(EMAIL));
 			settings.setGroup(form.getValueAsString(GROUPS));
-			settings.setAuthnRequestSigned(YES.equals(form.getValue(AUTHNREQUEST_SIGNED)));
+			settings.setAuthnRequestSigned(Boolean.valueOf(form.getValueAsString(AUTHNREQUEST_SIGNED)));
 			settings.setSignatureAlgorithm(form.getValueAsString(SIGNATURE_ALGORITHM));
-			settings.setWantAssertionsEncrypted(YES.equals(form.getValue(ASSERTIONS_ENCRYPTED)));
-			settings.setWantNameIdEncrypted(YES.equals(form.getValue(NAMEID_ENCRYPTED)));
-			settings.setKeepLocalMemberships(YES.equals(form.getValue(KEEPMEMBERSHIP)));
-			settings.setSingleLogOut(YES.equals(form.getValue(SLO_ENABLED)));
-			settings.setLogoutRequestSigned(YES.equals(form.getValue(LOGOUTREQUEST_SIGNED)));
-			settings.setLogoutResponseSigned(YES.equals(form.getValue(LOGOUTRESPONSE_SIGNED)));
+			settings.setWantAssertionsEncrypted(Boolean.valueOf(form.getValueAsString(ASSERTIONS_ENCRYPTED)));
+			settings.setWantNameIdEncrypted(Boolean.valueOf(form.getValueAsString(NAMEID_ENCRYPTED)));
+			settings.setKeepLocalMemberships(Boolean.valueOf(form.getValueAsString(KEEPMEMBERSHIP)));
+			settings.setSingleLogOut(Boolean.valueOf(form.getValueAsString(SLO_ENABLED)));
+			settings.setLogoutRequestSigned(Boolean.valueOf(form.getValueAsString(LOGOUTREQUEST_SIGNED)));
+			settings.setLogoutResponseSigned(Boolean.valueOf(form.getValueAsString(LOGOUTRESPONSE_SIGNED)));
 			settings.setCertificate(form.getValueAsString(SP_CERTIFICATE));
 			settings.setPrivateKey(form.getValueAsString(SP_PRIVATEKEY));
 			settings.setIdpMetadata(form.getValueAsString(IDP_METADATA));
+			settings.setUserType(Integer.parseInt(form.getValueAsString("usertype")));
+			settings.setValidation(form.getValueAsString("validation"));
 
-			SamlService.Instance.get().saveSettings(settings, new AsyncCallback<>() {
-
-				@Override
-				public void onFailure(Throwable caught) {
-					GuiLog.serverError(caught);
-				}
-
+			SamlService.Instance.get().saveSettings(settings, new DefaultAsyncCallback<>() {
 				@Override
 				public void onSuccess(Void ret) {
 					GuiLog.info(I18N.message("settingssaved"), null);

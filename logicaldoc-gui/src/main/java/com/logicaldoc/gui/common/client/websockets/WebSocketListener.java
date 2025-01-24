@@ -12,11 +12,11 @@ import org.realityforge.gwt.websockets.client.WebSocket;
 import org.realityforge.gwt.websockets.client.WebSocketListenerAdapter;
 
 import com.google.gwt.core.client.GWT;
-import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.google.gwt.user.client.rpc.SerializationException;
 import com.google.gwt.user.client.rpc.SerializationStreamFactory;
 import com.google.gwt.user.client.rpc.SerializationStreamReader;
 import com.google.gwt.user.client.rpc.SerializationStreamWriter;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Menu;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIReadingRequest;
@@ -116,6 +116,10 @@ public class WebSocketListener extends WebSocketListenerAdapter {
 	}
 
 	private void onEvent(WebsocketMessage event) {
+		// Skip events related to other tenants
+		if (event.getTenantId() != Session.get().getInfo().getTenant().getId())
+			return;
+
 		if (!moniteredEvents.contains(event.getEvent()))
 			return;
 
@@ -149,19 +153,13 @@ public class WebSocketListener extends WebSocketListenerAdapter {
 		} else if ("event.reading.requested".equals(event.getEvent())) {
 			String recipient = event.getComment().substring(event.getComment().indexOf(':') + 1).trim();
 			if (Session.get().getUser().getUsername().equals(recipient)) {
-				ReadingRequestService.Instance.get()
-						.getUnconfimedReadings(new AsyncCallback<>() {
+				ReadingRequestService.Instance.get().getUnconfimedReadings(new DefaultAsyncCallback<>() {
 
-							@Override
-							public void onFailure(Throwable caught) {
-								GuiLog.serverError(caught);
-							}
-
-							@Override
-							public void onSuccess(List<GUIReadingRequest> readings) {
-								ReadingRequestController.get().addUnconfirmedReadings(readings);
-							}
-						});
+					@Override
+					public void onSuccess(List<GUIReadingRequest> readings) {
+						ReadingRequestController.get().addUnconfirmedReadings(readings);
+					}
+				});
 			}
 		} else if (isCommandEvent(event)) {
 			processCommand(event);

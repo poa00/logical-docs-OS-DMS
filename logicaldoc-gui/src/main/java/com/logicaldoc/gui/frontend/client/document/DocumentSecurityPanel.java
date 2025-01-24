@@ -3,19 +3,19 @@ package com.logicaldoc.gui.frontend.client.document;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.logicaldoc.gui.common.client.Feature;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIAccessControlEntry;
 import com.logicaldoc.gui.common.client.beans.GUIDocument;
 import com.logicaldoc.gui.common.client.beans.GUIFolder;
 import com.logicaldoc.gui.common.client.data.AccessControlListDS;
+import com.logicaldoc.gui.common.client.grid.RefreshableListGrid;
+import com.logicaldoc.gui.common.client.grid.UserListGridField;
 import com.logicaldoc.gui.common.client.i18n.I18N;
 import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.GridUtil;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.LD;
-import com.logicaldoc.gui.common.client.widgets.grid.RefreshableListGrid;
-import com.logicaldoc.gui.common.client.widgets.grid.UserListGridField;
 import com.logicaldoc.gui.frontend.client.services.DocumentService;
 import com.logicaldoc.gui.frontend.client.services.FolderService;
 import com.smartgwt.client.data.Record;
@@ -72,7 +72,7 @@ public class DocumentSecurityPanel extends DocumentDetailTab {
 	private static final String SECURITY = "security";
 
 	private static final String WRITE = "write";
-	
+
 	private static final String CUSTOMID = "customid";
 
 	private static final String DOWNLOAD = "download";
@@ -122,7 +122,7 @@ public class DocumentSecurityPanel extends DocumentDetailTab {
 		ListGridField read = new ListGridField("read", prepareHeaderLabel("read"));
 		read.setType(ListGridFieldType.BOOLEAN);
 		read.setCanEdit(true);
-		
+
 		ListGridField preview = new ListGridField(PREVIEW, prepareHeaderLabel(PREVIEW));
 		preview.setType(ListGridFieldType.BOOLEAN);
 		preview.setCanEdit(true);
@@ -138,7 +138,7 @@ public class DocumentSecurityPanel extends DocumentDetailTab {
 		ListGridField write = new ListGridField(WRITE, prepareHeaderLabel(WRITE));
 		write.setType(ListGridFieldType.BOOLEAN);
 		write.setCanEdit(true);
-		
+
 		ListGridField customid = new ListGridField(CUSTOMID, prepareHeaderLabel(CUSTOMID));
 		customid.setType(ListGridFieldType.BOOLEAN);
 		customid.setCanEdit(true);
@@ -172,7 +172,7 @@ public class DocumentSecurityPanel extends DocumentDetailTab {
 		email.setCanEdit(true);
 
 		list = new RefreshableListGrid();
-		list.setEmptyMessage(I18N.message("notitemstoshow"));
+		list.setEmptyMessage(I18N.message("thisdocsecurityparent"));
 		list.setCanFreezeFields(true);
 		list.setSelectionType(SelectionStyle.MULTIPLE);
 		list.setAutoFetchData(true);
@@ -413,27 +413,27 @@ public class DocumentSecurityPanel extends DocumentDetailTab {
 			GUIAccessControlEntry ace = new GUIAccessControlEntry();
 			ace.setName(rec.getAttributeAsString(ENTITY));
 			ace.setEntityId(Long.parseLong(rec.getAttribute(ENTITY_ID)));
-			
-			ace.setRead(rec.getAttributeAsBoolean("read"));
-			ace.setPreview(rec.getAttributeAsBoolean(PREVIEW));
-			ace.setPrint(rec.getAttributeAsBoolean(PRINT));
-			ace.setWrite(rec.getAttributeAsBoolean(WRITE));
-			ace.setCustomid(rec.getAttributeAsBoolean(CUSTOMID));
-			ace.setDelete(rec.getAttributeAsBoolean(DELETE));
-			ace.setWorkflow(rec.getAttributeAsBoolean(WORKFLOW));
-			ace.setSign(rec.getAttributeAsBoolean("sign"));
-			ace.setImmutable(rec.getAttributeAsBoolean(IMMUTABLE));
-			ace.setRename(rec.getAttributeAsBoolean(RENAME));
-			ace.setSecurity(rec.getAttributeAsBoolean(SECURITY));
-			ace.setArchive(rec.getAttributeAsBoolean(ARCHIVE));
-			ace.setDownload(rec.getAttributeAsBoolean(DOWNLOAD));
-			ace.setCalendar(rec.getAttributeAsBoolean(CALENDAR));
-			ace.setSubscription(rec.getAttributeAsBoolean(SUBSCRIPTION));
-			ace.setPassword(rec.getAttributeAsBoolean(PASSWORD));
-			ace.setMove(rec.getAttributeAsBoolean("move"));
-			ace.setEmail(rec.getAttributeAsBoolean(EMAIL));
-			ace.setAutomation(rec.getAttributeAsBoolean(AUTOMATION));
-			ace.setReadingreq(rec.getAttributeAsBoolean(READINGREQ));
+
+			ace.setRead(Boolean.TRUE.equals(rec.getAttributeAsBoolean("read")));
+			ace.setPreview(Boolean.TRUE.equals(rec.getAttributeAsBoolean(PREVIEW)));
+			ace.setPrint(Boolean.TRUE.equals(rec.getAttributeAsBoolean(PRINT)));
+			ace.setWrite(Boolean.TRUE.equals(rec.getAttributeAsBoolean(WRITE)));
+			ace.setCustomid(Boolean.TRUE.equals(rec.getAttributeAsBoolean(CUSTOMID)));
+			ace.setDelete(Boolean.TRUE.equals(rec.getAttributeAsBoolean(DELETE)));
+			ace.setWorkflow(Boolean.TRUE.equals(rec.getAttributeAsBoolean(WORKFLOW)));
+			ace.setSign(Boolean.TRUE.equals(rec.getAttributeAsBoolean("sign")));
+			ace.setImmutable(Boolean.TRUE.equals(rec.getAttributeAsBoolean(IMMUTABLE)));
+			ace.setRename(Boolean.TRUE.equals(rec.getAttributeAsBoolean(RENAME)));
+			ace.setSecurity(Boolean.TRUE.equals(rec.getAttributeAsBoolean(SECURITY)));
+			ace.setArchive(Boolean.TRUE.equals(rec.getAttributeAsBoolean(ARCHIVE)));
+			ace.setDownload(Boolean.TRUE.equals(rec.getAttributeAsBoolean(DOWNLOAD)));
+			ace.setCalendar(Boolean.TRUE.equals(rec.getAttributeAsBoolean(CALENDAR)));
+			ace.setSubscription(Boolean.TRUE.equals(rec.getAttributeAsBoolean(SUBSCRIPTION)));
+			ace.setPassword(Boolean.TRUE.equals(rec.getAttributeAsBoolean(PASSWORD)));
+			ace.setMove(Boolean.TRUE.equals(rec.getAttributeAsBoolean("move")));
+			ace.setEmail(Boolean.TRUE.equals(rec.getAttributeAsBoolean(EMAIL)));
+			ace.setAutomation(Boolean.TRUE.equals(rec.getAttributeAsBoolean(AUTOMATION)));
+			ace.setReadingreq(Boolean.TRUE.equals(rec.getAttributeAsBoolean(READINGREQ)));
 
 			acl.add(ace);
 		}
@@ -483,13 +483,7 @@ public class DocumentSecurityPanel extends DocumentDetailTab {
 	public void onSave() {
 		validate();
 
-		DocumentService.Instance.get().saveACL(document, new AsyncCallback<>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
+		DocumentService.Instance.get().saveACL(document, new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(Void result) {
 				GuiLog.info(I18N.message("appliedrightsondoc"), null);
@@ -500,12 +494,7 @@ public class DocumentSecurityPanel extends DocumentDetailTab {
 
 	public void onCopyParentFolderSecurity() {
 		FolderService.Instance.get().getFolder(document.getFolder().getId(), false, false, false,
-				new AsyncCallback<>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(GUIFolder folder) {
 						document.setAccessControlList(folder.getAccessControlList());
@@ -521,7 +510,7 @@ public class DocumentSecurityPanel extends DocumentDetailTab {
 		else
 			return false;
 	}
-	
+
 	@Override
 	public int hashCode() {
 		return super.hashCode();

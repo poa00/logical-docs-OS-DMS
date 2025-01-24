@@ -1,9 +1,8 @@
 package com.logicaldoc.gui.frontend.client.settings.messages;
 
 import java.util.LinkedHashMap;
-import java.util.Map;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIEmailSettings;
 import com.logicaldoc.gui.common.client.i18n.I18N;
@@ -183,13 +182,7 @@ public class OutgoingEmailPanel extends AdminPanel {
 			LD.askForValue(I18N.message("email"), I18N.message("email"), vm.getValueAsString(SENDEREMAIL),
 					(String value) -> {
 						LD.contactingServer();
-						SettingService.Instance.get().testEmail(value, new AsyncCallback<Boolean>() {
-							@Override
-							public void onFailure(Throwable caught) {
-								GuiLog.serverError(caught);
-								LD.clearPrompt();
-							}
-
+						SettingService.Instance.get().testEmail(value, new DefaultAsyncCallback<>() {
 							@Override
 							public void onSuccess(Boolean yes) {
 								LD.clearPrompt();
@@ -212,36 +205,27 @@ public class OutgoingEmailPanel extends AdminPanel {
 			if (Boolean.FALSE.equals(vm.validate()))
 				return;
 
-			@SuppressWarnings("unchecked")
-			Map<String, Object> values = vm.getValues();
-
-			OutgoingEmailPanel.this.emailSettings.setProtocol((String) values.get(PROTOCOL));
-			OutgoingEmailPanel.this.emailSettings.setServer((String) values.get("server"));
-			if (values.get("port") instanceof Integer)
-				OutgoingEmailPanel.this.emailSettings.setPort((Integer) values.get("port"));
+			OutgoingEmailPanel.this.emailSettings.setProtocol(vm.getValueAsString(PROTOCOL));
+			OutgoingEmailPanel.this.emailSettings.setServer(vm.getValueAsString("server"));
+			if (vm.getValue("port") instanceof Integer intVal)
+				OutgoingEmailPanel.this.emailSettings.setPort(intVal);
 			else
-				OutgoingEmailPanel.this.emailSettings.setPort(Integer.parseInt(values.get("port").toString()));
+				OutgoingEmailPanel.this.emailSettings.setPort(Integer.parseInt(vm.getValueAsString("port")));
 
-			OutgoingEmailPanel.this.emailSettings.setUsername((String) values.get(USERNAME));
-			OutgoingEmailPanel.this.emailSettings.setPwd((String) values.get("password_hidden"));
-			OutgoingEmailPanel.this.emailSettings.setConnSecurity((String) values.get("connSecurity"));
-			OutgoingEmailPanel.this.emailSettings.setSecureAuth(values.get("secureAuth").toString().equals("true"));
-			OutgoingEmailPanel.this.emailSettings.setSenderEmail((String) values.get(SENDEREMAIL));
-			OutgoingEmailPanel.this.emailSettings.setUserAsFrom(values.get(USERASFROM).toString().equals("true"));
-			OutgoingEmailPanel.this.emailSettings.setFoldering(Integer.parseInt(values.get("foldering").toString()));
+			OutgoingEmailPanel.this.emailSettings.setUsername(vm.getValueAsString(USERNAME));
+			OutgoingEmailPanel.this.emailSettings.setPwd(vm.getValueAsString("password_hidden"));
+			OutgoingEmailPanel.this.emailSettings.setConnSecurity(vm.getValueAsString("connSecurity"));
+			OutgoingEmailPanel.this.emailSettings.setSecureAuth(Boolean.valueOf(vm.getValueAsString("secureAuth")));
+			OutgoingEmailPanel.this.emailSettings.setSenderEmail(vm.getValueAsString(SENDEREMAIL));
+			OutgoingEmailPanel.this.emailSettings.setUserAsFrom(Boolean.valueOf(vm.getValueAsString(USERASFROM)));
+			OutgoingEmailPanel.this.emailSettings.setFoldering(Integer.parseInt(vm.getValueAsString("foldering")));
 			OutgoingEmailPanel.this.emailSettings.setTargetFolder(targetSelector.getFolder());
-			OutgoingEmailPanel.this.emailSettings.setClientId((String) values.get("clientid"));
-			OutgoingEmailPanel.this.emailSettings.setClientSecret((String) values.get("clientsecret_hidden"));
-			OutgoingEmailPanel.this.emailSettings.setClientTenant((String) values.get("clienttenant"));
+			OutgoingEmailPanel.this.emailSettings.setClientId(vm.getValueAsString("clientid"));
+			OutgoingEmailPanel.this.emailSettings.setClientSecret(vm.getValueAsString("clientsecret_hidden"));
+			OutgoingEmailPanel.this.emailSettings.setClientTenant(vm.getValueAsString("clienttenant"));
 
 			SettingService.Instance.get().saveEmailSettings(OutgoingEmailPanel.this.emailSettings,
-					new AsyncCallback<>() {
-
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
-						}
-
+					new DefaultAsyncCallback<>() {
 						@Override
 						public void onSuccess(Void ret) {
 							Session.get().getInfo().setConfig(Session.get().getTenantName() + ".smtp.userasfrom",
@@ -251,5 +235,15 @@ public class OutgoingEmailPanel extends AdminPanel {
 					});
 		});
 		return save;
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

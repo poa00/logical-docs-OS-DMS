@@ -18,7 +18,6 @@ import com.logicaldoc.core.security.user.User;
 import com.logicaldoc.core.security.user.UserDAO;
 import com.logicaldoc.util.Context;
 import com.logicaldoc.util.config.ContextProperties;
-import com.logicaldoc.util.crypt.CryptUtil;
 
 /**
  * This Authentication provider extends the standard
@@ -46,15 +45,19 @@ public class AdminAuthenticationProvider implements AuthenticationProvider {
 	public Authentication authenticate(Authentication authentication) throws AuthenticationException {
 		UsernamePasswordAuthenticationToken auth = (UsernamePasswordAuthenticationToken) authentication;
 		String username = String.valueOf(auth.getPrincipal());
-		String password = String.valueOf(auth.getCredentials());
 
 		if (!ADMIN.equals(username))
 			throw new BadCredentialsException(BADCREDENTIALS);
 
 		User user = new User();
 		user.setUsername(ADMIN);
+		try {
+			user.setDecodedPassword(String.valueOf(auth.getCredentials()));
+		} catch (NoSuchAlgorithmException e) {
+			log.error(e.getMessage(), e);
+		}
 
-		UserDAO uDao = (UserDAO) Context.get().getBean(UserDAO.class);
+		UserDAO uDao = Context.get(UserDAO.class);
 
 		/**
 		 * The standard authentication has failed, now check the database
@@ -65,7 +68,7 @@ public class AdminAuthenticationProvider implements AuthenticationProvider {
 			long userId = uDao.queryForLong("select ld_id from ld_user where ld_username='admin' and ld_deleted=0");
 			dbAvailable = userId == 1L;
 		} catch (Exception t) {
-			// Noting to do
+			log.error(t.getMessage(), t);
 		}
 
 		String adminPasswd = null;
@@ -76,7 +79,7 @@ public class AdminAuthenticationProvider implements AuthenticationProvider {
 				adminPasswd = uDao
 						.queryForString("select ld_password from ld_user where ld_username='admin' and ld_deleted=0");
 			} catch (Exception t) {
-				// Noting to do
+				log.error(t.getMessage(), t);
 			}
 		} else {
 			// If the database is not available, get the password from the
@@ -85,23 +88,14 @@ public class AdminAuthenticationProvider implements AuthenticationProvider {
 				ContextProperties config = Context.get().getProperties();
 				adminPasswd = config.getProperty("adminpasswd");
 			} catch (Exception t) {
-				// Noting to do
+				log.error(t.getMessage(), t);
 			}
 		}
 
 		if (adminPasswd == null || adminPasswd.isEmpty())
 			throw new BadCredentialsException(BADCREDENTIALS);
 
-		// Check the password match with one of the current or legacy algorithm
-		String testLegacy = "";
-		try {
-			testLegacy = CryptUtil.encryptSHA(password);
-			user.setDecodedPassword(password);
-		} catch (NoSuchAlgorithmException e) {
-			log.error("Cannot cript the password", e);
-		}
-
-		if (!user.getPassword().equals(adminPasswd) && !testLegacy.equals(adminPasswd))
+		if (!user.getPassword().equals(adminPasswd))
 			throw new BadCredentialsException(BADCREDENTIALS);
 
 		Collection<GrantedAuthority> authorities = new ArrayList<>();

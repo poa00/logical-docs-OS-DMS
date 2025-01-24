@@ -10,10 +10,14 @@ import com.google.gwt.http.client.RequestCallback;
 import com.google.gwt.http.client.RequestException;
 import com.google.gwt.http.client.Response;
 import com.google.gwt.user.client.Timer;
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Feature;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIPatch;
+import com.logicaldoc.gui.common.client.grid.DateListGridField;
+import com.logicaldoc.gui.common.client.grid.DateListGridField.DateCellFormatter;
+import com.logicaldoc.gui.common.client.grid.FileSizeListGridField;
+import com.logicaldoc.gui.common.client.grid.IdListGridField;
 import com.logicaldoc.gui.common.client.i18n.I18N;
 import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
@@ -21,9 +25,6 @@ import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.common.client.util.Util;
 import com.logicaldoc.gui.common.client.widgets.ApplicationRestarting;
 import com.logicaldoc.gui.common.client.widgets.FeatureDisabled;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField.DateCellFormatter;
-import com.logicaldoc.gui.common.client.widgets.grid.FileSizeListGridField;
 import com.logicaldoc.gui.frontend.client.services.UpdateService;
 import com.smartgwt.client.types.Alignment;
 import com.smartgwt.client.types.ContentsType;
@@ -112,8 +113,7 @@ public class PatchPanel extends VLayout {
 		Util.removeChildren(this);
 		Util.removeChildren(notesPanel);
 
-		ListGridField id = new ListGridField("id", I18N.message("id"), 100);
-		id.setHidden(true);
+		ListGridField id = new IdListGridField();
 
 		ListGridField file = new ListGridField("file", I18N.message("file"), 150);
 		file.setHidden(true);
@@ -296,13 +296,7 @@ public class PatchPanel extends VLayout {
 	public void showList() {
 		LD.contactingServer();
 
-		UpdateService.Instance.get().checkPatch(new AsyncCallback<>() {
-			@Override
-			public void onFailure(Throwable caught) {
-				LD.clearPrompt();
-				GuiLog.serverError(caught);
-			}
-
+		UpdateService.Instance.get().checkPatch(new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(List<GUIPatch> patches) {
 				LD.clearPrompt();
@@ -347,44 +341,39 @@ public class PatchPanel extends VLayout {
 			bar.setPercentDone(0);
 			download.setDisabled(true);
 
-			UpdateService.Instance.get().downloadPatch(patch.getId(), fileName, patch.getSize(), new AsyncCallback<>() {
+			UpdateService.Instance.get().downloadPatch(patch.getId(), fileName, patch.getSize(),
+					new DefaultAsyncCallback<>() {
 
-				@Override
-				public void onFailure(Throwable caught) {
-					GuiLog.serverError(caught);
-					download.setDisabled(false);
-				}
-
-				@Override
-				public void onSuccess(Void arg) {
-					confirmPatch.setVisible(false);
-
-					new Timer() {
-						public void run() {
-							UpdateService.Instance.get().checkDownloadStatus(new AsyncCallback<>() {
-
-								@Override
-								public void onFailure(Throwable caught) {
-									GuiLog.serverError(caught);
-								}
-
-								@Override
-								public void onSuccess(List<Integer> status) {
-									bar.setPercentDone(status.get(1));
-
-									if (status.get(1) == 100) {
-										download.setDisabled(false);
-										confirmPatch.setVisible(true);
-										deleteButton.setVisible(true);
-										displayNotes(fileName);
-									} else
-										schedule(50);
-								}
-							});
+						@Override
+						public void onFailure(Throwable caught) {
+							super.onFailure(caught);
+							download.setDisabled(false);
 						}
-					}.schedule(50);
-				}
-			});
+
+						@Override
+						public void onSuccess(Void arg) {
+							confirmPatch.setVisible(false);
+
+							new Timer() {
+								public void run() {
+									UpdateService.Instance.get().checkDownloadStatus(new DefaultAsyncCallback<>() {
+										@Override
+										public void onSuccess(List<Integer> status) {
+											bar.setPercentDone(status.get(1));
+
+											if (status.get(1) == 100) {
+												download.setDisabled(false);
+												confirmPatch.setVisible(true);
+												deleteButton.setVisible(true);
+												displayNotes(fileName);
+											} else
+												schedule(50);
+										}
+									});
+								}
+							}.schedule(50);
+						}
+					});
 		});
 
 		HLayout buttonCanvas = new HLayout();
@@ -402,12 +391,7 @@ public class PatchPanel extends VLayout {
 	private void onDelete(String fileName) {
 		SC.ask(I18N.message("delete"), I18N.message("deletepatchquestion"), choice -> {
 			if (Boolean.TRUE.equals(choice)) {
-				UpdateService.Instance.get().deletePatch(fileName, new AsyncCallback<>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				UpdateService.Instance.get().deletePatch(fileName, new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Void ret) {
 						showList();
@@ -418,13 +402,7 @@ public class PatchPanel extends VLayout {
 	}
 
 	private void displayNotes(String fileName) {
-		UpdateService.Instance.get().getPatchNotes(fileName, new AsyncCallback<>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
+		UpdateService.Instance.get().getPatchNotes(fileName, new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(List<String> infos) {
 				VLayout panel = new VLayout();
@@ -483,8 +461,8 @@ public class PatchPanel extends VLayout {
 		patch.setDescription(rec.getAttribute(DESCRIPTION));
 		patch.setSize(rec.getAttributeAsLong("size"));
 		patch.setDate(rec.getAttributeAsDate("date"));
-		patch.setInstalled(rec.getAttributeAsBoolean(INSTALLED));
-		patch.setLocal(rec.getAttributeAsBoolean(LOCAL));
+		patch.setInstalled(Boolean.TRUE.equals(rec.getAttributeAsBoolean(INSTALLED)));
+		patch.setLocal(Boolean.TRUE.equals(rec.getAttributeAsBoolean(LOCAL)));
 
 		Menu contextMenu = new Menu();
 
@@ -507,13 +485,7 @@ public class PatchPanel extends VLayout {
 			if (Boolean.TRUE.equals(choice)) {
 				confirmPatch.setVisible(false);
 				download.setVisible(false);
-				UpdateService.Instance.get().confirmPatch(patch.getFile(), new AsyncCallback<>() {
-
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				UpdateService.Instance.get().confirmPatch(patch.getFile(), new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(String path) {
 						Session.get().setUpdating(true);
@@ -535,7 +507,7 @@ public class PatchPanel extends VLayout {
 		try {
 			builder.sendRequest(null, new RequestCallback() {
 				public void onError(Request request, Throwable exception) {
-					// Nothing to do
+					scheduleGetStatus(patch);
 				}
 
 				public void onResponseReceived(Request request, Response response) {
@@ -556,17 +528,18 @@ public class PatchPanel extends VLayout {
 							GuiLog.info(I18N.message("patchinstalled"));
 							if (patch.isRestart())
 								Util.waitForUpAndRunning(Session.get().getTenantName(), I18N.getLocale());
-						} else if (!"running".equals(statusLabel) && elapsedTime > MAX_WAIT_TIME) {
+						} else if (!"running".equals(statusLabel) && elapsedTime > MAX_WAIT_TIME && command != null
+								&& !command.isEmpty()) {
 							LD.clearPrompt();
 							ApplicationRestarting.get(I18N.message("patchnotstarted", command)).show();
-						} else {
-							scheduleGetStatus(patch);
 						}
+
+						scheduleGetStatus(patch);
 					}
 				}
 			});
 		} catch (RequestException e) {
-			// Nothing to do
+			scheduleGetStatus(patch);
 		}
 	}
 
@@ -576,5 +549,15 @@ public class PatchPanel extends VLayout {
 				getStatus(patch);
 			}
 		}.schedule(500);
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

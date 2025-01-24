@@ -72,7 +72,7 @@ public class GUIEmailAccount implements Serializable {
 	private Date startDate;
 
 	/**
-	 * This attribute defines the EmailAccount storage format.
+	 * This attribute defines the EmailAccount store format.
 	 * 
 	 * @see #FORMAT_MULTIPLE
 	 * @see #FORMAT_EML
@@ -88,6 +88,8 @@ public class GUIEmailAccount implements Serializable {
 	private String automation;
 
 	private String automationAfter;
+
+	private String automationEnd;
 
 	public GUIEmailAccount() {
 		super();
@@ -292,5 +294,13 @@ public class GUIEmailAccount implements Serializable {
 
 	public void setClientTenant(String clientTenant) {
 		this.clientTenant = clientTenant;
+	}
+
+	public String getAutomationEnd() {
+		return automationEnd;
+	}
+
+	public void setAutomationEnd(String automationEnd) {
+		this.automationEnd = automationEnd;
 	}
 }

@@ -2,7 +2,6 @@ package com.logicaldoc.webservice.model;
 
 import java.lang.reflect.InvocationTargetException;
 import java.text.DateFormat;
-import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -28,6 +27,7 @@ import com.logicaldoc.core.folder.Folder;
 import com.logicaldoc.core.folder.FolderDAO;
 import com.logicaldoc.core.metadata.Attribute;
 import com.logicaldoc.core.metadata.AttributeSet;
+import com.logicaldoc.core.metadata.AttributeSetDAO;
 import com.logicaldoc.core.metadata.Template;
 import com.logicaldoc.core.metadata.TemplateDAO;
 import com.logicaldoc.core.security.AccessControlEntry;
@@ -53,6 +53,7 @@ public class WSUtil {
 			wsDoc.setCustomId(document.getCustomId());
 			wsDoc.setLanguage(document.getLanguage());
 			wsDoc.setComment(document.getComment());
+			wsDoc.setLastNote(document.getLastNote());
 			wsDoc.setWorkflowStatus(document.getWorkflowStatus());
 			wsDoc.setWorkflowStatusDisplay(document.getWorkflowStatusDisplay());
 			wsDoc.setColor(document.getColor());
@@ -175,7 +176,7 @@ public class WSUtil {
 	}
 
 	public static Document toDocument(WSDocument wsDoc) throws PersistenceException {
-		FolderDAO fdao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+		FolderDAO fdao = Context.get(FolderDAO.class);
 		Folder folder = fdao.findById(wsDoc.getFolderId());
 		if (folder == null) {
 			throw new PersistenceException("error - folder not found");
@@ -236,7 +237,7 @@ public class WSUtil {
 		Template template = null;
 		Map<String, Attribute> attrs = new HashMap<>();
 		if (wsDoc.getTemplateId() != null) {
-			TemplateDAO templDao = (TemplateDAO) Context.get().getBean(TemplateDAO.class);
+			TemplateDAO templDao = Context.get(TemplateDAO.class);
 			template = templDao.findById(wsDoc.getTemplateId());
 			doc.setTemplate(template);
 			if (template != null) {
@@ -305,21 +306,25 @@ public class WSUtil {
 
 		try {
 			return DateUtils.parseDate(date, "yyyy-MM-dd HH:mm:ss.SSS Z", "yyyy-MM-dd HH:mm:ss.SS Z",
-					"yyyy-MM-dd HH:mm:ss Z", "yyyy-MM-dd");
-		} catch (ParseException e) {
+					"yyyy-MM-dd HH:mm:ss Z", "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd");
+		} catch (Exception e) {
 			log.error("Unparseable date {}", date);
+			log.error(e.getMessage(), e);
 		}
 
 		return null;
 	}
 
-	public static WSAttributeSet toWSAttributeSet(AttributeSet attributeSet) {
+	public static WSAttributeSet toWSAttributeSet(AttributeSet attributeSet) throws PersistenceException {
 		WSAttributeSet wsAttributeSet = new WSAttributeSet();
 
 		wsAttributeSet.setId(attributeSet.getId());
 		wsAttributeSet.setName(attributeSet.getName());
 		wsAttributeSet.setDescription(attributeSet.getDescription());
 		wsAttributeSet.setLastModified(DateUtil.format(attributeSet.getLastModified()));
+
+		AttributeSetDAO setDao = Context.get(AttributeSetDAO.class);
+		setDao.initialize(attributeSet);
 
 		// Populate extended attributes
 		List<WSAttribute> wsAttributes;
@@ -443,7 +448,7 @@ public class WSUtil {
 			wsTemplate.setValidation(template.getValidation());
 			wsTemplate.setLastModified(DateUtil.format(template.getLastModified()));
 
-			TemplateDAO templateDao = (TemplateDAO) Context.get().getBean(TemplateDAO.class);
+			TemplateDAO templateDao = Context.get(TemplateDAO.class);
 			templateDao.initialize(template);
 			wsTemplate.setDocsCount(templateDao.countDocs(template.getId()));
 
@@ -492,7 +497,7 @@ public class WSUtil {
 			throw new PersistenceException(e.getMessage(), e);
 		}
 
-		GroupDAO groupDao = (GroupDAO) Context.get().getBean(GroupDAO.class);
+		GroupDAO groupDao = Context.get(GroupDAO.class);
 		Group group = groupDao.findById(ace.getGroupId());
 		if (group.getName().startsWith("_user_"))
 			wsAce.setUserId(Long.parseLong(group.getName().substring(group.getName().lastIndexOf('_') + 1)));
@@ -509,7 +514,7 @@ public class WSUtil {
 		}
 
 		if (wsAce.getUserId() != 0L) {
-			UserDAO userDao = (UserDAO) Context.get().getBean(UserDAO.class);
+			UserDAO userDao = Context.get(UserDAO.class);
 			User user = userDao.findById(wsAce.getUserId());
 			userDao.initialize(user);
 			ace.setGroupId(user.getUserGroup().getId());

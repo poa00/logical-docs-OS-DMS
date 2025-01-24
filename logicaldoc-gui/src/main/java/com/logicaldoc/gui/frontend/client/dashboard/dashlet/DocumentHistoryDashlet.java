@@ -3,18 +3,17 @@ package com.logicaldoc.gui.frontend.client.dashboard.dashlet;
 import java.util.List;
 import java.util.Map;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.logicaldoc.gui.common.client.Constants;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIDashlet;
+import com.logicaldoc.gui.common.client.grid.ColoredListGridField;
+import com.logicaldoc.gui.common.client.grid.DateListGridField;
+import com.logicaldoc.gui.common.client.grid.RefreshableListGrid;
+import com.logicaldoc.gui.common.client.grid.UserListGridField;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.AwesomeFactory;
 import com.logicaldoc.gui.common.client.util.LD;
-import com.logicaldoc.gui.common.client.widgets.grid.ColoredListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.RefreshableListGrid;
-import com.logicaldoc.gui.common.client.widgets.grid.UserListGridField;
 import com.logicaldoc.gui.frontend.client.document.grid.DocumentsListGrid;
 import com.logicaldoc.gui.frontend.client.services.DocumentService;
 import com.smartgwt.client.data.Record;
@@ -43,12 +42,12 @@ public class DocumentHistoryDashlet extends DocumentDashlet {
 
 		HeaderControl markAsRead = new HeaderControl(HeaderControl.TRASH, e -> {
 			LD.contactingServer();
-			DocumentService.Instance.get().markHistoryAsRead(event, new AsyncCallback<>() {
+			DocumentService.Instance.get().markHistoryAsRead(event, new DefaultAsyncCallback<>() {
 
 				@Override
 				public void onFailure(Throwable caught) {
 					LD.clearPrompt();
-					GuiLog.serverError(caught);
+					super.onFailure(caught);
 				}
 
 				@Override
@@ -135,7 +134,7 @@ public class DocumentHistoryDashlet extends DocumentDashlet {
 
 			@Override
 			protected String getCellCSSText(ListGridRecord rec, int rowNum, int colNum) {
-				if ("true".equals(rec.getAttributeAsString("new")) && event != null) {
+				if (Boolean.TRUE.equals(rec.getAttributeAsBoolean("new")) && event != null) {
 					return "font-weight: bold;";
 				} else {
 					return super.getCellCSSText(rec, rowNum, colNum);
@@ -182,7 +181,7 @@ public class DocumentHistoryDashlet extends DocumentDashlet {
 			Record[] records = grid.getRecordList().toArray();
 			int unread = 0;
 			for (Record rec : records) {
-				if ("true".equals(rec.getAttributeAsString("new")))
+				if (Boolean.TRUE.equals(rec.getAttributeAsBoolean("new")))
 					unread++;
 			}
 
@@ -214,5 +213,15 @@ public class DocumentHistoryDashlet extends DocumentDashlet {
 			Session.get().getUser().setLockedDocs(total);
 		else if (Constants.EVENT_CHECKEDOUT.equals(event))
 			Session.get().getUser().setCheckedOutDocs(total);
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+	
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

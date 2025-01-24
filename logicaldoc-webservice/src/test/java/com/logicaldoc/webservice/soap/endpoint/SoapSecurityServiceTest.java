@@ -7,13 +7,13 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.List;
 
 import org.junit.Test;
 
+import com.logicaldoc.core.security.Client;
 import com.logicaldoc.core.security.Session;
 import com.logicaldoc.core.security.SessionManager;
 import com.logicaldoc.core.security.user.Group;
@@ -41,7 +41,7 @@ public class SoapSecurityServiceTest extends AbstractWebserviceTestCase {
 	private SoapSecurityService securityServiceImpl;
 
 	@Override
-	public void setUp() throws FileNotFoundException, IOException, SQLException, PluginException {
+	public void setUp() throws IOException, SQLException, PluginException {
 		super.setUp();
 		userDao = (UserDAO) context.getBean("UserDAO");
 		groupDao = (GroupDAO) context.getBean("GroupDAO");
@@ -66,7 +66,7 @@ public class SoapSecurityServiceTest extends AbstractWebserviceTestCase {
 
 		securityServiceImpl.setValidateSession(true);
 		SessionManager sm = SessionManager.get();
-		Session session1 = sm.newSession("author", "admin", null);
+		Session session1 = sm.newSession("author", "admin", (Client) null);
 
 		users = securityServiceImpl.listUsers(session1.getSid(), "admin");
 
@@ -147,7 +147,7 @@ public class SoapSecurityServiceTest extends AbstractWebserviceTestCase {
 		wsUserTest.setType(User.TYPE_SYSTEM);
 
 		try {
-			userId = securityServiceImpl.storeUser("", wsUserTest);
+			securityServiceImpl.storeUser("", wsUserTest);
 			fail("Expected exception was not thrown");
 		} catch (Exception e) {
 			// nothing to do here

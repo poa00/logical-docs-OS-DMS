@@ -2,7 +2,7 @@ package com.logicaldoc.gui.frontend.client.document;
 
 import java.util.List;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Feature;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIDocument;
@@ -10,22 +10,24 @@ import com.logicaldoc.gui.common.client.beans.GUIVersion;
 import com.logicaldoc.gui.common.client.controllers.DocumentController;
 import com.logicaldoc.gui.common.client.controllers.FolderController;
 import com.logicaldoc.gui.common.client.data.VersionsDS;
+import com.logicaldoc.gui.common.client.grid.ColoredListGridField;
+import com.logicaldoc.gui.common.client.grid.DateListGridField;
+import com.logicaldoc.gui.common.client.grid.FileNameListGridField;
+import com.logicaldoc.gui.common.client.grid.IdListGridField;
+import com.logicaldoc.gui.common.client.grid.RefreshableListGrid;
+import com.logicaldoc.gui.common.client.grid.UserListGridField;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
+import com.logicaldoc.gui.common.client.preview.PreviewPopup;
 import com.logicaldoc.gui.common.client.util.DocUtil;
 import com.logicaldoc.gui.common.client.util.GridUtil;
+import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.common.client.util.Util;
-import com.logicaldoc.gui.common.client.widgets.grid.ColoredListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.FileNameListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.UserListGridField;
-import com.logicaldoc.gui.common.client.widgets.preview.PreviewPopup;
 import com.logicaldoc.gui.frontend.client.document.note.VersionNotesWindow;
 import com.logicaldoc.gui.frontend.client.services.DocumentService;
 import com.smartgwt.client.types.Alignment;
 import com.smartgwt.client.types.ListGridFieldType;
-import com.smartgwt.client.widgets.grid.ListGrid;
+import com.smartgwt.client.widgets.form.fields.SpinnerItem;
 import com.smartgwt.client.widgets.grid.ListGridField;
 import com.smartgwt.client.widgets.grid.ListGridRecord;
 import com.smartgwt.client.widgets.layout.VLayout;
@@ -51,7 +53,7 @@ public class VersionsPanel extends DocumentDetailTab {
 
 	private static final String FILE_VERSION = "fileVersion";
 
-	private ListGrid list = null;
+	private RefreshableListGrid list = null;
 
 	public VersionsPanel(final GUIDocument document) {
 		super(document, null);
@@ -59,9 +61,7 @@ public class VersionsPanel extends DocumentDetailTab {
 
 	@Override
 	protected void onDraw() {
-		ListGridField id = new ListGridField("id");
-		id.setHidden(true);
-
+		ListGridField id = new IdListGridField();
 		ListGridField user = new UserListGridField("user", "userId", "user");
 		ListGridField event = new ColoredListGridField("event", 200);
 		ListGridField version = new ColoredListGridField(VERSION, 70);
@@ -79,15 +79,15 @@ public class VersionsPanel extends DocumentDetailTab {
 
 		ListGridField wfStatus = prepareWorkflow();
 
-		list = new ListGrid();
+		list = new RefreshableListGrid(
+				new VersionsDS(document.getId(), null, Session.get().getConfigAsInt("gui.maxversions")));
 		list.setEmptyMessage(I18N.message("notitemstoshow"));
 		list.setCanFreezeFields(true);
 		list.setAutoFetchData(true);
-		list.setDataSource(new VersionsDS(document.getId(), null, 100));
 		if (document.getFolder().isDownload())
-			list.setFields(user, event, fileName, type, fileVersion, version, date, permalink, wfStatus, comment);
+			list.setFields(id, user, event, fileName, type, fileVersion, version, date, permalink, wfStatus, comment);
 		else
-			list.setFields(user, event, fileName, type, fileVersion, version, date, comment);
+			list.setFields(id, user, event, fileName, type, fileVersion, version, date, comment);
 
 		addListHandlers();
 
@@ -104,6 +104,17 @@ public class VersionsPanel extends DocumentDetailTab {
 	private ToolStrip prepareButtons() {
 		ToolStrip buttons = new ToolStrip();
 		buttons.setWidth100();
+
+		SpinnerItem maxItem = ItemFactory.newSpinnerItem("max", "display",
+				Session.get().getConfigAsInt("gui.maxversions"), 1, (Integer) null);
+		maxItem.setWidth(70);
+		maxItem.setStep(20);
+		maxItem.setSaveOnEnter(true);
+		maxItem.setImplicitSave(true);
+		maxItem.setHint(I18N.message("elements"));
+		buttons.addFormItem(maxItem);
+		maxItem.addChangedHandler(evnt -> list
+				.refresh(new VersionsDS(document.getId(), null, Integer.parseInt(maxItem.getValueAsString()))));
 
 		ToolStripButton export = new ToolStripButton(I18N.message("export"));
 		export.addClickHandler(clkEvent -> GridUtil.exportCSV(list, true));
@@ -254,12 +265,7 @@ public class VersionsPanel extends DocumentDetailTab {
 				I18N.message("delversionwarn") + ".\n " + I18N.message("confirmdelete"), (Boolean value) -> {
 					if (Boolean.TRUE.equals(value)) {
 						DocumentService.Instance.get().deleteVersions(GridUtil.getIds(selection),
-								new AsyncCallback<>() {
-									@Override
-									public void onFailure(Throwable caught) {
-										GuiLog.serverError(caught);
-									}
-
+								new DefaultAsyncCallback<>() {
 									@Override
 									public void onSuccess(GUIDocument result) {
 										if (result != null) {
@@ -284,14 +290,7 @@ public class VersionsPanel extends DocumentDetailTab {
 					if (Boolean.TRUE.equals(yes)) {
 						LD.contactingServer();
 						DocumentService.Instance.get().promoteVersion(document.getId(),
-								selection[0].getAttributeAsString(VERSION), new AsyncCallback<>() {
-
-									@Override
-									public void onFailure(Throwable caught) {
-										LD.clearPrompt();
-										GuiLog.serverError(caught);
-									}
-
+								selection[0].getAttributeAsString(VERSION), new DefaultAsyncCallback<>() {
 									@Override
 									public void onSuccess(GUIDocument document) {
 										LD.clearPrompt();
@@ -309,12 +308,7 @@ public class VersionsPanel extends DocumentDetailTab {
 		compareContent.setTitle(I18N.message("comparecontent"));
 		compareContent.addClickHandler(compareContentEvent -> DocumentService.Instance.get().getVersionsById(
 				Long.parseLong(selection[0].getAttribute("id")), Long.parseLong(selection[1].getAttribute("id")),
-				new AsyncCallback<>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(List<GUIVersion> versions) {
 						new ComparisonWindow(versions.get(0), versions.get(1)).show();
@@ -328,18 +322,22 @@ public class VersionsPanel extends DocumentDetailTab {
 		compareMetadata.setTitle(I18N.message("comparemetadata"));
 		compareMetadata.addClickHandler(compareMetadataEvent -> DocumentService.Instance.get().getVersionsById(
 				Long.parseLong(selection[0].getAttribute("id")), Long.parseLong(selection[1].getAttribute("id")),
-				new AsyncCallback<>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(List<GUIVersion> result) {
-						MetadataDiff diffWinfow = new MetadataDiff(result.get(0), result.get(1));
-						diffWinfow.show();
+						new MetadataDiff(result.get(0), result.get(1)).show();
 					}
 				}));
 		return compareMetadata;
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

@@ -45,7 +45,7 @@ public class DefaultSchedulerFactory extends org.springframework.scheduling.quar
 			return super.getObject();
 		else {
 			log.debug(ASPECT_DISABLED);
-			return null;
+			return new DummyScheduler();
 		}
 	}
 
@@ -71,12 +71,14 @@ public class DefaultSchedulerFactory extends org.springframework.scheduling.quar
 
 		List<Trigger> triggers = new ArrayList<>();
 
-		TaskManager manager = (TaskManager) applicationContext.getBean("TaskManager");
+		TaskManager manager = (TaskManager) applicationContext.getBean("taskManager");
 		Collection<Task> tasks = manager.getTasks(applicationContext);
 		for (Task task : tasks) {
 			String name = task.getName();
-			Object trigger = applicationContext.getBean(name + "Trigger");
-			if (trigger instanceof Trigger trgr) {
+			String triggerName = name + "Trigger";
+			if (!applicationContext.containsBean(triggerName))
+				triggerName = Character.toLowerCase(triggerName.charAt(0)) + triggerName.substring(1);
+			if (applicationContext.getBean(triggerName) instanceof Trigger trgr) {
 				triggers.add(trgr);
 			} else
 				log.warn("Cannot schedule task {}", name);

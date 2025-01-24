@@ -58,7 +58,7 @@ public class SearchEngineServiceImpl extends AbstractRemoteService implements Se
 		try {
 			GUISearchEngine searchEngine = new GUISearchEngine();
 
-			SearchEngine indexer = (SearchEngine) Context.get().getBean(SearchEngine.class);
+			SearchEngine indexer = Context.get(SearchEngine.class);
 			searchEngine.setLocked(indexer.isLocked());
 
 			ContextProperties conf = Context.get().getProperties();
@@ -92,7 +92,7 @@ public class SearchEngineServiceImpl extends AbstractRemoteService implements Se
 
 			return searchEngine;
 		} catch (Exception t) {
-			return (GUISearchEngine) throwServerException(session, log, t);
+			return throwServerException(session, log, t);
 		}
 	}
 
@@ -102,26 +102,22 @@ public class SearchEngineServiceImpl extends AbstractRemoteService implements Se
 
 		if (dropIndex)
 			try {
-				SearchEngine indexer = (SearchEngine) Context.get().getBean(SearchEngine.class);
-				indexer.dropIndex();
+				Context.get(SearchEngine.class).dropIndex();
 			} catch (Exception e) {
 				throw new ServerException(e.getMessage(), e);
 			}
 
 		Runnable task = () -> {
 			try {
-				DocumentDAO documentDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
-				documentDao.bulkUpdate(
-						"set ld_indexed=0 where ld_indexed=1 "
-								+ (!dropIndex ? " and ld_tenantid=" + session.getTenantId() : ""),
-						(Map<String, Object>) null);
+				Context.get(DocumentDAO.class)
+						.jdbcUpdate("update ld_document set ld_indexed=0 where ld_indexed=1 "
+								+ (!dropIndex ? " and ld_tenantid=" + session.getTenantId() : ""));
 			} catch (Exception t) {
 				log.error(t.getMessage(), t);
 			}
 		};
 
-		Thread recreateThread = new Thread(task);
-		recreateThread.start();
+		new Thread(task).start();
 	}
 
 	@Override
@@ -129,7 +125,7 @@ public class SearchEngineServiceImpl extends AbstractRemoteService implements Se
 		Session session = validateSession();
 
 		try {
-			SearchEngine indexer = (SearchEngine) Context.get().getBean(SearchEngine.class);
+			SearchEngine indexer = Context.get(SearchEngine.class);
 			indexer.unlock();
 		} catch (Exception t) {
 			throwServerException(session, log, t);
@@ -141,10 +137,10 @@ public class SearchEngineServiceImpl extends AbstractRemoteService implements Se
 		Session session = validateSession();
 
 		try {
-			SearchEngine indexer = (SearchEngine) Context.get().getBean(SearchEngine.class);
+			SearchEngine indexer = Context.get(SearchEngine.class);
 			return indexer.check();
 		} catch (Exception t) {
-			return (String) throwServerException(session, log, t);
+			return throwServerException(session, log, t);
 		}
 	}
 
@@ -220,10 +216,10 @@ public class SearchEngineServiceImpl extends AbstractRemoteService implements Se
 	public long countEntries() throws ServerException {
 		Session session = validateSession();
 		try {
-			SearchEngine indexer = (SearchEngine) Context.get().getBean(SearchEngine.class);
+			SearchEngine indexer = Context.get(SearchEngine.class);
 			return indexer.getCount();
 		} catch (Exception t) {
-			return (Long) throwServerException(session, log, t);
+			return throwServerException(session, log, t);
 		}
 	}
 
@@ -273,7 +269,7 @@ public class SearchEngineServiceImpl extends AbstractRemoteService implements Se
 
 		try {
 			Runnable runnable = () -> {
-				SearchEngine indexer = (SearchEngine) Context.get().getBean(SearchEngine.class);
+				SearchEngine indexer = Context.get(SearchEngine.class);
 				indexer.purge();
 			};
 
@@ -289,12 +285,12 @@ public class SearchEngineServiceImpl extends AbstractRemoteService implements Se
 
 		try {
 			Runnable runnable = () -> {
-				SearchEngine indexer = (SearchEngine) Context.get().getBean(SearchEngine.class);
+				SearchEngine indexer = Context.get(SearchEngine.class);
 
 				indexer.deleteHits(entryIds);
 				log.info("Removed {} entries from the index", entryIds.size());
 
-				DocumentDAO dao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+				DocumentDAO dao = Context.get(DocumentDAO.class);
 				StringBuilder updateQuery = new StringBuilder();
 				updateQuery = new StringBuilder("update ld_document set ld_indexed=0 where ld_indexed = 1 ");
 
@@ -339,7 +335,7 @@ public class SearchEngineServiceImpl extends AbstractRemoteService implements Se
 	public GUIResult query(String query, int page, int size) throws ServerException {
 		Session session = validateSession();
 		try {
-			SearchEngine indexer = (SearchEngine) Context.get().getBean(SearchEngine.class);
+			SearchEngine indexer = Context.get(SearchEngine.class);
 			Hits hits = indexer.query(query, page, size);
 
 			GUIResult result = new GUIResult();
@@ -365,7 +361,7 @@ public class SearchEngineServiceImpl extends AbstractRemoteService implements Se
 
 			return result;
 		} catch (Exception t) {
-			return (GUIResult) throwServerException(session, log, t);
+			return throwServerException(session, log, t);
 		}
 	}
 
@@ -459,7 +455,7 @@ public class SearchEngineServiceImpl extends AbstractRemoteService implements Se
 		richQuery.append(" left outer join ld_template C on A.ld_templateid=C.ld_id ");
 		richQuery.append(" where A.ld_deleted=0 and A.ld_folderid=FOLD.ld_id  ");
 
-		DocumentDAO dao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO dao = Context.get(DocumentDAO.class);
 
 		Set<Long> hitsIds = hitsMap.keySet();
 		StringBuilder hitsIdsCondition = new StringBuilder();

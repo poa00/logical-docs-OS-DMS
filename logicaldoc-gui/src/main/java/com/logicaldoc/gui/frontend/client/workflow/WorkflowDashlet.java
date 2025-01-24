@@ -2,21 +2,21 @@ package com.logicaldoc.gui.frontend.client.workflow;
 
 import java.util.ArrayList;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.logicaldoc.gui.common.client.Constants;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIWorkflow;
 import com.logicaldoc.gui.common.client.controllers.UserController;
 import com.logicaldoc.gui.common.client.data.WorkflowTasksDS;
+import com.logicaldoc.gui.common.client.grid.DateListGridField;
+import com.logicaldoc.gui.common.client.grid.IdListGridField;
+import com.logicaldoc.gui.common.client.grid.RefreshableListGrid;
+import com.logicaldoc.gui.common.client.grid.VersionListGridField;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.AwesomeFactory;
 import com.logicaldoc.gui.common.client.util.GridUtil;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.LD;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.RefreshableListGrid;
-import com.logicaldoc.gui.common.client.widgets.grid.VersionListGridField;
 import com.logicaldoc.gui.frontend.client.services.WorkflowService;
 import com.smartgwt.client.data.AdvancedCriteria;
 import com.smartgwt.client.data.Record;
@@ -109,8 +109,7 @@ public class WorkflowDashlet extends Portlet {
 		ListGridField workflowDisplay = new ListGridField("workflowLabel", I18N.message("workflow"), 100);
 		ListGridField workflow = new ListGridField("workflow", I18N.message("workflowname"), 100);
 		workflow.setHidden(true);
-		ListGridField id = new ListGridField("id", I18N.message("id"), 70);
-		id.setHidden(true);
+		ListGridField id = new IdListGridField();
 		ListGridField processId = new ListGridField(PROCESS_ID, I18N.message("processid"), 80);
 		processId.setHidden(true);
 		ListGridField name = new WorkflowTaskNameListGridField("name", "display", "task", 100);
@@ -166,13 +165,7 @@ public class WorkflowDashlet extends Portlet {
 		list.addCellDoubleClickHandler(event -> {
 			Record rec = event.getRecord();
 			WorkflowService.Instance.get().getWorkflowDetailsByTask(rec.getAttributeAsString("id"),
-					new AsyncCallback<>() {
-
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
-						}
-
+					new DefaultAsyncCallback<>() {
 						@Override
 						public void onSuccess(GUIWorkflow result) {
 							if (result != null) {
@@ -217,13 +210,7 @@ public class WorkflowDashlet extends Portlet {
 			// recalculate the total assigned tasks
 			if (total != Session.get().getUser().getTasks()) {
 				WorkflowService.Instance.get().countAssignedTasks(Session.get().getUser().getUsername(),
-						new AsyncCallback<Integer>() {
-
-							@Override
-							public void onFailure(Throwable caught) {
-								GuiLog.serverError(caught);
-							}
-
+						new DefaultAsyncCallback<>() {
 							@Override
 							public void onSuccess(Integer total) {
 								Session.get().getUser().setTasks(total != null ? total.intValue() : 0);
@@ -279,5 +266,15 @@ public class WorkflowDashlet extends Portlet {
 
 	public WorkflowDashboard getWorkflowDashboard() {
 		return workflowDashboard;
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

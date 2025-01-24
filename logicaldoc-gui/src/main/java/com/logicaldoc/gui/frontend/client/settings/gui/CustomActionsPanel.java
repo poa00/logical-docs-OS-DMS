@@ -4,8 +4,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIMenu;
+import com.logicaldoc.gui.common.client.grid.IdListGridField;
 import com.logicaldoc.gui.common.client.i18n.I18N;
 import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.services.SecurityService;
@@ -79,20 +80,12 @@ public class CustomActionsPanel extends VLayout {
 				action.setEnabled(true);
 				action.setParentId(com.logicaldoc.gui.common.client.Menu.CUSTOM_ACTIONS);
 
-				SecurityService.Instance.get().saveMenu(action, I18N.getLocale(), new AsyncCallback<>() {
-
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				SecurityService.Instance.get().saveMenu(action, I18N.getLocale(), new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(GUIMenu newMenu) {
 						actions.add(newMenu);
 						fillGrid();
-
-						CustomActionEditor editor = new CustomActionEditor(newMenu, CustomActionsPanel.this);
-						editor.show();
+						new CustomActionEditor(newMenu, CustomActionsPanel.this).show();
 					}
 				});
 			});
@@ -119,11 +112,7 @@ public class CustomActionsPanel extends VLayout {
 		enabled.setImageURLSuffix(".gif");
 		enabled.setCanFilter(false);
 
-		ListGridField id = new ListGridField("id", I18N.message("id"));
-		id.setWidth(80);
-		id.setRequired(true);
-		id.setCanEdit(false);
-		id.setHidden(true);
+		ListGridField id = new IdListGridField();
 
 		ListGridField name = new ListGridField("name", I18N.message("name"));
 		name.setWidth(100);
@@ -186,12 +175,7 @@ public class CustomActionsPanel extends VLayout {
 
 	private void reload() {
 		SecurityService.Instance.get().getMenus(com.logicaldoc.gui.common.client.Menu.CUSTOM_ACTIONS, I18N.getLocale(),
-				false, new AsyncCallback<>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				false, new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(List<GUIMenu> menus) {
 						actions.clear();
@@ -218,12 +202,7 @@ public class CustomActionsPanel extends VLayout {
 					action.setPosition(i++);
 			}
 
-		SecurityService.Instance.get().saveMenus(actions, I18N.getLocale(), new AsyncCallback<>() {
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
+		SecurityService.Instance.get().saveMenus(actions, I18N.getLocale(), new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(Void arg0) {
 				GuiLog.info(I18N.message("settingssaved"), null);
@@ -281,12 +260,7 @@ public class CustomActionsPanel extends VLayout {
 					actions.remove(index);
 				} else {
 					SecurityService.Instance.get().deleteMenu(selectedRecord.getAttributeAsLong("id"),
-							new AsyncCallback<>() {
-								@Override
-								public void onFailure(Throwable caught) {
-									GuiLog.serverError(caught);
-								}
-
+							new DefaultAsyncCallback<>() {
 								@Override
 								public void onSuccess(Void arg) {
 									reload();
@@ -306,5 +280,15 @@ public class CustomActionsPanel extends VLayout {
 				return action;
 		}
 		return null;
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

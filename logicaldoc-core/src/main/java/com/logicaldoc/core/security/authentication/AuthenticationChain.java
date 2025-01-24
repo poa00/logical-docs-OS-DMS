@@ -29,7 +29,7 @@ import com.logicaldoc.util.plugin.PluginRegistry;
  * @author Sebastian Wenzky
  * @since 4.5
  */
-@Component("AuthenticationChain")
+@Component("authenticationChain")
 public class AuthenticationChain extends AbstractAuthenticator {
 
 	private static Logger log = LoggerFactory.getLogger(AuthenticationChain.class);
@@ -45,8 +45,6 @@ public class AuthenticationChain extends AbstractAuthenticator {
 	public final User authenticate(String username, String password, String key, Client client)
 			throws AuthenticationException {
 		init();
-
-		UserDAO userDao = (UserDAO) Context.get().getBean(UserDAO.class);
 
 		User user = validateAnonymousUser(username, key, client);
 		if (user != null)
@@ -73,7 +71,7 @@ public class AuthenticationChain extends AbstractAuthenticator {
 		log.debug("Collected authentication errors: {}", errors);
 
 		if (user != null) {
-			userDao.initialize(user);
+			initializeUser(user);
 		} else if (!errors.isEmpty()) {
 			// In case of multiple errors, we consider the first one that is
 			// not a UserNotFound exception because it is normal that some
@@ -86,6 +84,15 @@ public class AuthenticationChain extends AbstractAuthenticator {
 		}
 
 		return user;
+	}
+
+	private void initializeUser(User user) {
+		try {
+			UserDAO userDao = Context.get(UserDAO.class);
+			userDao.initialize(user);
+		} catch (PersistenceException e) {
+			log.warn(e.getMessage(), e);
+		}
 	}
 
 	private User validateAnonymousUser(String username, String key, Client client) {
@@ -122,13 +129,12 @@ public class AuthenticationChain extends AbstractAuthenticator {
 
 	protected void defaultValidations(String username, Client client)
 			throws AuthenticationException, PersistenceException {
-		UserDAO userDao = (UserDAO) Context.get().getBean(UserDAO.class);
+		UserDAO userDao = Context.get(UserDAO.class);
 		User user = userDao.findByUsername(username);
 		if (user == null)
 			return;
 
-		DefaultAuthenticator defaultValidator = (DefaultAuthenticator) Context.get()
-				.getBean(DefaultAuthenticator.class);
+		DefaultAuthenticator defaultValidator = Context.get(DefaultAuthenticator.class);
 		try {
 			defaultValidator.validateUser(user);
 		} catch (AccountInactiveException ie) {
@@ -169,9 +175,7 @@ public class AuthenticationChain extends AbstractAuthenticator {
 			}
 		}
 
-		UserDAO userDao = (UserDAO) Context.get().getBean(UserDAO.class);
-		if (user != null)
-			userDao.initialize(user);
+		initializeUser(user);
 		return user;
 	}
 
@@ -182,12 +186,12 @@ public class AuthenticationChain extends AbstractAuthenticator {
 			throws AuthenticationException, PersistenceException {
 		String tenant = Tenant.DEFAULT_NAME;
 
-		UserDAO userDao = (UserDAO) Context.get().getBean(UserDAO.class);
+		UserDAO userDao = Context.get(UserDAO.class);
 		User user = userDao.getUser(username);
 
 		defaultValidations(username, client);
 
-		TenantDAO tdao = (TenantDAO) Context.get().getBean(TenantDAO.class);
+		TenantDAO tdao = Context.get(TenantDAO.class);
 		Tenant t = user != null ? tdao.findById(user.getTenantId()) : null;
 		if (t != null)
 			tenant = t.getName();
@@ -242,8 +246,10 @@ public class AuthenticationChain extends AbstractAuthenticator {
 					.add((Authenticator) context.getBean(extension.getParameter("authenticatorId").valueAsString()));
 		}
 
-		if (sortedExts.isEmpty())
-			authenticators.add((Authenticator) context.getBean(DefaultAuthenticator.class));
+		if (sortedExts.isEmpty()) {
+			authenticators.add(context.getBean(DefaultAuthenticator.class));
+			authenticators.add(context.getBean(ApiKeyAuthenticator.class));
+		}
 
 		for (Authenticator auth : authenticators) {
 			log.warn("Added authenticator {}", auth.getClass().getSimpleName());

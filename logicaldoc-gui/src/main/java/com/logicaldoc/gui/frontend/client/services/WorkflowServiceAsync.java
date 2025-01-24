@@ -25,13 +25,13 @@ public interface WorkflowServiceAsync {
 			AsyncCallback<Void> callback);
 
 	void startWorkflow(String workflowName, String workflowDescription, String tag, String color, List<Long> docIds,
-			AsyncCallback<Void> callback);
+			AsyncCallback<String> callback);
 
 	void getWorkflowDetailsByTask(String taskId, AsyncCallback<GUIWorkflow> callback);
 
 	void endTask(String taskId, String transitionName, AsyncCallback<Void> callback);
 
-	void claimTask(String taskId, String userId, AsyncCallback<GUIWorkflow> callback);
+	void claimTask(String taskId, long userId, AsyncCallback<GUIWorkflow> callback);
 
 	void turnBackTaskToPool(String taskId, AsyncCallback<Void> callback);
 
@@ -45,7 +45,7 @@ public interface WorkflowServiceAsync {
 
 	void deleteInstance(String id, AsyncCallback<Void> callback);
 
-	void reassignTask(String taskId, String userId, AsyncCallback<GUIWorkflow> callback);
+	void reassignTask(String taskId, long userId, AsyncCallback<GUIWorkflow> callback);
 
 	void undeploy(String workflowName, AsyncCallback<Void> callback);
 

@@ -8,7 +8,6 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.sql.SQLException;
@@ -40,10 +39,10 @@ public class ResourceServiceImplTest extends AbstractWebdavTestCase {
 	private BookmarkDAO bookmarkDao;
 
 	@Override
-	public void setUp() throws FileNotFoundException, IOException, SQLException, PluginException {
+	public void setUp() throws IOException, SQLException, PluginException {
 		super.setUp();
 
-		testSubject = (ResourceServiceImpl) context.getBean("ResourceService");
+		testSubject = (ResourceServiceImpl) context.getBean("resourceService");
 
 		docDao = (DocumentDAO) context.getBean("DocumentDAO");
 		bookmarkDao = (BookmarkDAO) context.getBean("BookmarkDAO");
@@ -100,7 +99,7 @@ public class ResourceServiceImplTest extends AbstractWebdavTestCase {
 
 		davSession.putObject("id", 99L);
 		try {
-			resource = testSubject.getResource("/Default/one.pdf", davSession);
+			testSubject.getResource("/Default/one.pdf", davSession);
 			fail("The user should not have access to the resource");
 		} catch (DavException e) {
 			// All ok
@@ -158,7 +157,7 @@ public class ResourceServiceImplTest extends AbstractWebdavTestCase {
 	}
 
 	@Test
-	public void testGetChildByName() throws DavException, IOException {
+	public void testGetChildByName() throws DavException {
 		Resource resource = testSubject.getResource("/Default", davSession);
 		assertNotNull(resource);
 		assertTrue(resource.isFolder());
@@ -173,7 +172,7 @@ public class ResourceServiceImplTest extends AbstractWebdavTestCase {
 	}
 
 	@Test
-	public void testMoveFile() throws DavException, IOException {
+	public void testMoveFile() throws DavException {
 		Resource source = testSubject.getResource("/Default/one.pdf", davSession);
 		assertNotNull(source);
 		assertEquals("one.pdf", source.getName());
@@ -197,7 +196,7 @@ public class ResourceServiceImplTest extends AbstractWebdavTestCase {
 	}
 
 	@Test
-	public void testMoveFolder() throws DavException, IOException {
+	public void testMoveFolder() throws DavException {
 		Resource source = testSubject.getResource("/Default/folder6", davSession);
 		assertNotNull(source);
 		assertEquals("folder6", source.getName());
@@ -221,7 +220,7 @@ public class ResourceServiceImplTest extends AbstractWebdavTestCase {
 	}
 
 	@Test
-	public void testDeleteResource() throws DavException, IOException {
+	public void testDeleteResource() throws DavException {
 		Resource resource = testSubject.getResource("/Default/one.pdf", davSession);
 		assertNotNull(resource);
 		assertEquals("one.pdf", resource.getName());
@@ -240,7 +239,7 @@ public class ResourceServiceImplTest extends AbstractWebdavTestCase {
 	}
 
 	@Test
-	public void testCopy() throws DavException, IOException {
+	public void testCopy() throws DavException {
 		Resource source = testSubject.getResource("/Default/one.pdf", davSession);
 		assertNotNull(source);
 		assertEquals("one.pdf", source.getName());
@@ -277,7 +276,7 @@ public class ResourceServiceImplTest extends AbstractWebdavTestCase {
 	}
 
 	@Test
-	public void testCheckout() throws DavException, IOException, PersistenceException {
+	public void testCheckout() throws DavException, PersistenceException  {
 		Document doc = docDao.findById(1L);
 		assertEquals(AbstractDocument.DOC_UNLOCKED, doc.getStatus());
 
@@ -299,7 +298,7 @@ public class ResourceServiceImplTest extends AbstractWebdavTestCase {
 	}
 
 	@Test
-	public void testGetHistory() throws DavException, IOException, PersistenceException {
+	public void testGetHistory() throws DavException {
 		Resource resource = testSubject.getResource("/Default/one.pdf", davSession);
 		assertNotNull(resource);
 		assertEquals("one.pdf", resource.getName());
@@ -311,7 +310,7 @@ public class ResourceServiceImplTest extends AbstractWebdavTestCase {
 	}
 
 	@Test
-	public void testAddBookmark() throws DavException, IOException, PersistenceException {
+	public void testAddBookmark() throws DavException, PersistenceException {
 		assertEquals(0, bookmarkDao.findAll().size());
 
 		Resource resource = testSubject.getResource("/Default/one.pdf", davSession);

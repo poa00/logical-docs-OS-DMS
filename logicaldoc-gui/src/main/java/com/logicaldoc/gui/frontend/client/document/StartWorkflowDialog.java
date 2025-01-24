@@ -2,7 +2,7 @@ package com.logicaldoc.gui.frontend.client.document;
 
 import java.util.List;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.i18n.I18N;
 import com.logicaldoc.gui.common.client.log.GuiLog;
@@ -76,18 +76,22 @@ public class StartWorkflowDialog extends Window {
 
 		WorkflowService.Instance.get().startWorkflow(selection.getAttributeAsString("name"),
 				selection.getAttributeAsString("description"), tag.getValueAsString(), color.getValueAsString(), ids,
-				new AsyncCallback<>() {
-
+				new DefaultAsyncCallback<>() {
 					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
-					@Override
-					public void onSuccess(Void result) {
+					public void onSuccess(String result) {
 						GuiLog.info(I18N.message("event.workflow.start"), null);
 						destroy();
 					}
 				});
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+	
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

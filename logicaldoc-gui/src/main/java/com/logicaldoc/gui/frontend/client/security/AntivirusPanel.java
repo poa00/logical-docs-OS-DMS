@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIParameter;
 import com.logicaldoc.gui.common.client.i18n.I18N;
@@ -15,8 +15,8 @@ import com.smartgwt.client.types.Alignment;
 import com.smartgwt.client.types.TitleOrientation;
 import com.smartgwt.client.widgets.IButton;
 import com.smartgwt.client.widgets.form.DynamicForm;
-import com.smartgwt.client.widgets.form.fields.RadioGroupItem;
 import com.smartgwt.client.widgets.form.fields.TextItem;
+import com.smartgwt.client.widgets.form.fields.ToggleItem;
 import com.smartgwt.client.widgets.layout.VLayout;
 import com.smartgwt.client.widgets.tab.Tab;
 import com.smartgwt.client.widgets.tab.TabSet;
@@ -52,20 +52,15 @@ public class AntivirusPanel extends VLayout {
 	@Override
 	protected void onDraw() {
 		String tenant = Session.get().getTenantName();
-		SettingService.Instance.get().loadSettingsByNames(
-				Arrays.asList(ANTIVIRUS_COMMAND, tenant + ANTIVIRUS_ENABLED, tenant + ANTIVIRUS_INCLUDES,
-						tenant + ANTIVIRUS_EXCLUDES, tenant + ANTIVIRUS_TIMEOUT),
-				new AsyncCallback<>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
-					@Override
-					public void onSuccess(List<GUIParameter> parameters) {
-						initGUI(parameters);
-					}
-				});
+		SettingService.Instance.get()
+				.loadSettingsByNames(Arrays.asList(ANTIVIRUS_COMMAND, tenant + ANTIVIRUS_ENABLED,
+						tenant + ANTIVIRUS_INCLUDES, tenant + ANTIVIRUS_EXCLUDES, tenant + ANTIVIRUS_TIMEOUT),
+						new DefaultAsyncCallback<>() {
+							@Override
+							public void onSuccess(List<GUIParameter> parameters) {
+								initGUI(parameters);
+							}
+						});
 
 	}
 
@@ -89,13 +84,7 @@ public class AntivirusPanel extends VLayout {
 				if (Session.get().isDefaultTenant())
 					params.add(new GUIParameter(ANTIVIRUS_COMMAND, form.getValueAsString("command").trim()));
 
-				SettingService.Instance.get().saveSettings(params, new AsyncCallback<>() {
-
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				SettingService.Instance.get().saveSettings(params, new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Void ret) {
 						GuiLog.info(I18N.message("settingssaved"), null);
@@ -120,7 +109,7 @@ public class AntivirusPanel extends VLayout {
 		form.setTitleOrientation(TitleOrientation.LEFT);
 		form.setAlign(Alignment.LEFT);
 
-		RadioGroupItem enabled = ItemFactory.newBooleanSelector(ENABLED, I18N.message(ENABLED));
+		ToggleItem enabled = ItemFactory.newToggleItem(ENABLED, false);
 		enabled.setWrapTitle(false);
 		enabled.setRequired(true);
 
@@ -138,7 +127,7 @@ public class AntivirusPanel extends VLayout {
 
 		for (GUIParameter setting : settings) {
 			if ((Session.get().getTenantName() + ANTIVIRUS_ENABLED).equals(setting.getName()))
-				enabled.setValue("true".equals(setting.getValue()) ? "yes" : "no");
+				enabled.setValue(setting.getValueAsBoolean());
 			else if (ANTIVIRUS_COMMAND.equals(setting.getName()))
 				command.setValue(setting.getValue());
 			else if ((Session.get().getTenantName() + ANTIVIRUS_EXCLUDES).equals(setting.getName()))
@@ -153,5 +142,15 @@ public class AntivirusPanel extends VLayout {
 			form.setFields(enabled, command, includes, excludes, timeout);
 		else
 			form.setFields(enabled, includes, excludes, timeout);
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

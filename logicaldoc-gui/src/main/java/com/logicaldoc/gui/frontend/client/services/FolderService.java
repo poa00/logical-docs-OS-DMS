@@ -8,6 +8,7 @@ import com.google.gwt.user.client.rpc.RemoteServiceRelativePath;
 import com.google.gwt.user.client.rpc.ServiceDefTarget;
 import com.logicaldoc.gui.common.client.LDRpcRequestBuilder;
 import com.logicaldoc.gui.common.client.ServerException;
+import com.logicaldoc.gui.common.client.beans.GUIAccessControlEntry;
 import com.logicaldoc.gui.common.client.beans.GUIFolder;
 import com.logicaldoc.gui.common.client.beans.GUIValue;
 import com.logicaldoc.gui.frontend.client.clipboard.Clipboard;
@@ -109,13 +110,13 @@ public interface FolderService extends RemoteService {
 	public void applyTags(long parentId) throws ServerException;
 
 	/**
-	 * Applies the storage setting to a sub-tree
+	 * Applies the store setting to a sub-tree
 	 * 
 	 * @param parentId The parent folder containing the tags
 	 * 
 	 * @throws ServerException an error happened in the server application
 	 */
-	public void applyStorage(long parentId) throws ServerException;
+	public void applyStore(long parentId) throws ServerException;
 
 	/**
 	 * Applies all OCR settings to a sub-tree
@@ -296,6 +297,14 @@ public interface FolderService extends RemoteService {
 	 * @throws ServerException an error happened in the server application
 	 */
 	public String readImage() throws ServerException;
+	
+	/**
+	 * Gets the allowed permissions on a set of folders in regards of the
+	 * current user
+	 * 
+	 * @param folderIds collection of the folders
+	 */
+	public GUIAccessControlEntry getAllowedPermissions(List<Long> folderIds) throws ServerException;
 
 	public static class Instance {
 		private static FolderServiceAsync inst;

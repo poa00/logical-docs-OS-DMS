@@ -22,7 +22,7 @@ import com.logicaldoc.util.plugin.PluginRegistry;
  * @author Matteo Caruso - LogicalDOC
  * @since 5.1
  */
-@Component("UserListenerManager")
+@Component("userListenerManager")
 public class UserListenerManager {
 	private static final String POSITION = "position";
 
@@ -70,7 +70,7 @@ public class UserListenerManager {
 					log.info("Added new user listener {} position {}", className,
 							ext.getParameter(POSITION).valueAsString());
 			} catch (ClassNotFoundException | InstantiationException | IllegalAccessException | IllegalArgumentException
-					| InvocationTargetException | NoSuchMethodException | SecurityException e) {
+					| InvocationTargetException | NoSuchMethodException e) {
 				log.error(e.getMessage());
 			}
 		}

@@ -1,6 +1,6 @@
 package com.logicaldoc.gui.frontend.client.metadata.zonalocr;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.IgnoreAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIAttribute;
 import com.logicaldoc.gui.common.client.beans.GUIZone;
 import com.logicaldoc.gui.common.client.i18n.I18N;
@@ -64,18 +64,7 @@ public class ZoneEditor extends Window {
 		addItem(layout);
 
 		// Just to clean the upload folder
-		DocumentService.Instance.get().cleanUploadedFileFolder(new AsyncCallback<>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				// Nothing to do
-			}
-
-			@Override
-			public void onSuccess(Void result) {
-				// Nothing to do
-			}
-		});
+		DocumentService.Instance.get().cleanUploadedFileFolder(new IgnoreAsyncCallback<>());
 	}
 
 	private void prepareForm() {
@@ -127,5 +116,15 @@ public class ZoneEditor extends Window {
 		zone.setLanguage(vm.getValueAsString("language"));
 
 		destroy();
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

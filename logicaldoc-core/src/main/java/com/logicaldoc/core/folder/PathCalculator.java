@@ -2,9 +2,8 @@ package com.logicaldoc.core.folder;
 
 import java.util.List;
 
-import javax.annotation.Resource;
-
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import com.logicaldoc.core.PersistenceException;
@@ -18,21 +17,22 @@ import com.logicaldoc.core.task.TaskException;
  * @author Marco Meschieri - LogicalDOC
  * @since 8.3.3
  */
-@Component("PathCalculator")
+@Component("pathCalculator")
 public class PathCalculator extends Task {
 
 	public static final String NAME = "PathCalculator";
 
-	@Resource(name = "FolderDAO")
 	private FolderDAO folderDao;
 
 	private long processed = 0;
 
 	private long errors = 0;
 
-	public PathCalculator() {
+	@Autowired
+	public PathCalculator(FolderDAO folderDao) {
 		super(NAME);
 		log = LoggerFactory.getLogger(PathCalculator.class);
+		this.folderDao = folderDao;
 	}
 
 	@Override
@@ -55,7 +55,6 @@ public class PathCalculator extends Task {
 		try {
 			// First of all find folders to be processed and not already
 			// involved into a transaction
-			@SuppressWarnings("unchecked")
 			List<Long> ids = folderDao
 					.queryForList("select ld_id from ld_folder where ld_deleted=0 and ld_path is null", Long.class);
 			log.info("Found a total of {} folders to be processed", ids.size());
@@ -95,7 +94,4 @@ public class PathCalculator extends Task {
 		return folderDao;
 	}
 
-	public void setFolderDao(FolderDAO folderDao) {
-		this.folderDao = folderDao;
-	}
 }

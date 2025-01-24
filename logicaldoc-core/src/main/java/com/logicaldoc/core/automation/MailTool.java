@@ -34,7 +34,7 @@ import com.logicaldoc.core.document.DocumentHistory;
 import com.logicaldoc.core.document.DocumentManager;
 import com.logicaldoc.core.security.user.User;
 import com.logicaldoc.core.security.user.UserDAO;
-import com.logicaldoc.core.store.Storer;
+import com.logicaldoc.core.store.Store;
 import com.logicaldoc.util.Context;
 import com.logicaldoc.util.MimeType;
 import com.logicaldoc.util.io.FileUtil;
@@ -78,7 +78,7 @@ public class MailTool {
 	 * @param message message printed in the body of the email
 	 * 
 	 * @throws IOException I/O error
-	 * @throws MessagingException Cannot send the email
+	 * 
 	 */
 	public void sendDocuments(Collection<Document> documents, String from, Collection<String> to, String subject,
 			String message) throws IOException, MessagingException {
@@ -103,8 +103,8 @@ public class MailTool {
 			att.setFileName(document.getFileName());
 			String extension = document.getFileExtension();
 			att.setMimeType(MimeType.get(extension));
-			Storer storer = (Storer) Context.get().getBean(Storer.class);
-			att.setData(storer.getBytes(document.getId(), storer.getResourceName(document, null, null)));
+			Store store = Context.get(Store.class);
+			att.setData(store.getBytes(document.getId(), store.getResourceName(document, null, null)));
 			email.addAttachment(2 + email.getAttachments().size(), att);
 		}
 
@@ -201,7 +201,7 @@ public class MailTool {
 	 */
 	public void sendMessage(long tenantId, String from, String to, String subject, String message)
 			throws MessagingException {
-		this.sendMessage(tenantId, from, to != null ? Arrays.asList( to ) : null, subject, message);
+		this.sendMessage(tenantId, from, to != null ? Arrays.asList(to) : null, subject, message);
 	}
 
 	/**
@@ -224,19 +224,16 @@ public class MailTool {
 			throw new IllegalArgumentException("Filename must end with .msg or .eml");
 
 		EMail email = null;
-		Storer storer = (Storer) Context.get().getBean(Storer.class);
-		if (document.getFileName().toLowerCase().endsWith(".eml"))
-			email = MailUtil.messageToMail(
-					storer.getStream(document.getId(), storer.getResourceName(document, null, null)),
-					extractAttachments);
-		else
-			try {
-				email = MailUtil.msgToMail(
-						storer.getStream(document.getId(), storer.getResourceName(document, null, null)),
-						extractAttachments);
-			} catch (CMSException e) {
-				throw new MessagingException(e.getMessage(), e);
-			}
+		Store store = Context.get(Store.class);
+		try (InputStream stream = store.getStream(document.getId(), store.getResourceName(document, null, null))) {
+			if (document.getFileName().toLowerCase().endsWith(".eml"))
+				email = MailUtil.messageToMail(stream, extractAttachments);
+			else
+
+				email = MailUtil.msgToMail(stream, extractAttachments);
+		} catch (CMSException e) {
+			throw new MessagingException(e.getMessage(), e);
+		}
 		return email;
 	}
 
@@ -254,7 +251,7 @@ public class MailTool {
 	 */
 	public void sendSystemMessage(String recipient, String message, String subject, int scope, int priority)
 			throws PersistenceException {
-		UserDAO uDao = (UserDAO) Context.get().getBean(UserDAO.class);
+		UserDAO uDao = Context.get(UserDAO.class);
 		User user = uDao.findByUsername(recipient);
 
 		SystemMessage m = new SystemMessage();
@@ -277,7 +274,7 @@ public class MailTool {
 		m.setDateScope(scope);
 		m.setPrio(priority);
 
-		SystemMessageDAO dao = (SystemMessageDAO) Context.get().getBean(SystemMessageDAO.class);
+		SystemMessageDAO dao = Context.get(SystemMessageDAO.class);
 		dao.store(m);
 	}
 
@@ -299,9 +296,9 @@ public class MailTool {
 		InputStream is = null;
 		try {
 			long docId = doc.getId();
-			Storer storer = (Storer) Context.get().getBean(Storer.class);
-			String resource = storer.getResourceName(docId, doc.getFileVersion(), null);
-			is = storer.getStream(docId, resource);
+			Store store = Context.get(Store.class);
+			String resource = store.getResourceName(docId, doc.getFileVersion(), null);
+			is = store.getStream(docId, resource);
 
 			EMail email = null;
 
@@ -330,7 +327,7 @@ public class MailTool {
 							DocumentHistory transaction = new DocumentHistory();
 							transaction.setUser(user);
 
-							DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+							DocumentManager manager = Context.get(DocumentManager.class);
 							Document attDoc = manager.create(tmpFile, docVO, transaction);
 							createdDocs.add(attDoc);
 						} finally {

@@ -16,8 +16,10 @@ import com.logicaldoc.core.searchengine.Search;
 import com.logicaldoc.core.searchengine.SearchException;
 import com.logicaldoc.core.searchengine.SearchOptions;
 import com.logicaldoc.core.security.Permission;
+import com.logicaldoc.core.security.SessionManager;
 import com.logicaldoc.core.security.authentication.AuthenticationException;
 import com.logicaldoc.core.security.user.User;
+import com.logicaldoc.core.security.user.UserHistory;
 import com.logicaldoc.util.Context;
 import com.logicaldoc.webservice.AbstractService;
 import com.logicaldoc.webservice.WebserviceException;
@@ -45,6 +47,7 @@ public class SoapSearchService extends AbstractService implements SearchService 
 
 		SearchOptions options = opt.toSearchOptions();
 		options.setUserId(user.getId());
+		options.setTransaction(new UserHistory(SessionManager.get().get(sid)));
 
 		WSSearchResult searchResult = new WSSearchResult();
 
@@ -52,7 +55,7 @@ public class SoapSearchService extends AbstractService implements SearchService 
 		lastSearch.search();
 		List<Hit> hitsList = lastSearch.getHits();
 
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
 		List<WSDocument> docs = new ArrayList<>();
 		for (Hit hit : hitsList) {
 			Document d = docDao.findById(hit.getId());
@@ -80,7 +83,7 @@ public class SoapSearchService extends AbstractService implements SearchService 
 			throws AuthenticationException, WebserviceException, PersistenceException {
 		User user = validateSession(sid);
 
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
 		List<Document> docs = docDao.findByFileNameAndParentFolderId(null, filename, null, user.getTenantId(), null);
 
 		List<WSDocument> wsDocs = new ArrayList<>();
@@ -104,7 +107,7 @@ public class SoapSearchService extends AbstractService implements SearchService 
 			throws AuthenticationException, WebserviceException, PersistenceException {
 		User user = validateSession(sid);
 
-		FolderDAO folderDao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+		FolderDAO folderDao = Context.get(FolderDAO.class);
 		List<Folder> folders = folderDao.find(name, user.getTenantId());
 		List<WSFolder> wsFolders = new ArrayList<>();
 		for (Folder folder : folders) {

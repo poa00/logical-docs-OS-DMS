@@ -50,6 +50,33 @@ public class GUIAutomationRoutine extends GUIExtensibleObject implements Seriali
 		this.automation = automation;
 	}
 
+	public GUIAccessControlEntry getAce(long entityId) {
+		for (GUIAccessControlEntry ace : accessControlList) {
+			if (ace.getEntityId() == entityId)
+				return ace;
+		}
+		return null;
+	}
+
+	public void removeAce(long entityId) {
+		List<GUIAccessControlEntry> newAcls = new ArrayList<>();
+		for (GUIAccessControlEntry ace : accessControlList) {
+			if (ace.getEntityId() != entityId)
+				newAcls.add(ace);
+		}
+		accessControlList = newAcls;
+	}
+
+	public void addAce(GUIAccessControlEntry ace) {
+		GUIAccessControlEntry existingAce = getAce(ace.getEntityId());
+		if(existingAce==null) {
+			accessControlList.add(ace);
+		} else {
+			existingAce.setRead(ace.isRead());
+			existingAce.setWrite(ace.isWrite());
+		}
+	}
+	
 	public List<GUIAccessControlEntry> getAccessControlList() {
 		return accessControlList;
 	}
@@ -77,5 +104,36 @@ public class GUIAutomationRoutine extends GUIExtensibleObject implements Seriali
 			if (p.equals(permission))
 				return true;
 		return false;
+	}
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = super.hashCode();
+		result = prime * result + ((automation == null) ? 0 : automation.hashCode());
+		result = prime * result + ((name == null) ? 0 : name.hashCode());
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (!super.equals(obj))
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		GUIAutomationRoutine other = (GUIAutomationRoutine) obj;
+		if (automation == null) {
+			if (other.automation != null)
+				return false;
+		} else if (!automation.equals(other.automation))
+			return false;
+		if (name == null) {
+			if (other.name != null)
+				return false;
+		} else if (!name.equals(other.name))
+			return false;
+		return true;
 	}
 }

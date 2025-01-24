@@ -1,6 +1,5 @@
 package com.logicaldoc.webservice.soap.endpoint;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.List;
@@ -27,7 +26,7 @@ public class SoapSystemServiceTest extends AbstractWebserviceTestCase {
 	private SoapSystemService systemServiceImpl;
 
 	@Override
-	public void setUp() throws FileNotFoundException, IOException, SQLException, PluginException {
+	public void setUp() throws IOException, SQLException, PluginException {
 		super.setUp();
 
 		// Make sure that this is a SoapSystemService instance
@@ -48,9 +47,9 @@ public class SoapSystemServiceTest extends AbstractWebserviceTestCase {
 	public void testGetStatistics() throws Exception {
 		List<WSParameter> parameters = systemServiceImpl.getStatistics("");
 
-		Map<String, String> map = parameters.stream().collect(Collectors.toMap(p->p.getName(), p->p.getValue()));
+		Map<String, String> map = parameters.stream().collect(Collectors.toMap(p -> p.getName(), p -> p.getValue()));
 		
-		Assert.assertEquals("5437281", map.get("repo_docs"));
+		Assert.assertEquals("5437281", map.get("repo_storage"));
 		Assert.assertEquals("986753", map.get("repo_database"));
 		Assert.assertEquals("181", map.get("docs_indexed"));
 		Assert.assertEquals("45", map.get("folder_withdocs"));

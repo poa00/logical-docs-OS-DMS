@@ -31,6 +31,10 @@ public class UserHistoryDS extends DataSource {
 	}
 
 	public UserHistoryDS(long userId, String event, Integer max) {
+		this(null, userId, event, null, max);
+	}
+
+	public UserHistoryDS(Long tenantId, Long userId, String event, String commentPrefix, Integer max) {
 		setRecordXPath("/list/history");
 		DataSourceTextField user = new DataSourceTextField("user");
 
@@ -41,16 +45,23 @@ public class UserHistoryDS extends DataSource {
 		DataSourceTextField comment = new DataSourceTextField("comment");
 		DataSourceTextField reason = new DataSourceTextField("reason");
 		DataSourceTextField sid = new DataSourceTextField("sid");
+		DataSourceTextField key = new DataSourceTextField("key");
 		DataSourceTextField ip = new DataSourceTextField("id");
 		DataSourceTextField device = new DataSourceTextField("device");
 		DataSourceTextField geolocation = new DataSourceTextField("geolocation");
 
-		setFields(user, date, evnt, ip, device, geolocation, comment, reason, sid, folderId);
+		setFields(user, date, evnt, ip, device, geolocation, comment, reason, sid, key, folderId);
 		setClientOnly(true);
 
-		String url = "data/userhistory.xml?id=" + userId + "&locale=" + I18N.getLocale();
+		String url = "data/userhistory.xml?&locale=" + I18N.getLocale();
+		if (tenantId != null)
+			url += "&tenantId=" + tenantId;
+		if (userId != null)
+			url += "&id=" + userId;
 		if (event != null)
 			url += "&event=" + event;
+		if (commentPrefix != null)
+			url += "&comment=" + commentPrefix;
 		url += "&max=" + (max != null ? max : getDefaultMaxHistories());
 		setDataURL(url);
 	}

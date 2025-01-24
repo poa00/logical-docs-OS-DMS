@@ -130,7 +130,7 @@ public abstract class AbstractWebdavServlet extends HttpServlet implements DavCo
 			DavSessionImpl davSession = new DavSessionImpl();
 			davSession.setTenantId(SessionManager.get().get(session.getSid()).getTenantId());
 			davSession.putObject("sid", session.getSid());
-			UserDAO dao = (UserDAO) Context.get().getBean(UserDAO.class);
+			UserDAO dao = Context.get(UserDAO.class);
 			User user = dao.findById(session.getUserId());
 			dao.initialize(user);
 			davSession.putObject("id", session.getUserId());
@@ -725,7 +725,8 @@ public abstract class AbstractWebdavServlet extends HttpServlet implements DavCo
 		WebdavSession session = (com.logicaldoc.webdav.session.WebdavSession) request.getDavSession();
 		DavResource destResource = null;
 		try {
-			log.debug("Destination: {}", request.getHeader("Destination"));
+			if (log.isDebugEnabled())
+				log.debug("Destination: {}", request.getHeader("Destination"));
 			destResource = getResourceFactory().createResource(request.getDestinationLocator(), request, session);
 		} catch (Exception e) {
 			destResource = resource.getCollection();
@@ -904,11 +905,12 @@ public abstract class AbstractWebdavServlet extends HttpServlet implements DavCo
 			throws DavException, IOException {
 		log.debug("doCheckin");
 
-		ResourceService resourceService = (ResourceService) Context.get().getBean(ResourceService.class);
+		ResourceService resourceService = Context.get(ResourceService.class);
 		WebdavSession session = (com.logicaldoc.webdav.session.WebdavSession) request.getDavSession();
 		Resource repositoryResource = resourceService.getResource(resource.getResourcePath(), session);
-		
-		resourceService.updateResource(repositoryResource, new ImportContextImpl(repositoryResource, null, request.getInputStream()), session);
+
+		resourceService.updateResource(repositoryResource,
+				new ImportContextImpl(repositoryResource, null, request.getInputStream()), session);
 	}
 
 	/**
@@ -927,17 +929,18 @@ public abstract class AbstractWebdavServlet extends HttpServlet implements DavCo
 
 		ReportInfo info = request.getReportInfo();
 		Report report;
-		if (resource instanceof DeltaVResource deltaResource) {
-			report = deltaResource.getReport(info);
-		} else if (resource instanceof AclResource aclResource) {
-			report = aclResource.getReport(info);
-		} else {
+
+		switch (resource) {
+		case DeltaVResource deltaResource -> report = deltaResource.getReport(info);
+		case AclResource aclResource -> report = aclResource.getReport(info);
+		default -> {
 			try {
 				response.sendError(HttpServletResponse.SC_METHOD_NOT_ALLOWED);
 			} catch (Exception t) {
 				// Nothing to do
 			}
 			return;
+		}
 		}
 
 		int statusCode = (report.isMultiStatusReport()) ? DavServletResponse.SC_MULTI_STATUS

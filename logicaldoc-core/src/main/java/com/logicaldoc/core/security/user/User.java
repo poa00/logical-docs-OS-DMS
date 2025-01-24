@@ -8,6 +8,7 @@ import java.util.Iterator;
 import java.util.Locale;
 import java.util.Set;
 
+import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -398,7 +399,7 @@ public class User extends PersistentObject implements Serializable {
 	 * @throws NoSuchAlgorithmException Cripting error
 	 */
 	public void setDecodedPassword(String pwd) throws NoSuchAlgorithmException {
-		if (org.apache.commons.lang.StringUtils.isNotEmpty(pwd)) {
+		if (StringUtils.isNotEmpty(pwd)) {
 			decodedPassword = pwd;
 			password = CryptUtil.encryptSHA256(pwd);
 		}
@@ -506,7 +507,7 @@ public class User extends PersistentObject implements Serializable {
 		// The special group was not found in the belonging groups, this may
 		// indicate a lost association between this user and his group
 		log.warn("User {} has lost association with his group", username);
-		GroupDAO dao = (GroupDAO) Context.get().getBean(GroupDAO.class);
+		GroupDAO dao = Context.get(GroupDAO.class);
 		Group group = dao.findByName(getUserGroupName(), getTenantId());
 		if (group == null)
 			log.warn("User {} doesn't have his user group {}", username, getUserGroupName());
@@ -879,5 +880,30 @@ public class User extends PersistentObject implements Serializable {
 
 	public void setBuilding(String building) {
 		this.building = building;
+	}
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = super.hashCode();
+		result = prime * result + ((username == null) ? 0 : username.hashCode());
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (!super.equals(obj))
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		User other = (User) obj;
+		if (username == null) {
+			if (other.username != null)
+				return false;
+		} else if (!username.equals(other.username))
+			return false;
+		return true;
 	}
 }

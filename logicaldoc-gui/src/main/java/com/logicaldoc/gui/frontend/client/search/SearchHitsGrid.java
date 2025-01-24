@@ -19,6 +19,7 @@ import com.smartgwt.client.widgets.grid.ListGridField;
 public class SearchHitsGrid extends DocumentsListGrid {
 
 	private static final String CUSTOM_ID = "customId";
+	
 	private List<ListGridField> fields = new ArrayList<>();
 
 	public SearchHitsGrid() {
@@ -149,5 +150,15 @@ public class SearchHitsGrid extends DocumentsListGrid {
 			setViewState(gridLayout);
 
 		return pageSize;
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

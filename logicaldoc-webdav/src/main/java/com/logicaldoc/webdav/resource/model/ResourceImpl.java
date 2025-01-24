@@ -16,6 +16,8 @@ import com.logicaldoc.util.Context;
 import com.logicaldoc.webdav.session.WebdavSession;
 
 /**
+ * Implementation of a generic WebDAV resource
+ * 
  * @see Resource
  * 
  * @author Sebastian Wenzky
@@ -280,7 +282,7 @@ public class ResourceImpl implements Resource {
 			personRequest = (Long) session.getObject("id");
 		}
 
-		FolderDAO fdao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+		FolderDAO fdao = Context.get(FolderDAO.class);
 		Set<Permission> permissions = new HashSet<>();
 		long fid = 0;
 		if (folder)
@@ -314,7 +316,7 @@ public class ResourceImpl implements Resource {
 			moveEnabled = true;
 		} else {
 			try {
-				permissions = fdao.getEnabledPermissions(fid, personRequest);
+				permissions = fdao.getAllowedPermissions(fid, personRequest);
 			} catch (PersistenceException e) {
 				log.error(e.getMessage(), e);
 			}

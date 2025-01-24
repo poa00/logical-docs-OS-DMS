@@ -9,7 +9,6 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -48,7 +47,7 @@ public class SystemServiceImplTest extends AbstractWebappTestCase {
 	private SystemServiceImpl testSubject = new SystemServiceImpl();
 
 	@Override
-	public void setUp() throws FileNotFoundException, IOException, SQLException, PluginException {
+	public void setUp() throws IOException, SQLException, PluginException {
 		super.setUp();
 		Context.get().getProperties().setMaxBackups(0);
 
@@ -108,16 +107,14 @@ public class SystemServiceImplTest extends AbstractWebappTestCase {
 	@Test
 	public void testStartStop() throws ServerException, InterruptedException {
 		testSubject.startTask("IndexerTask");
-		GUITask task = testSubject.getTaskByName("IndexerTask", "en");
-
 		testSubject.stopTask("IndexerTask");
 		waiting();
-		task = testSubject.getTaskByName("IndexerTask", "en");
+		GUITask task = testSubject.getTaskByName("IndexerTask", "en");
 		assertEquals(Task.STATUS_IDLE, task.getStatus());
 	}
 
 	@Test
-	public void testEnableDisable() throws ServerException, InterruptedException {
+	public void testEnableDisable() throws ServerException {
 		testSubject.disableTask("IndexerTask");
 		GUITask task = testSubject.getTaskByName("IndexerTask", "en");
 		assertFalse(task.getScheduling().isEnabled());
@@ -170,7 +167,7 @@ public class SystemServiceImplTest extends AbstractWebappTestCase {
 	}
 
 	@Test
-	public void testSearch() throws ServerException, InterruptedException {
+	public void testSearch() throws ServerException {
 		List<GUIHistory> hits = testSubject.search(null, null, null, 100, null, new ArrayList<>(), null);
 		assertEquals(7, hits.size());
 
@@ -183,7 +180,7 @@ public class SystemServiceImplTest extends AbstractWebappTestCase {
 	}
 
 	@Test
-	public void testSearchApiCalls() throws ServerException, InterruptedException {
+	public void testSearchApiCalls() throws ServerException {
 		List<GUIHistory> hits = testSubject.searchApiCalls(null, null, null, null, null, null, 100);
 		assertEquals(7, hits.size());
 
@@ -198,41 +195,34 @@ public class SystemServiceImplTest extends AbstractWebappTestCase {
 	}
 
 	@Test
-	public void testUninstallPlugin() throws ServerException {
-		File pluginFile = new File("target/tests-plugins/logicaldoc-dummy-plugin.jar");
-		assertTrue(pluginFile.exists());
-		assertEquals(2, testSubject.getPlugins().size());
-		testSubject.uninstallPlugin("logicaldoc-dummy");
-
-		pluginFile = new File("target/tests-plugins/logicaldoc-dummy-plugin.jar");
-		assertFalse(pluginFile.exists());
-	}
-
-	@Test
 	public void testInitializePlugin() throws ServerException {
 		try {
 			assertEquals(2, testSubject.getPlugins().size());
 			testSubject.initializePlugin("logicaldoc-dummy");
 		} catch (ServerException e) {
 			fail(e.getMessage());
+		} finally {
+			testSubject.uninstallPlugin("logicaldoc-dummy");
 		}
 	}
 
 	@Test
 	public void testSaveLogger() throws ServerException {
+		final String loggerName = "pippo.pluto";
 		try {
-			assertFalse(new LogConfigurator().getLoggers().stream()
-					.anyMatch(l -> "pippo.pluto".equals(l.getAttributeValue("name"))));
-			testSubject.saveLogger("pippo.pluto", "warn", true);
+			assertFalse(new LogConfigurator().getLoggers().stream().anyMatch(l -> {
+				return loggerName.equals(l.getAttributeValue("name"));
+			}));
+			testSubject.saveLogger(loggerName, "warn", true);
 			assertTrue(new LogConfigurator().getLoggers().stream()
-					.anyMatch(l -> "pippo.pluto".equals(l.getAttributeValue("name"))));
+					.anyMatch(l -> loggerName.equals(l.getAttributeValue("name"))));
 		} finally {
-			testSubject.removeLogger("pippo.pluto");
+			testSubject.removeLogger(loggerName);
 		}
 	}
 
 	@Test
-	public void testInstallPlugin() throws ServerException, IOException, PluginException {
+	public void testInstallPlugin() throws ServerException, IOException {
 		testSubject.uninstallPlugin("logicaldoc-dummy");
 
 		File libFolder = new File(new File(SystemServiceImpl.defaultWebappRootFolder, "WEB-INF"), "lib");
@@ -243,7 +233,7 @@ public class SystemServiceImplTest extends AbstractWebappTestCase {
 
 		Map<String, File> uploadedFilesMap = new HashMap<>();
 		uploadedFilesMap.put(pluginFile.getName(), pluginFile);
-		session.getDictionary().put(UploadServlet.RECEIVED_FILES, uploadedFilesMap);
+		session.getDictionary().put(UploadServlet.UPLOADS, uploadedFilesMap);
 
 		testSubject.installPlugin();
 
@@ -253,7 +243,7 @@ public class SystemServiceImplTest extends AbstractWebappTestCase {
 
 	@Test
 	public void testUnscheduleJobs() throws SchedulerException, ServerException {
-		JobManager jobManager = (JobManager) Context.get().getBean(JobManager.class);
+		JobManager jobManager = Context.get(JobManager.class);
 		jobManager.schedule(new AbstractJob("Dummy", "xyz") {
 
 			@Override

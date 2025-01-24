@@ -4,18 +4,18 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.logicaldoc.gui.common.client.Feature;
+import com.logicaldoc.gui.common.client.automation.HtmlItemEditor;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIForm;
 import com.logicaldoc.gui.common.client.beans.GUIUser;
 import com.logicaldoc.gui.common.client.data.UsersDS;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.widgets.EditingTabSet;
 import com.logicaldoc.gui.common.client.widgets.FeatureDisabled;
 import com.logicaldoc.gui.common.client.widgets.FolderSelector;
-import com.logicaldoc.gui.common.client.widgets.automation.HtmlItemEditor;
+import com.logicaldoc.gui.frontend.client.menu.QuickSearchTray;
 import com.logicaldoc.gui.frontend.client.services.FormService;
 import com.smartgwt.client.data.Criteria;
 import com.smartgwt.client.types.TitleOrientation;
@@ -24,11 +24,11 @@ import com.smartgwt.client.widgets.form.DynamicForm;
 import com.smartgwt.client.widgets.form.ValuesManager;
 import com.smartgwt.client.widgets.form.fields.CheckboxItem;
 import com.smartgwt.client.widgets.form.fields.MultiComboBoxItem;
-import com.smartgwt.client.widgets.form.fields.RadioGroupItem;
 import com.smartgwt.client.widgets.form.fields.SelectItem;
 import com.smartgwt.client.widgets.form.fields.SpinnerItem;
 import com.smartgwt.client.widgets.form.fields.TextAreaItem;
 import com.smartgwt.client.widgets.form.fields.TextItem;
+import com.smartgwt.client.widgets.form.fields.ToggleItem;
 import com.smartgwt.client.widgets.form.fields.events.ChangedHandler;
 import com.smartgwt.client.widgets.layout.HLayout;
 import com.smartgwt.client.widgets.layout.Layout;
@@ -96,12 +96,7 @@ public class FormDetailsPanel extends VLayout {
 
 		tabSet = new EditingTabSet(saveEvent -> onSave(), cancelEvent -> {
 			if (form.getId() != 0) {
-				FormService.Instance.get().getById(form.getId(), new AsyncCallback<>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				FormService.Instance.get().getById(form.getId(), new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(GUIForm form) {
 						setForm(form);
@@ -235,18 +230,17 @@ public class FormDetailsPanel extends VLayout {
 			webTabPanel.setHeight100();
 			tab.setPane(webTabPanel);
 
-			RadioGroupItem webEnabled = ItemFactory.newBooleanSelector(WEB_ENABLED, "enabled");
-			webEnabled.setValue(form.isWebEnabled() ? "yes" : "no");
+			ToggleItem webEnabled = ItemFactory.newToggleItem(WEB_ENABLED, "enabled", form.isWebEnabled());
 			webEnabled.setRequired(true);
 			webEnabled.addChangedHandler(changedHandler);
 
-			RadioGroupItem collectEmails = ItemFactory.newBooleanSelector("collectEmails", "collectemails");
-			collectEmails.setValue(form.isCollectEmails() ? "yes" : "no");
+			ToggleItem collectEmails = ItemFactory.newToggleItem("collectEmails", "collectemails",
+					form.isCollectEmails());
 			collectEmails.setRequired(true);
 			collectEmails.addChangedHandler(changedHandler);
 
-			RadioGroupItem editAfterSubmit = ItemFactory.newBooleanSelector("editAfterSubmit", "alloweditaftersubmit");
-			editAfterSubmit.setValue(form.isEditAfterSubmit() ? "yes" : "no");
+			ToggleItem editAfterSubmit = ItemFactory.newToggleItem("editAfterSubmit", "alloweditaftersubmit",
+					form.isEditAfterSubmit());
 			editAfterSubmit.setRequired(true);
 			editAfterSubmit.addChangedHandler(changedHandler);
 
@@ -385,14 +379,14 @@ public class FormDetailsPanel extends VLayout {
 			form.setDescription(vm.getValueAsString(DESCRIPTION));
 			form.setFooter(vm.getValueAsString(FOOTER));
 			form.setConfirmation(vm.getValueAsString("confirmation"));
-			form.setWebEnabled("yes".equals(vm.getValueAsString(WEB_ENABLED)));
-			form.setCollectEmails("yes".equals(vm.getValueAsString("collectEmails")));
-			form.setEditAfterSubmit("yes".equals(vm.getValueAsString("editAfterSubmit")));
+			form.setWebEnabled(Boolean.valueOf(vm.getValueAsString(WEB_ENABLED)));
+			form.setCollectEmails(Boolean.valueOf(vm.getValueAsString("collectEmails")));
+			form.setEditAfterSubmit(Boolean.valueOf(vm.getValueAsString("editAfterSubmit")));
 			form.setBackgroundColor(vm.getValueAsString("backgroundColor"));
 			form.setWidth(Integer.parseInt(vm.getValueAsString("width")));
 			form.setColumns(Integer.parseInt(vm.getValueAsString("columns")));
 			form.setTargetFolder(targetFolder.getFolder());
-			form.setNotifyResponses("true".equals(vm.getValueAsString("notifyResponses")));
+			form.setNotifyResponses(Boolean.valueOf(vm.getValueAsString("notifyResponses")));
 
 			String[] ids = recipients.getValues();
 			List<GUIUser> formReceipients = new ArrayList<>();
@@ -409,12 +403,7 @@ public class FormDetailsPanel extends VLayout {
 	}
 
 	private void saveForm() {
-		FormService.Instance.get().save(form, new AsyncCallback<>() {
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
+		FormService.Instance.get().save(form, new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(GUIForm newForm) {
 				tabSet.hideSave();
@@ -426,5 +415,18 @@ public class FormDetailsPanel extends VLayout {
 				}
 			}
 		});
+	}
+	
+	@Override
+	public boolean equals(Object obj) {
+		if (obj instanceof QuickSearchTray)
+			return super.equals(obj);
+		else
+			return false;
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

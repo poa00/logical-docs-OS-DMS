@@ -48,7 +48,7 @@ public class AttributeSetsDataServlet extends AbstractDataServlet {
 			writer.print("</attributeset>");
 		}
 
-		AttributeSetDAO dao = (AttributeSetDAO) Context.get().getBean(AttributeSetDAO.class);
+		AttributeSetDAO dao = Context.get(AttributeSetDAO.class);
 		List<AttributeSet> sets = null;
 		if (type != null)
 			sets = dao.findByType(type, session.getTenantId());
@@ -59,7 +59,6 @@ public class AttributeSetsDataServlet extends AbstractDataServlet {
 		 * Iterate over the collection of templates
 		 */
 		for (AttributeSet set : sets) {
-
 			writer.print("<attributeset>");
 			writer.print("<id>" + set.getId() + "</id>");
 			writer.print("<name><![CDATA[" + set.getName() + "]]></name>");

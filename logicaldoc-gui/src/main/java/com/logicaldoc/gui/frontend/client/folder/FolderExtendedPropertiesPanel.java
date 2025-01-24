@@ -1,10 +1,9 @@
 package com.logicaldoc.gui.frontend.client.folder;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.ServerValidationError;
 import com.logicaldoc.gui.common.client.beans.GUIFolder;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.common.client.widgets.ExtendedPropertiesPanel;
@@ -12,7 +11,7 @@ import com.logicaldoc.gui.frontend.client.services.FolderService;
 import com.smartgwt.client.types.TitleOrientation;
 import com.smartgwt.client.widgets.form.DynamicForm;
 import com.smartgwt.client.widgets.form.fields.ButtonItem;
-import com.smartgwt.client.widgets.form.fields.RadioGroupItem;
+import com.smartgwt.client.widgets.form.fields.ToggleItem;
 import com.smartgwt.client.widgets.form.fields.events.ChangedHandler;
 
 /**
@@ -33,8 +32,7 @@ public class FolderExtendedPropertiesPanel extends FolderDetailTab {
 		setHeight100();
 		setMembersMargin(1);
 
-		RadioGroupItem locked = ItemFactory.newBooleanSelector("locked", "templatelocked");
-		locked.setValue(folder.getTemplateLocked() == 1 ? "yes" : "no");
+		ToggleItem locked = ItemFactory.newToggleItem("locked", "templatelocked", folder.getTemplateLocked() == 1);
 		locked.addChangedHandler(changedHandler);
 		locked.setEndRow(true);
 
@@ -45,12 +43,12 @@ public class FolderExtendedPropertiesPanel extends FolderDetailTab {
 		applyMetadata.setColSpan(1);
 		applyMetadata.addClickHandler(event -> {
 			LD.contactingServer();
-			FolderService.Instance.get().applyMetadata(folder.getId(), new AsyncCallback<>() {
+			FolderService.Instance.get().applyMetadata(folder.getId(), new DefaultAsyncCallback<>() {
 
 				@Override
 				public void onFailure(Throwable caught) {
 					LD.clearPrompt();
-					GuiLog.serverError(caught);
+					super.onFailure(caught);
 				}
 
 				@Override
@@ -74,7 +72,7 @@ public class FolderExtendedPropertiesPanel extends FolderDetailTab {
 	@Override
 	public boolean validate() {
 		if (propertiesPanel.validate() && form1.validate()) {
-			folder.setTemplateLocked("yes".equals(form1.getValueAsString("locked")) ? 1 : 0);
+			folder.setTemplateLocked(Boolean.parseBoolean(form1.getValueAsString("locked")) ? 1 : 0);
 			return true;
 		}
 		return false;
@@ -83,5 +81,15 @@ public class FolderExtendedPropertiesPanel extends FolderDetailTab {
 	@Override
 	public void handleErrors(ServerValidationError[] errors) {
 		propertiesPanel.onErrors(errors);
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

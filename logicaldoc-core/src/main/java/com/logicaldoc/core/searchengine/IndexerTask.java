@@ -13,11 +13,10 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import javax.annotation.Resource;
-
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import com.logicaldoc.core.PersistenceException;
@@ -46,7 +45,7 @@ import com.logicaldoc.util.time.TimeDiff.TimeField;
  * @author Marco Meschieri - LogicalDOC
  * @since 4.0
  */
-@Component("IndexerTask")
+@Component("indexerTask")
 public class IndexerTask extends Task {
 
 	private static Logger lg = LoggerFactory.getLogger(IndexerTask.class);
@@ -58,16 +57,12 @@ public class IndexerTask extends Task {
 
 	public static final String NAME = "IndexerTask";
 
-	@Resource(name = "DocumentManager")
 	private DocumentManager documentManager;
 
-	@Resource(name = "DocumentDAO")
 	private DocumentDAO documentDao;
 
-	@Resource(name = "TenantDAO")
 	private TenantDAO tenantDao;
 
-	@Resource(name = "SearchEngine")
 	private SearchEngine indexer;
 
 	private long indexed = 0;
@@ -78,17 +73,15 @@ public class IndexerTask extends Task {
 
 	private long parsingTime = 0;
 
-	public IndexerTask() {
+	@Autowired
+	public IndexerTask(DocumentManager documentManager, DocumentDAO documentDao, TenantDAO tenantDao,
+			SearchEngine indexer) {
 		super(NAME);
 		log = LoggerFactory.getLogger(IndexerTask.class);
-	}
-
-	public void setDocumentManager(DocumentManager documentManager) {
 		this.documentManager = documentManager;
-	}
-
-	public void setDocumentDao(DocumentDAO documentDao) {
 		this.documentDao = documentDao;
+		this.tenantDao = tenantDao;
+		this.indexer = indexer;
 	}
 
 	@Override
@@ -118,6 +111,7 @@ public class IndexerTask extends Task {
 		errors = 0;
 		indexed = 0;
 		indexingTime = 0;
+		parsingTime = 0;
 		try {
 			Integer max = getMax();
 
@@ -207,7 +201,9 @@ public class IndexerTask extends Task {
 				Map<String, Object> params = new HashMap<>();
 				params.put("transactionId", transactionId);
 
-				documentDao.bulkUpdate("set ld_transactionid = null where ld_transactionId = :transactionId", params);
+				documentDao.jdbcUpdate(
+						"update ld_document set ld_transactionid = null where ld_transactionId = :transactionId",
+						params);
 			} catch (PersistenceException e) {
 				log.error(e.getMessage(), e);
 			}
@@ -253,8 +249,9 @@ public class IndexerTask extends Task {
 			Map<String, Object> params = new HashMap<>();
 			params.put("transactionId", transactionId);
 
-			documentDao.bulkUpdate(
-					" set ld_transactionid = :transactionId where ld_transactionid is null and ld_id in " + idsStr,
+			documentDao.jdbcUpdate(
+					" update ld_document set ld_transactionid = :transactionId where ld_transactionid is null and ld_id in "
+							+ idsStr,
 					params);
 		}
 		log.info("Documents marked for indexing in transaction {}", transactionId);
@@ -309,10 +306,6 @@ public class IndexerTask extends Task {
 		return new String[] { where, sorting };
 	}
 
-	public void setIndexer(SearchEngine indexer) {
-		this.indexer = indexer;
-	}
-
 	@Override
 	protected String prepareReport(Locale locale) {
 		StringBuilder sb = new StringBuilder();
@@ -325,10 +318,6 @@ public class IndexerTask extends Task {
 		sb.append(I18N.message("errors", locale) + ": ");
 		sb.append(errors);
 		return sb.toString();
-	}
-
-	public void setTenantDao(TenantDAO tenantDao) {
-		this.tenantDao = tenantDao;
 	}
 
 	private static void startIndexerThreads(int threadsTotal) {

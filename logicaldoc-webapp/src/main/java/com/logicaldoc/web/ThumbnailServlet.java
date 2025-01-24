@@ -25,7 +25,7 @@ import com.logicaldoc.core.security.authentication.InvalidSessionException;
 import com.logicaldoc.core.security.authorization.PermissionException;
 import com.logicaldoc.core.security.user.Group;
 import com.logicaldoc.core.security.user.User;
-import com.logicaldoc.core.store.Storer;
+import com.logicaldoc.core.store.Store;
 import com.logicaldoc.util.Context;
 import com.logicaldoc.web.util.ServletUtil;
 
@@ -72,14 +72,14 @@ public class ThumbnailServlet extends HttpServlet {
 		String suffix = request.getParameter(SUFFIX);
 
 		try {
-			Storer storer = (Storer) Context.get().getBean(Storer.class);
+			Store store = Context.get(Store.class);
 
 			// 1) check if the document exists
 			String id = request.getParameter(DOC_ID);
 			long docId = Long.parseLong(id);
 			if (StringUtils.isEmpty(suffix))
 				suffix = ThumbnailManager.SUFFIX_THUMB;
-			DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+			DocumentDAO docDao = Context.get(DocumentDAO.class);
 			Document doc = docDao.findById(docId);
 			if (doc.getDocRef() != null) {
 				doc = docDao.findById(doc.getDocRef());
@@ -94,19 +94,19 @@ public class ThumbnailServlet extends HttpServlet {
 			checkPublication(doc, user);
 			
 			// Check read and preview
-			DocumentDAO dDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+			DocumentDAO dDao = Context.get(DocumentDAO.class);
 			Set<Permission> allowedPermissions = dDao.getAllowedPermissions(docId, user.getId());
 			if(!allowedPermissions.contains(Permission.READ) || !allowedPermissions.contains(Permission.PREVIEW))
 				throw new PermissionException(user.getUsername(), doc.toString(), Permission.PREVIEW);
 					
-			String resource = storer.getResourceName(docId, fileVersion, suffix);
+			String resource = store.getResourceName(docId, fileVersion, suffix);
 
 			// 2) prepare the thumbnail
 			createImageResource(session.getSid(), doc, fileVersion, resource);
 
 			// 3) return the the thumbnail resource
 			ServletUtil.downloadDocument(request, response, session.getSid(), docId, fileVersion,
-					storer.getResourceName(doc, fileVersion, suffix), suffix, user);
+					store.getResourceName(doc, fileVersion, suffix), suffix, user);
 		} catch (NumberFormatException | InvalidSessionException | PersistenceException | IOException
 				| PermissionException | ServletException e) {
 			log.error(e.getMessage(), e);
@@ -126,7 +126,7 @@ public class ThumbnailServlet extends HttpServlet {
 			fileVersion = doc.getFileVersion();
 
 		if (version != null) {
-			VersionDAO vDao = (VersionDAO) Context.get().getBean(VersionDAO.class);
+			VersionDAO vDao = Context.get(VersionDAO.class);
 			Version ver = vDao.findByVersion(docId, version);
 			if (ver != null)
 				fileVersion = ver.getFileVersion();
@@ -154,15 +154,15 @@ public class ThumbnailServlet extends HttpServlet {
 	}
 
 	private void createThumbnailImage(String sid, Document doc, String fileVersion, String resource) {
-		Storer storer = (Storer) Context.get().getBean(Storer.class);
-		if (storer.size(doc.getId(), resource) <= 0L) {
+		Store store = Context.get(Store.class);
+		if (store.size(doc.getId(), resource) <= 0L) {
 			try {
 				/*
 				 * In this case the resource is like thumn450.png so we extract
 				 * the size from the name
 				 */
 				String sizeStr = resource.substring(resource.indexOf('-') + 6, resource.lastIndexOf('.'));
-				ThumbnailManager thumbManager = (ThumbnailManager) Context.get().getBean(ThumbnailManager.class);
+				ThumbnailManager thumbManager = Context.get(ThumbnailManager.class);
 				thumbManager.createTumbnail(doc, fileVersion, Integer.parseInt(sizeStr), null, sid);
 				log.debug("Created custom thumbnail {}", resource);
 			} catch (Exception t) {
@@ -172,11 +172,11 @@ public class ThumbnailServlet extends HttpServlet {
 	}
 
 	private void createTileImage(String sid, Document doc, String fileVersion, String resource) {
-		Storer storer = (Storer) Context.get().getBean(Storer.class);
-		String tileResource = storer.getResourceName(doc, fileVersion, ThumbnailManager.SUFFIX_TILE);
-		if (storer.size(doc.getId(), tileResource) <= 0L) {
+		Store store = Context.get(Store.class);
+		String tileResource = store.getResourceName(doc, fileVersion, ThumbnailManager.SUFFIX_TILE);
+		if (store.size(doc.getId(), tileResource) <= 0L) {
 			try {
-				ThumbnailManager thumbManager = (ThumbnailManager) Context.get().getBean(ThumbnailManager.class);
+				ThumbnailManager thumbManager = Context.get(ThumbnailManager.class);
 				thumbManager.createTile(doc, fileVersion, sid);
 				log.debug("Created tile {}", resource);
 			} catch (Exception t) {
@@ -186,10 +186,10 @@ public class ThumbnailServlet extends HttpServlet {
 	}
 
 	private void buildThumbnail(String sid, Document doc, String fileVersion, String resource) {
-		Storer storer = (Storer) Context.get().getBean(Storer.class);
-		ThumbnailManager thumbManager = (ThumbnailManager) Context.get().getBean(ThumbnailManager.class);
-		String thumbResource = storer.getResourceName(doc, fileVersion, ThumbnailManager.SUFFIX_THUMB);
-		if (storer.size(doc.getId(), thumbResource) <= 0) {
+		Store store = Context.get(Store.class);
+		ThumbnailManager thumbManager = Context.get(ThumbnailManager.class);
+		String thumbResource = store.getResourceName(doc, fileVersion, ThumbnailManager.SUFFIX_THUMB);
+		if (store.size(doc.getId(), thumbResource) <= 0) {
 			try {
 				thumbManager.createTumbnail(doc, fileVersion, sid);
 				log.debug("Created thumbnail {}", resource);

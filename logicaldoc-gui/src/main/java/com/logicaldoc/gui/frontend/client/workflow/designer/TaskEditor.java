@@ -3,18 +3,16 @@ package com.logicaldoc.gui.frontend.client.workflow.designer;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIMessageTemplate;
 import com.logicaldoc.gui.common.client.beans.GUIValue;
 import com.logicaldoc.gui.common.client.beans.GUIWFState;
+import com.logicaldoc.gui.common.client.grid.RefreshableListGrid;
+import com.logicaldoc.gui.common.client.grid.UserListGridField;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
-import com.logicaldoc.gui.common.client.widgets.grid.RefreshableListGrid;
-import com.logicaldoc.gui.common.client.widgets.grid.UserListGridField;
 import com.logicaldoc.gui.frontend.client.services.MessageService;
 import com.smartgwt.client.data.AdvancedCriteria;
 import com.smartgwt.client.types.HeaderControls;
@@ -31,12 +29,11 @@ import com.smartgwt.client.widgets.form.DynamicForm;
 import com.smartgwt.client.widgets.form.ValuesManager;
 import com.smartgwt.client.widgets.form.fields.ColorPickerItem;
 import com.smartgwt.client.widgets.form.fields.FormItemIcon;
-import com.smartgwt.client.widgets.form.fields.RadioGroupItem;
 import com.smartgwt.client.widgets.form.fields.SelectItem;
 import com.smartgwt.client.widgets.form.fields.SpinnerItem;
 import com.smartgwt.client.widgets.form.fields.TextAreaItem;
 import com.smartgwt.client.widgets.form.fields.TextItem;
-import com.smartgwt.client.widgets.form.fields.events.ChangedEvent;
+import com.smartgwt.client.widgets.form.fields.ToggleItem;
 import com.smartgwt.client.widgets.form.fields.events.FormItemIconClickEvent;
 import com.smartgwt.client.widgets.grid.ListGrid;
 import com.smartgwt.client.widgets.grid.ListGridField;
@@ -57,6 +54,8 @@ import com.smartgwt.client.widgets.tab.TabSet;
  * @since 6.0
  */
 public class TaskEditor extends Window {
+
+	private static final String GROUP_PREFIX = "#group.";
 
 	private static final String AVATAR = "avatar";
 
@@ -110,7 +109,7 @@ public class TaskEditor extends Window {
 			setHeight(600);
 		} else {
 			tabSet.setTabs(propertiesTab, automationTab, messagesTab);
-			setHeight(550);	
+			setHeight(550);
 		}
 		addItem(tabSet);
 
@@ -163,13 +162,7 @@ public class TaskEditor extends Window {
 
 		messagesPanel.addMember(messagesForm);
 
-		MessageService.Instance.get().loadTemplates(I18N.getLocale(), "user", new AsyncCallback<>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
+		MessageService.Instance.get().loadTemplates(I18N.getLocale(), "user", new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(List<GUIMessageTemplate> templates) {
 				LinkedHashMap<String, String> map = new LinkedHashMap<>();
@@ -355,11 +348,11 @@ public class TaskEditor extends Window {
 		formsPanel.setMembersMargin(5);
 		formsPanel.setHeight(70);
 
-		RadioGroupItem humanInteraction = ItemFactory.newBooleanSelector("humanInteraction", "humaninteraction");
-		humanInteraction.setDefaultValue(isHumanInteraction ? "yes" : "no");
-		humanInteraction.setValue(isHumanInteraction);
-		humanInteraction.addChangedHandler((ChangedEvent event) -> {
-			if ("yes".equals(event.getValue())) {
+		ToggleItem humanInteraction = ItemFactory.newToggleItem("humanInteraction", "humaninteraction",
+				isHumanInteraction);
+		humanInteraction.setDefaultValue(true);
+		humanInteraction.addChangedHandler(changed -> {
+			if (Boolean.TRUE.equals(changed.getValue())) {
 				candidatesPanel.show();
 			} else
 				candidatesPanel.hide();
@@ -490,10 +483,11 @@ public class TaskEditor extends Window {
 				// Check if the selected user is already present in the
 				// candidates list
 				if (candidatesGrid.find(new AdvancedCriteria("name", OperatorId.EQUALS,
-						"g." + selectedRecord.getAttribute("name"))) != null)
+						GROUP_PREFIX + selectedRecord.getAttribute("name"))) != null)
 					return;
 				else
-					addCandidates("g." + selectedRecord.getAttribute("name"), selectedRecord.getAttribute("name"));
+					addCandidates(GROUP_PREFIX + selectedRecord.getAttribute("name"),
+							selectedRecord.getAttribute("name"));
 				addGroup.clearValue();
 			}
 		});
@@ -525,9 +519,9 @@ public class TaskEditor extends Window {
 
 	private void addTaskItems(HLayout formsPanel) {
 		if (state.getType() == GUIWFState.TYPE_TASK) {
-			RadioGroupItem requiresNote = ItemFactory.newBooleanSelector("requiresNote", "requirenoteatcompletion");
+			ToggleItem requiresNote = ItemFactory.newToggleItem("requiresNote", "requirenoteatcompletion",
+					this.state.isRequiresNote());
 			requiresNote.setWrapTitle(false);
-			requiresNote.setDefaultValue(this.state.isRequiresNote() ? "yes" : "no");
 
 			SpinnerItem minNoteSize = ItemFactory.newSpinnerItem("minnotesize",
 					this.state.getMinNoteSize() != null && this.state.getMinNoteSize() > 0 ? this.state.getMinNoteSize()
@@ -577,7 +571,7 @@ public class TaskEditor extends Window {
 		ListGridRecord rec = new ListGridRecord();
 		rec.setAttribute("name", name);
 		rec.setAttribute(LABEL, label);
-		if (name.startsWith("g."))
+		if (name.startsWith(GROUP_PREFIX))
 			rec.setAttribute(AVATAR, "group");
 		else if (name.startsWith("att."))
 			rec.setAttribute(AVATAR, "attribute");
@@ -594,38 +588,36 @@ public class TaskEditor extends Window {
 			candidatesGrid.getDataAsRecordList().add(createCandidateRecord(entityCode, entityLabel));
 	}
 
-	@SuppressWarnings("unchecked")
 	private void onSave() {
-		Map<String, Object> values = vm.getValues();
-		boolean humanInteraction = "yes".equals(values.get("humanInteraction"));
+		boolean humanInteraction = Boolean.parseBoolean(vm.getValueAsString("humanInteraction"));
 
 		if (Boolean.FALSE.equals(vm.validate()) && humanInteraction)
 			return;
 
 		// Remove the ' because of the WF engine would go in error saving into
 		// the DB
-		TaskEditor.this.state.setName(values.get("taskName").toString().trim().replace("'", ""));
-		TaskEditor.this.state.setDisplay((String) values.get("taskColor"));
-		TaskEditor.this.state.setDescription((String) values.get("taskDescr"));
-		TaskEditor.this.state.setOnCreation((String) values.get("onCreation"));
+		TaskEditor.this.state.setName(vm.getValueAsString("taskName").trim().replace("'", ""));
+		TaskEditor.this.state.setDisplay(vm.getValueAsString("taskColor"));
+		TaskEditor.this.state.setDescription(vm.getValueAsString("taskDescr"));
+		TaskEditor.this.state.setOnCreation(vm.getValueAsString("onCreation"));
 		TaskEditor.this.widget.setContents("<b>" + state.getName() + "</b>");
 		TaskEditor.this.widget.getDrawingPanel().getDiagramController().update();
-		TaskEditor.this.state.setCreationMessageTemplate((String) values.get("creationMessageTemplate"));
+		TaskEditor.this.state.setCreationMessageTemplate(vm.getValueAsString("creationMessageTemplate"));
 
 		if (state.getType() == GUIWFState.TYPE_TASK) {
-			TaskEditor.this.state.setRequiresNote("yes".equals(values.get("requiresNote")));
-			TaskEditor.this.state.setMinNoteSize((Integer) values.get("minnotesize"));
-			TaskEditor.this.state.setDueDateNumber((Integer) values.get("duedateNumber"));
-			TaskEditor.this.state.setDueDateUnit((String) values.get("duedateTime"));
-			TaskEditor.this.state.setReminderNumber((Integer) values.get("remindtimeNumber"));
-			TaskEditor.this.state.setReminderUnit((String) values.get("remindTime"));
-			TaskEditor.this.state.setOnAssignment((String) values.get("onAssignment"));
-			TaskEditor.this.state.setOnCompletion((String) values.get("onCompletion"));
-			TaskEditor.this.state.setOnOverdue((String) values.get("onOverdue"));
-			TaskEditor.this.state.setOnValidation((String) values.get("onValidation"));
-			TaskEditor.this.state.setAssignmentMessageTemplate((String) values.get("assignmentMessageTemplate"));
-			TaskEditor.this.state.setReminderMessageTemplate((String) values.get("reminderMessageTemplate"));
-			TaskEditor.this.state.setCompletionMessageTemplate((String) values.get("completionMessageTemplate"));
+			TaskEditor.this.state.setRequiresNote(Boolean.valueOf(vm.getValueAsString("requiresNote")));
+			TaskEditor.this.state.setMinNoteSize((Integer) vm.getValue("minnotesize"));
+			TaskEditor.this.state.setDueDateNumber((Integer) vm.getValue("duedateNumber"));
+			TaskEditor.this.state.setDueDateUnit(vm.getValueAsString("duedateTime"));
+			TaskEditor.this.state.setReminderNumber((Integer) vm.getValue("remindtimeNumber"));
+			TaskEditor.this.state.setReminderUnit(vm.getValueAsString("remindTime"));
+			TaskEditor.this.state.setOnAssignment(vm.getValueAsString("onAssignment"));
+			TaskEditor.this.state.setOnCompletion(vm.getValueAsString("onCompletion"));
+			TaskEditor.this.state.setOnOverdue(vm.getValueAsString("onOverdue"));
+			TaskEditor.this.state.setOnValidation(vm.getValueAsString("onValidation"));
+			TaskEditor.this.state.setAssignmentMessageTemplate(vm.getValueAsString("assignmentMessageTemplate"));
+			TaskEditor.this.state.setReminderMessageTemplate(vm.getValueAsString("reminderMessageTemplate"));
+			TaskEditor.this.state.setCompletionMessageTemplate(vm.getValueAsString("completionMessageTemplate"));
 
 			if (!humanInteraction) {
 				candidatesGrid.getRecordList().removeList(candidatesGrid.getRecordList().toArray());
@@ -641,5 +633,15 @@ public class TaskEditor extends Window {
 		if (humanInteraction && state.getType() == GUIWFState.TYPE_TASK
 				&& TaskEditor.this.state.getCandidates().isEmpty())
 			SC.warn(I18N.message("workflowtaskcandidateatleast"));
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

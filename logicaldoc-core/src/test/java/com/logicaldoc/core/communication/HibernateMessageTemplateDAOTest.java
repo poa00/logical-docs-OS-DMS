@@ -4,7 +4,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.Collection;
@@ -16,10 +15,12 @@ import org.junit.Test;
 
 import com.logicaldoc.core.AbstractCoreTestCase;
 import com.logicaldoc.core.PersistenceException;
+import com.logicaldoc.core.automation.AutomationException;
 import com.logicaldoc.util.plugin.PluginException;
 
 /**
- * Test case for <code>HibernateMessageTemplateDAO</code> * 
+ * Test case for <code>HibernateMessageTemplateDAO</code> *
+ * 
  * @author Marco Meschieri - LogicalDOC
  * @since 6.5
  */
@@ -28,7 +29,7 @@ public class HibernateMessageTemplateDAOTest extends AbstractCoreTestCase {
 	private MessageTemplateDAO dao;
 
 	@Before
-	public void setUp() throws FileNotFoundException, IOException, SQLException, PluginException {
+	public void setUp() throws IOException, SQLException, PluginException {
 		super.setUp();
 
 		// Retrieve the instance under test from spring context.
@@ -45,7 +46,7 @@ public class HibernateMessageTemplateDAOTest extends AbstractCoreTestCase {
 		coll = dao.findByLanguage("de", 1L);
 		assertEquals(0, coll.size());
 	}
-	
+
 	@Test
 	public void testFindByName() throws PersistenceException {
 		Collection<MessageTemplate> coll = dao.findByName("psw.rec1", 1L);
@@ -55,17 +56,17 @@ public class HibernateMessageTemplateDAOTest extends AbstractCoreTestCase {
 		coll = dao.findByName("xxxxx", 1L);
 		assertEquals(0, coll.size());
 	}
-	
+
 	@Test
 	public void testFindByTypeLanguage() throws PersistenceException {
-		Collection<MessageTemplate> coll = dao.findByTypeAndLanguage(MessageTemplate.TYPE_SYSTEM,"en", 1L);
+		Collection<MessageTemplate> coll = dao.findByTypeAndLanguage(MessageTemplate.TYPE_SYSTEM, "en", 1L);
 		assertEquals(6, coll.size());
-		coll = dao.findByTypeAndLanguage("xxx","en", 1L);
+		coll = dao.findByTypeAndLanguage("xxx", "en", 1L);
 		assertEquals(0, coll.size());
 	}
 
 	@Test
-	public void testFindByNameAndLanguage() throws PersistenceException {
+	public void testFindByNameAndLanguage() throws PersistenceException, AutomationException {
 		Map<String, Object> dictionary = new HashMap<>();
 		dictionary.put("username", "pippo");
 		dictionary.put("xxx", "label");

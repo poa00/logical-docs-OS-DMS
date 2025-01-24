@@ -20,9 +20,7 @@ import com.logicaldoc.core.document.Document;
 import com.logicaldoc.core.document.DocumentDAO;
 import com.logicaldoc.core.folder.Folder;
 import com.logicaldoc.core.security.Session;
-import com.logicaldoc.core.util.IconSelector;
 import com.logicaldoc.util.Context;
-import com.logicaldoc.util.io.FileUtil;
 
 /**
  * This servlet is responsible for deleted documents data retrieval
@@ -48,7 +46,7 @@ public class DeletedDocsDataServlet extends AbstractDataServlet {
 		response.setContentType("text/xml");
 		response.setCharacterEncoding("UTF-8");
 
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
 		DateFormat df = getDateFormat();
 
 		PrintWriter writer = response.getWriter();
@@ -80,7 +78,6 @@ public class DeletedDocsDataServlet extends AbstractDataServlet {
 		if (log.isErrorEnabled())
 			log.error(query.toString());
 
-		@SuppressWarnings("unchecked")
 		List<Document> records = docDao.query(query.toString(), new RowMapper<Document>() {
 			public Document mapRow(ResultSet rs, int rowNum) throws SQLException {
 				Document doc = new Document();
@@ -118,9 +115,7 @@ public class DeletedDocsDataServlet extends AbstractDataServlet {
 				writer.print("<customId><![CDATA[" + doc.getCustomId() + "]]></customId>");
 			else
 				writer.print("<customId> </customId>");
-			writer.print(
-					"<icon>" + FileUtil.getBaseName(IconSelector.selectIcon(doc.getType(), doc.getDocRef() != null))
-							+ "</icon>");
+			writer.print("<icon>" + doc.getIcon() + "</icon>");
 			writer.print("<version>" + doc.getVersion() + "</version>");
 			writer.print("<fileVersion>" + doc.getFileVersion() + "</fileVersion>");
 			writer.print("<lastModified>" + df.format(doc.getLastModified()) + "</lastModified>");

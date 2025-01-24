@@ -38,6 +38,7 @@ import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang.LocaleUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -354,9 +355,9 @@ public class FileUtil {
 	 */
 	public static String getDisplaySize(long size, String language) {
 		String displaySize = "";
-		Locale locale = new Locale("en");
+		Locale locale = LocaleUtils.toLocale("en");
 		if (StringUtils.isNotEmpty(language))
-			locale = new Locale(language);
+			locale = LocaleUtils.toLocale(language);
 		NumberFormat nf = new DecimalFormat("###,###,###.0", new DecimalFormatSymbols(locale));
 		if (size > 1000000000) {
 			displaySize = nf.format((double) size / 1024 / 1024 / 1024) + " GB";
@@ -382,9 +383,9 @@ public class FileUtil {
 	 */
 	public static String getDisplaySizeKB(long size, String language) {
 		String displaySize = "";
-		Locale locale = new Locale("en");
+		Locale locale = LocaleUtils.toLocale("en");
 		if (StringUtils.isNotEmpty(language))
-			locale = new Locale(language);
+			locale = LocaleUtils.toLocale(language);
 		NumberFormat nf = new DecimalFormat("###,###,##0.0", new DecimalFormatSymbols(locale));
 		displaySize = nf.format((double) size / 1024) + " KB";
 		return displaySize;
@@ -562,8 +563,10 @@ public class FileUtil {
 	 * @throws IOException if the copy resulted in an error
 	 */
 	public static void copyFile(File source, File target) throws IOException {
-		try (FileChannel in = new FileInputStream(source).getChannel();
-				FileChannel out = new FileOutputStream(target).getChannel();) {
+		try (FileInputStream fis = new FileInputStream(source);
+				FileChannel in = fis.getChannel();
+				FileOutputStream fos = new FileOutputStream(target);
+				FileChannel out = fos.getChannel();) {
 
 			ByteBuffer buffer = ByteBuffer.allocateDirect(BUFF_SIZE);
 			while (in.read(buffer) != -1) {

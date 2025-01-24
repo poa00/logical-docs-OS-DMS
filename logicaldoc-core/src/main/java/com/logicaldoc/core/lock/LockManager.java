@@ -24,7 +24,7 @@ import com.logicaldoc.util.config.ContextProperties;
  * @author Marco Meschieri - LogicalDOC
  * @since 6.5
  */
-@Component("LockManager")
+@Component("lockManager")
 public class LockManager {
 	private static final String LOCK = "lock";
 
@@ -35,13 +35,18 @@ public class LockManager {
 
 	@Resource(name = "ContextProperties")
 	private ContextProperties config;
+	
+	public LockManager(GenericDAO genericDao, ContextProperties config) {
+		super();
+		this.genericDao = genericDao;
+		this.config = config;
+	}
 
 	/**
 	 * Gets all the transaction ids associated to the locks
 	 * 
 	 * @return the lists of transactions
 	 */
-	@SuppressWarnings("unchecked")
 	public List<String> getAllTransactions() {
 		try {
 			return genericDao.queryForList(
@@ -62,7 +67,7 @@ public class LockManager {
 	 */
 	public boolean get(String lockName, String transactionId) {
 		GregorianCalendar cal = new GregorianCalendar();
-		cal.add(Calendar.SECOND, config.getInt("lock.wait"));
+		cal.add(Calendar.SECOND, config.getInt("lock.wait", 10));
 		Date ldDate = cal.getTime();
 		while (new Date().before(ldDate)) {
 			try {
@@ -152,11 +157,4 @@ public class LockManager {
 		}
 	}
 
-	public void setGenericDao(GenericDAO genericDao) {
-		this.genericDao = genericDao;
-	}
-
-	public void setConfig(ContextProperties config) {
-		this.config = config;
-	}
 }

@@ -1,9 +1,9 @@
 package com.logicaldoc.gui.frontend.client.search;
 
 import com.google.gwt.core.client.GWT;
-import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.logicaldoc.gui.common.client.CookiesManager;
 import com.logicaldoc.gui.common.client.Feature;
+import com.logicaldoc.gui.common.client.IgnoreAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIAccessControlEntry;
 import com.logicaldoc.gui.common.client.beans.GUIDocument;
@@ -107,8 +107,8 @@ public class SearchToolbar extends ToolStrip {
 	private void addPrint(final HitsListPanel hitsPanel) {
 		ToolStripButton print = AwesomeFactory.newToolStripButton("print", "print");
 		print.addClickHandler(event -> {
-			if (hitsPanel.getGrid() instanceof ListGrid)
-				GridUtil.print((ListGrid) hitsPanel.getGrid());
+			if (hitsPanel.getGrid() instanceof ListGrid listGrid)
+				GridUtil.print(listGrid);
 			else
 				Canvas.printComponents(new Object[] { hitsPanel.getGrid() });
 		});
@@ -263,17 +263,21 @@ public class SearchToolbar extends ToolStrip {
 
 	private void saveGridState() {
 		Session.get().getUser().setHitsGrid(SearchPanel.get().getDocsGridLayout());
-		SecurityService.Instance.get().saveInterfaceSettings(Session.get().getUser(), new AsyncCallback<>() {
-
-			@Override
-			public void onFailure(Throwable e) {
-				// Nothing to do
-			}
-
+		SecurityService.Instance.get().saveInterfaceSettings(Session.get().getUser(), new IgnoreAsyncCallback<>() {
 			@Override
 			public void onSuccess(GUIUser usr) {
 				GuiLog.info(I18N.message("settingssaved"));
 			}
 		});
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

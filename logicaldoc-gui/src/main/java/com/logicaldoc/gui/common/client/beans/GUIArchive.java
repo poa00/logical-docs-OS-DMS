@@ -14,7 +14,7 @@ public class GUIArchive implements Serializable {
 
 	private long id = 0;
 
-	public static final int STATUS_OPENED = 0;
+	public static final int STATUS_OPEN = 0;
 
 	public static final int STATUS_READY_TO_IMPORT = 0;
 
@@ -28,7 +28,7 @@ public class GUIArchive implements Serializable {
 
 	public static final int TYPE_DEFAULT = 0;
 
-	public static final int TYPE_STORAGE = 1;
+	public static final int TYPE_STORE = 1;
 
 	public static final int MODE_IMPORT = 0;
 
@@ -60,7 +60,7 @@ public class GUIArchive implements Serializable {
 
 	private Date closure;
 
-	private int status = STATUS_OPENED;
+	private int status = STATUS_OPEN;
 
 	private int type = TYPE_DEFAULT;
 
@@ -112,7 +112,7 @@ public class GUIArchive implements Serializable {
 	/**
 	 * The archive status
 	 * 
-	 * @see #STATUS_OPENED
+	 * @see #STATUS_OPEN
 	 * @see #STATUS_CLOSED
 	 * @see #STATUS_FINALIZED
 	 * @see #STATUS_READYTOSIGN
@@ -146,7 +146,7 @@ public class GUIArchive implements Serializable {
 	 * The archive type
 	 * 
 	 * @see #TYPE_DEFAULT
-	 * @see #TYPE_STORAGE
+	 * @see #TYPE_STORE
 	 * 
 	 * @return the type
 	 */

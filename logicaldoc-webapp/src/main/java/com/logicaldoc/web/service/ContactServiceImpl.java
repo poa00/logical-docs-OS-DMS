@@ -43,7 +43,7 @@ public class ContactServiceImpl extends AbstractRemoteService implements Contact
 		validateSession();
 
 		try {
-			ContactDAO dao = (ContactDAO) Context.get().getBean(ContactDAO.class);
+			ContactDAO dao = Context.get(ContactDAO.class);
 			for (Long id : ids) {
 				dao.delete(id);
 			}
@@ -55,7 +55,7 @@ public class ContactServiceImpl extends AbstractRemoteService implements Contact
 	@Override
 	public void save(GUIContact contact) throws ServerException {
 		validateSession();
-		ContactDAO dao = (ContactDAO) Context.get().getBean(ContactDAO.class);
+		ContactDAO dao = Context.get(ContactDAO.class);
 		try {
 			Contact cnt = dao.findById(contact.getId());
 			if (cnt == null)
@@ -80,11 +80,11 @@ public class ContactServiceImpl extends AbstractRemoteService implements Contact
 		Session session = validateSession();
 
 		try {
-			ContactDAO dao = (ContactDAO) Context.get().getBean(ContactDAO.class);
+			ContactDAO dao = Context.get(ContactDAO.class);
 			Contact contact = dao.findById(id);
 			return fromContact(contact);
 		} catch (PersistenceException e) {
-			return (GUIContact) throwServerException(session, log, e);
+			return throwServerException(session, log, e);
 		}
 	}
 
@@ -109,10 +109,10 @@ public class ContactServiceImpl extends AbstractRemoteService implements Contact
 	public List<GUIContact> parseContacts(boolean preview, GUIParseContactsParameters parameters) throws ServerException {
 		final Session session = validateSession();
 
-		Map<String, File> uploadedFilesMap = UploadServlet.getReceivedFiles(session.getSid());
+		Map<String, File> uploadedFilesMap = UploadServlet.getUploads(session.getSid());
 		File file = uploadedFilesMap.values().iterator().next();
 
-		ContactDAO dao = (ContactDAO) Context.get().getBean(ContactDAO.class);
+		ContactDAO dao = Context.get(ContactDAO.class);
 
 		List<GUIContact> contacts = new ArrayList<>();
 
@@ -163,7 +163,7 @@ public class ContactServiceImpl extends AbstractRemoteService implements Contact
 		} catch (IOException | PersistenceException e) {
 			log.error("Unable to parse contacs in CSV file", e);
 		} finally {
-			UploadServlet.cleanReceivedFiles(session.getSid());
+			UploadServlet.cleanUploads(session.getSid());
 		}
 
 		return contacts;
@@ -174,7 +174,7 @@ public class ContactServiceImpl extends AbstractRemoteService implements Contact
 		validateSession();
 		try {
 			appendUserIdsFromGroups(groupIds, userIds);
-			ContactDAO dao = (ContactDAO) Context.get().getBean(ContactDAO.class);
+			ContactDAO dao = Context.get(ContactDAO.class);
 			for (Long cId : contactIds) {
 				Contact originalContact = dao.findById(cId);
 				for (Long userId : userIds) {
@@ -193,7 +193,7 @@ public class ContactServiceImpl extends AbstractRemoteService implements Contact
 	}
 
 	private void storeContact(Contact contact) {
-		ContactDAO dao = (ContactDAO) Context.get().getBean(ContactDAO.class);
+		ContactDAO dao = Context.get(ContactDAO.class);
 		try {
 			dao.store(contact);
 		} catch (PersistenceException e) {
@@ -202,7 +202,7 @@ public class ContactServiceImpl extends AbstractRemoteService implements Contact
 	}
 
 	private void appendUserIdsFromGroups(Collection<Long> groupIds, Collection<Long> users) throws PersistenceException {
-		UserDAO gDao = (UserDAO) Context.get().getBean(UserDAO.class);
+		UserDAO gDao = Context.get(UserDAO.class);
 		for (Long gId : groupIds) {
 			Set<User> usrs = gDao.findByGroup(gId);
 			for (User user : usrs) {

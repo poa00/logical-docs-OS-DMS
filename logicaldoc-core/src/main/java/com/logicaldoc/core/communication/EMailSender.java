@@ -5,7 +5,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
-import java.net.URL;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
@@ -43,7 +43,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.logicaldoc.core.PersistenceException;
+import com.logicaldoc.core.RunLevel;
 import com.logicaldoc.core.automation.Automation;
+import com.logicaldoc.core.automation.AutomationException;
 import com.logicaldoc.core.communication.oauth.Microsoft365TokenProvider;
 import com.logicaldoc.core.document.Document;
 import com.logicaldoc.core.document.DocumentHistory;
@@ -52,11 +54,13 @@ import com.logicaldoc.core.folder.Folder;
 import com.logicaldoc.core.folder.FolderDAO;
 import com.logicaldoc.core.metadata.Attribute;
 import com.logicaldoc.core.metadata.TemplateDAO;
+import com.logicaldoc.core.security.Tenant;
 import com.logicaldoc.core.security.TenantDAO;
 import com.logicaldoc.core.security.user.UserDAO;
 import com.logicaldoc.core.threading.ThreadPools;
 import com.logicaldoc.util.Context;
 import com.logicaldoc.util.config.ContextProperties;
+import com.logicaldoc.util.http.UrlUtil;
 import com.logicaldoc.util.io.FileUtil;
 import com.sun.mail.smtp.SMTPTransport;
 
@@ -135,7 +139,7 @@ public class EMailSender {
 	private Long folderId;
 
 	public EMailSender(long tenant) {
-		TenantDAO tenantDao = (TenantDAO) Context.get().getBean(TenantDAO.class);
+		TenantDAO tenantDao = Context.get(TenantDAO.class);
 		try {
 			loadSettings(tenantDao.findById(tenant).getName());
 		} catch (PersistenceException e) {
@@ -148,7 +152,7 @@ public class EMailSender {
 	}
 
 	public void setTenant(long tenant) {
-		TenantDAO tenantDao = (TenantDAO) Context.get().getBean(TenantDAO.class);
+		TenantDAO tenantDao = Context.get(TenantDAO.class);
 		try {
 			loadSettings(tenantDao.findById(tenant).getName());
 		} catch (PersistenceException e) {
@@ -230,7 +234,7 @@ public class EMailSender {
 	 * @param dictionary map of variable to pass to the automation
 	 */
 	public void sendAsync(EMail email, String templateName, Map<String, Object> dictionary) {
-		ThreadPools tPools = (ThreadPools) Context.get().getBean(ThreadPools.class);
+		ThreadPools tPools = Context.get(ThreadPools.class);
 		tPools.execute(() -> {
 			try {
 				send(email, templateName, dictionary);
@@ -248,13 +252,23 @@ public class EMailSender {
 	 * @param dictionary The dictionary to be used in the template
 	 * 
 	 * @throws MessagingException raised if the email cannot be sent
+	 * @throws AutomationException the automation has been evaluated but
+	 *         produced an error
 	 */
-	public void send(EMail email, String templateName, Map<String, Object> dictionary) throws MessagingException {
-		MessageTemplateDAO templateDao = (MessageTemplateDAO) Context.get().getBean(MessageTemplateDAO.class);
+	public void send(EMail email, String templateName, Map<String, Object> dictionary)
+			throws MessagingException, AutomationException {
+		if (!RunLevel.current().aspectEnabled("sendingMessages")) {
+			log.error("Aspect sendingMessages not enabled");
+			return;
+		}
+
+		MessageTemplateDAO templateDao = Context.get(MessageTemplateDAO.class);
 		MessageTemplate template = null;
 		try {
 			template = templateDao.findByNameAndLanguage(templateName, email.getLocale().toString(),
 					email.getTenantId());
+			if (template == null)
+				templateDao.findByNameAndLanguage(templateName, email.getLocale().toString(), Tenant.DEFAULT_ID);
 		} catch (PersistenceException e) {
 			log.error(e.getMessage(), e);
 		}
@@ -276,7 +290,7 @@ public class EMailSender {
 	 * @param email the email to send
 	 */
 	public void sendAsync(EMail email) {
-		ThreadPools tPools = (ThreadPools) Context.get().getBean(ThreadPools.class);
+		ThreadPools tPools = Context.get(ThreadPools.class);
 		tPools.execute(() -> {
 			try {
 				send(email);
@@ -295,11 +309,18 @@ public class EMailSender {
 	 * @throws MessagingException raised if the email cannot be sent
 	 */
 	public void send(EMail email) throws MessagingException {
+		if (!RunLevel.current().aspectEnabled("sendingMessages")) {
+			log.error("Aspect sendingMessages not enabled");
+			return;
+		}
+
 		cleanAuthorAddress(email);
 
 		Session session = newMailSession();
 
 		MimeMessage message = new MimeMessage(session);
+		for (Map.Entry<String, String> line : email.getHeaders().entrySet())
+			message.addHeaderLine(line.getKey() + "=" + line.getValue());
 
 		// The FROM field must to be the one configured for the SMTP connection.
 		// because of errors will be returned in the case the sender is not in
@@ -309,54 +330,29 @@ public class EMailSender {
 		Set<InternetAddress> cc = email.getAddressesCC();
 		Set<InternetAddress> bcc = email.getAddressesBCC();
 		message.setFrom(from);
-		message.setRecipients(javax.mail.Message.RecipientType.TO, to.toArray(new InternetAddress[0]));
+		if (CollectionUtils.isNotEmpty(to))
+			message.setRecipients(javax.mail.Message.RecipientType.TO, to.toArray(new InternetAddress[0]));
 		if (CollectionUtils.isNotEmpty(cc))
 			message.setRecipients(javax.mail.Message.RecipientType.CC, cc.toArray(new InternetAddress[0]));
-		if (CollectionUtils.isNotEmpty(cc))
+		if (CollectionUtils.isNotEmpty(bcc))
 			message.setRecipients(javax.mail.Message.RecipientType.BCC, bcc.toArray(new InternetAddress[0]));
 		message.setSubject(email.getSubject(), UTF_8);
-
-		MimeBodyPart body = buildBodyPart(email);
 
 		/*
 		 * If we have to images, the parts must be 'related' otherwise 'mixed'
 		 */
-		Multipart mpMessage = new MimeMultipart(email.getImages().isEmpty() ? "mixed" : "related");
-		mpMessage.addBodyPart(body);
+		Multipart multipartMessage = new MimeMultipart(email.getImages().isEmpty() ? "mixed" : "related");
 
-		int i = 1;
-		for (String image : email.getImages()) {
-			MimeBodyPart imageBodyPart = new MimeBodyPart();
-
-			try {
-				DataSource ds = new URLDataSource(new URL(image));
-				imageBodyPart.setDataHandler(new DataHandler(ds));
-			} catch (MalformedURLException e) {
-				throw new MessagingException(e.getMessage(), e);
-			}
-
-			imageBodyPart.setHeader("Content-ID", "<image_" + (i++) + ">");
-			imageBodyPart.setDisposition("inline");
-			mpMessage.addBodyPart(imageBodyPart);
+		if (StringUtils.isNotEmpty(email.getMessageText())) {
+			MimeBodyPart body = buildBodyPart(email);
+			multipartMessage.addBodyPart(body);
 		}
 
-		for (Integer partId : email.getAttachments().keySet()) {
-			EMailAttachment att = email.getAttachment(partId);
-			String mime = detectMimeType(att);
-			DataSource fdSource = new ByteArrayDataSource(att.getData(), mime);
-			DataHandler fdHandler = new DataHandler(fdSource);
-			MimeBodyPart part = new MimeBodyPart();
-			part.setDataHandler(fdHandler);
-			try {
-				String fileName = MimeUtility.encodeText(att.getFileName(), UTF_8, null);
-				part.setFileName(fileName);
-			} catch (UnsupportedEncodingException e) {
-				throw new MessagingException(e.getMessage(), e);
-			}
-			mpMessage.addBodyPart(part);
-		}
+		includeImages(email, multipartMessage);
 
-		message.setContent(mpMessage);
+		includeAttachments(email, multipartMessage);
+
+		message.setContent(multipartMessage);
 
 		MailDateFormat formatter = new MailDateFormat();
 		formatter.setTimeZone(TimeZone.getTimeZone("GMT")); // always use UTC
@@ -385,6 +381,57 @@ public class EMailSender {
 		historycizeOutgoingEmail(email, message, from);
 	}
 
+	private void includeAttachments(EMail email, Multipart multipartMessage) throws MessagingException {
+		for (Integer partId : email.getAttachments().keySet()) {
+			EMailAttachment att = email.getAttachment(partId);
+			String mime = detectMimeType(att);
+			DataSource fdSource = new ByteArrayDataSource(att.getData(), mime);
+			DataHandler fdHandler = new DataHandler(fdSource);
+			MimeBodyPart part = new MimeBodyPart();
+			part.setDataHandler(fdHandler);
+			try {
+				String fileName = MimeUtility.encodeText(att.getFileName(), UTF_8, null);
+				part.setFileName(fileName);
+			} catch (UnsupportedEncodingException e) {
+				throw new MessagingException(e.getMessage(), e);
+			}
+
+			if (StringUtils.isNotEmpty(att.getDisposition())) {
+				if ("remove".equals(att.getDisposition())) {
+					part.removeHeader("Content-Disposition");
+				} else {
+					part.setDisposition(att.getDisposition());
+				}
+			}
+
+			if (StringUtils.isNotEmpty(att.getContentType()))
+				part.setHeader("Content-Type", att.getContentType());
+
+			if (StringUtils.isNotEmpty(att.getContentEncoding()))
+				part.setHeader("Content-Transfer-Encoding", att.getContentEncoding());
+
+			multipartMessage.addBodyPart(part);
+		}
+	}
+
+	private void includeImages(EMail email, Multipart multipartMessage) throws MessagingException {
+		int i = 1;
+		for (String image : email.getImages()) {
+			MimeBodyPart imageBodyPart = new MimeBodyPart();
+
+			try {
+				DataSource ds = new URLDataSource(UrlUtil.toURL(image));
+				imageBodyPart.setDataHandler(new DataHandler(ds));
+			} catch (MalformedURLException | URISyntaxException e) {
+				throw new MessagingException(e.getMessage(), e);
+			}
+
+			imageBodyPart.setHeader("Content-ID", "<image_" + (i++) + ">");
+			imageBodyPart.setDisposition("inline");
+			multipartMessage.addBodyPart(imageBodyPart);
+		}
+	}
+
 	protected InternetAddress prepareFrom(EMail email) throws AddressException {
 		InternetAddress from = new InternetAddress(sender);
 		if (StringUtils.isNotEmpty(email.getAuthorAddress()))
@@ -404,7 +451,7 @@ public class EMailSender {
 
 	private void cleanAuthorAddress(EMail email) {
 		try {
-			TenantDAO tDao = (TenantDAO) Context.get().getBean(TenantDAO.class);
+			TenantDAO tDao = Context.get(TenantDAO.class);
 			String tenantName = tDao.getTenantName(email.getTenantId());
 			if (!Context.get().getProperties().getBoolean(tenantName + ".smtp.userasfrom", false))
 				email.setAuthorAddress(null);
@@ -521,7 +568,7 @@ public class EMailSender {
 	}
 
 	private String detectMimeType(EMailAttachment att) {
-		String mime = "text/plain";
+		String mime = StringUtils.isEmpty(att.getMimeType()) ? att.getMimeType() : "text/plain";
 		try {
 			MagicMatch match = Magic.getMagicMatch(att.getData(), true);
 			mime = match.getMimeType();
@@ -542,11 +589,11 @@ public class EMailSender {
 		if (folderId == null || !email.isHistoricyze())
 			return;
 
-		DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
-		TemplateDAO templateDao = (TemplateDAO) Context.get().getBean(TemplateDAO.class);
-		UserDAO userDao = (UserDAO) Context.get().getBean(UserDAO.class);
+		DocumentManager manager = Context.get(DocumentManager.class);
+		TemplateDAO templateDao = Context.get(TemplateDAO.class);
+		UserDAO userDao = Context.get(UserDAO.class);
 
-		FolderDAO folderDao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+		FolderDAO folderDao = Context.get(FolderDAO.class);
 		Folder saveFolder = null;
 		try {
 			saveFolder = folderId != null && folderId != 0 ? folderDao.findFolder(folderId) : null;

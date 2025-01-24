@@ -7,7 +7,6 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.List;
@@ -16,6 +15,7 @@ import org.junit.Test;
 
 import com.logicaldoc.core.folder.Folder;
 import com.logicaldoc.core.folder.FolderDAO;
+import com.logicaldoc.core.security.Client;
 import com.logicaldoc.core.security.Permission;
 import com.logicaldoc.core.security.Session;
 import com.logicaldoc.core.security.SessionManager;
@@ -44,7 +44,7 @@ public class SoapFolderServiceTest extends AbstractWebserviceTestCase {
 	private SoapSecurityService soapSecurityService;
 
 	@Override
-	public void setUp() throws FileNotFoundException, IOException, SQLException, PluginException {
+	public void setUp() throws IOException, SQLException, PluginException {
 		super.setUp();
 		folderDao = (FolderDAO) context.getBean("FolderDAO");
 		userDao = (UserDAO) context.getBean("UserDAO");
@@ -131,7 +131,7 @@ public class SoapFolderServiceTest extends AbstractWebserviceTestCase {
 
 		// trying to get a non existent folder
 		try {
-			wsFolder = soapFolderService.getFolder("", 2510);
+			soapFolderService.getFolder("", 2510);
 			fail("Expected exception was not thrown");
 		} catch (Exception e) {
 			// nothing to do here
@@ -146,11 +146,11 @@ public class SoapFolderServiceTest extends AbstractWebserviceTestCase {
 		// trying to get a folder for which the user does not have read
 		// permission
 		SessionManager sm = SessionManager.get();
-		Session session1 = sm.newSession("guest", "admin", null);
+		Session session1 = sm.newSession("guest", "admin", (Client) null);
 
 		try {
 			soapFolderService.setValidateSession(true);
-			wsFolder = soapFolderService.getFolder(session1.getSid(), 99);
+			soapFolderService.getFolder(session1.getSid(), 99);
 			fail("Expected exception was not thrown");
 		} catch (Exception e) {
 			// nothing to do here
@@ -177,14 +177,6 @@ public class SoapFolderServiceTest extends AbstractWebserviceTestCase {
 		ace.setGroupId(user.getUserGroup().getId());
 
 		soapFolderService.setAccessControlList("", 80L, List.of(ace));
-
-		// Because of these methods use JDBC directly, they fails when the test
-		// is executed by maven. Probably the folder groups are not already
-		// persisted in the DB
-		// assertTrue(folderDao.isPermissionEnabled(Permission.IMMUTABLE,
-		// 80, user.getId()));
-		// assertFalse(folderDao.isPermissionEnabled(Permission.ADD, 80,
-		// user.getId()));
 	}
 
 	@Test

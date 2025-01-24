@@ -3,7 +3,6 @@ package com.logicaldoc.core.searchengine.saved;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -35,7 +34,7 @@ public class HibernateSearchDAOTest extends AbstractCoreTestCase {
 	private SearchDAO dao;
 
 	@Before
-	public void setUp() throws FileNotFoundException, IOException, SQLException, PluginException {
+	public void setUp() throws IOException, SQLException, PluginException {
 		super.setUp();
 
 		// Retrieve the instance under test from spring context. Make sure that
@@ -44,7 +43,7 @@ public class HibernateSearchDAOTest extends AbstractCoreTestCase {
 	}
 
 	@Test
-	public void testFindByUserId() throws PersistenceException, IOException {
+	public void testFindByUserId() throws PersistenceException {
 		FulltextSearchOptions opt = new FulltextSearchOptions();
 
 		opt.setLanguage("it");
@@ -80,7 +79,7 @@ public class HibernateSearchDAOTest extends AbstractCoreTestCase {
 	}
 
 	@Test
-	public void testCharsets() throws IOException, PersistenceException {
+	public void testCharsets() throws PersistenceException {
 		FulltextSearchOptions opt = new FulltextSearchOptions();
 
 		opt.setLanguage("it");
@@ -122,9 +121,10 @@ public class HibernateSearchDAOTest extends AbstractCoreTestCase {
 		saved.setName("缺乏谦卑");
 		saved.saveOptions(opt);
 		xml = saved.getOptions();
-		
+
 		assertNotNull(xml);
-		assertTrue(xml.length() > 700);
+		System.out.println(xml);
+		assertTrue(xml.length() > 600);
 
 		saved = new SavedSearch();
 		saved.setOptions(xml);

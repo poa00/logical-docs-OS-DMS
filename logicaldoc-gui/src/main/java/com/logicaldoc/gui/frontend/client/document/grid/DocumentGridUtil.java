@@ -160,8 +160,7 @@ public class DocumentGridUtil {
 		if (rec.getAttributeAsInt(IMMUTABLE) != null)
 			document.setImmutable(rec.getAttributeAsInt(IMMUTABLE));
 
-		if (rec.getAttributeAsInt(PASSWORD) != null)
-			document.setPasswordProtected(rec.getAttributeAsBoolean(PASSWORD));
+		document.setPasswordProtected(Boolean.TRUE.equals(rec.getAttributeAsBoolean(PASSWORD)));
 
 		if (rec.getAttributeAsInt(SIGNED) != null)
 			document.setSigned(rec.getAttributeAsInt(SIGNED));
@@ -169,8 +168,7 @@ public class DocumentGridUtil {
 		if (rec.getAttributeAsInt(STAMPED) != null)
 			document.setStamped(rec.getAttributeAsInt(STAMPED));
 
-		if (rec.getAttributeAsInt(BOOKMARKED) != null)
-			document.setBookmarked(rec.getAttributeAsBoolean(BOOKMARKED));
+		document.setBookmarked(Boolean.TRUE.equals(rec.getAttributeAsBoolean(BOOKMARKED)));
 	}
 
 	private static void setDates(Record rec, GUIDocument document) {
@@ -257,6 +255,7 @@ public class DocumentGridUtil {
 			rec.setAttribute("fileVersion", doc.getFileVersion());
 			rec.setAttribute("version", doc.getVersion());
 			rec.setAttribute(COMMENT, doc.getComment());
+			rec.setAttribute("lastNote", doc.getLastNote());
 			rec.setAttribute(WORKFLOW_STATUS, doc.getWorkflowStatus());
 			rec.setAttribute(WORKFLOW_STATUS_DISPLAY, doc.getWorkflowStatusDisplay());
 			rec.setAttribute("color", doc.getColor());

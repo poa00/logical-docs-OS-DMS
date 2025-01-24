@@ -68,6 +68,7 @@ public class WorkflowDesigner extends AdminPanel {
 
 	public void redraw(GUIWorkflow workflow) {
 		this.workflow = workflow;
+		this.workflowToolstrip.setCurrentWorkflow(workflow);
 		drawingPanel.redraw();
 	}
 
@@ -171,5 +172,15 @@ public class WorkflowDesigner extends AdminPanel {
 
 			srcWidget.getWFState().setTransitions(transitions);
 		}
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

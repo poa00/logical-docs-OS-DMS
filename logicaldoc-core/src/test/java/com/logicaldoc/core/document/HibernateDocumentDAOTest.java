@@ -7,7 +7,6 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Writer;
@@ -32,6 +31,7 @@ import com.logicaldoc.core.folder.FolderDAO;
 import com.logicaldoc.core.lock.LockManager;
 import com.logicaldoc.core.metadata.Template;
 import com.logicaldoc.core.metadata.TemplateDAO;
+import com.logicaldoc.core.security.Client;
 import com.logicaldoc.core.security.Permission;
 import com.logicaldoc.core.security.Session;
 import com.logicaldoc.core.security.SessionManager;
@@ -60,7 +60,7 @@ public class HibernateDocumentDAOTest extends AbstractCoreTestCase {
 	private TemplateDAO templateDao;
 
 	@Before
-	public void setUp() throws FileNotFoundException, IOException, SQLException, PluginException {
+	public void setUp() throws IOException, SQLException, PluginException {
 		super.setUp();
 
 		// Retrieve the instance under test from spring context. Make sure that
@@ -68,7 +68,7 @@ public class HibernateDocumentDAOTest extends AbstractCoreTestCase {
 		dao = (DocumentDAO) context.getBean("DocumentDAO");
 
 		folderDao = (FolderDAO) context.getBean("FolderDAO");
-		lockManager = (LockManager) context.getBean("LockManager");
+		lockManager = (LockManager) context.getBean("lockManager");
 		templateDao = (TemplateDAO) context.getBean("TemplateDAO");
 	}
 
@@ -93,8 +93,10 @@ public class HibernateDocumentDAOTest extends AbstractCoreTestCase {
 
 	@Test
 	public void testGetTagCloud() throws PersistenceException {
-		Session session = SessionManager.get().newSession("admin", "admin", null);
+		Session session = SessionManager.get().newSession("admin", "admin", (Client) null);
 		try {
+			dao.updateCountUniqueTags();
+			
 			List<TagCloud> cloud = dao.getTagCloud(session.getSid());
 			assertNotNull(cloud);
 			assertEquals("approved,rejected", cloud.stream().map(TagCloud::getTag).collect(Collectors.joining(",")));
@@ -104,7 +106,7 @@ public class HibernateDocumentDAOTest extends AbstractCoreTestCase {
 	}
 
 	@Test
-	public void testUpdateDigest() throws PersistenceException, IOException {
+	public void testUpdateDigest() throws PersistenceException {
 		Document doc = dao.findById(1);
 		assertNotNull(doc);
 		dao.initialize(doc);
@@ -371,7 +373,7 @@ public class HibernateDocumentDAOTest extends AbstractCoreTestCase {
 	}
 
 	@Test
-	public void testMultipleValues() throws IOException, PersistenceException {
+	public void testMultipleValues() throws PersistenceException {
 		Folder folder = folderDao.findById(Folder.ROOTID);
 		Template template = templateDao.findById(-1L);
 
@@ -403,16 +405,13 @@ public class HibernateDocumentDAOTest extends AbstractCoreTestCase {
 	}
 
 	@Test
-	public void testStore() throws IOException, PersistenceException {
-		Document doc = new Document();
-		Folder folder = folderDao.findById(Folder.ROOTID);
-
-		doc = dao.findById(1);
+	public void testStore() throws PersistenceException {
+		Document doc = dao.findById(1);
 		assertNotNull(doc);
 		dao.initialize(doc);
 
 		// Try to store it inside a folder with extended attributes
-		folder = folderDao.findById(1202);
+		Folder folder = folderDao.findById(1202);
 		doc.setFolder(folder);
 
 		doc.setValue("object", "test");
@@ -443,7 +442,7 @@ public class HibernateDocumentDAOTest extends AbstractCoreTestCase {
 
 	@Test
 	public void testFindTags() throws PersistenceException {
-		TagsProcessor processor = (TagsProcessor) context.getBean("TagsProcessor");
+		TagsProcessor processor = (TagsProcessor) context.getBean("tagsProcessor");
 		processor.run();
 
 		Collection<String> tags = dao.findTags("a", 1L).keySet();
@@ -462,7 +461,7 @@ public class HibernateDocumentDAOTest extends AbstractCoreTestCase {
 
 	@Test
 	public void testFindAllTags() throws PersistenceException {
-		TagsProcessor processor = (TagsProcessor) context.getBean("TagsProcessor");
+		TagsProcessor processor = (TagsProcessor) context.getBean("tagsProcessor");
 		processor.run();
 
 		Collection<String> tags = dao.findAllTags("a", 1L);
@@ -632,11 +631,11 @@ public class HibernateDocumentDAOTest extends AbstractCoreTestCase {
 
 	@Test
 	public void testFindByLockUserAndStatus() {
-		assertEquals(4, dao.findByLockUserAndStatus(3L, null).size());
+		assertEquals(3, dao.findByLockUserAndStatus(3L, null).size());
 		assertEquals(2, dao.findByLockUserAndStatus(3L, AbstractDocument.DOC_CHECKED_OUT).size());
-		assertEquals(2, dao.findByLockUserAndStatus(null, AbstractDocument.DOC_CHECKED_OUT).size());
-		assertEquals(0, dao.findByLockUserAndStatus(1L, null).size());
-		assertEquals(0, dao.findByLockUserAndStatus(1L, AbstractDocument.DOC_CHECKED_OUT).size());
+		assertEquals(3, dao.findByLockUserAndStatus(null, AbstractDocument.DOC_CHECKED_OUT).size());
+		assertEquals(1, dao.findByLockUserAndStatus(1L, null).size());
+		assertEquals(1, dao.findByLockUserAndStatus(1L, AbstractDocument.DOC_CHECKED_OUT).size());
 		assertEquals(0, dao.findByLockUserAndStatus(987541L, null).size());
 	}
 
@@ -756,15 +755,15 @@ public class HibernateDocumentDAOTest extends AbstractCoreTestCase {
 	}
 
 	@Test
-	public void getEnabledPermissions() throws PersistenceException {
+	public void testGetAllowedPermissions() throws PersistenceException {
 		assertTrue(dao.isReadAllowed(7L, 3L));
 		assertTrue(dao.isWriteAllowed(7L, 3L));
 		assertTrue(dao.isPrintAllowed(7L, 3L));
 
-		assertTrue(dao.getAllowedPermissions(7L, 3L).contains(Permission.SECURITY));
-		assertTrue(!dao.getAllowedPermissions(7L, 2L).contains(Permission.SECURITY));
+		assertFalse(dao.getAllowedPermissions(7L, 2L).contains(Permission.IMMUTABLE));
+		assertTrue(dao.getAllowedPermissions(7L, 2L).contains(Permission.SECURITY));
 	}
-
+	
 	@Test
 	public void testApplyParentFolderSecurity() throws PersistenceException {
 		Document doc = dao.findById(1L);

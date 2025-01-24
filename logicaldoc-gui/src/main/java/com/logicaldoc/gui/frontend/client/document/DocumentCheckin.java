@@ -2,7 +2,7 @@ package com.logicaldoc.gui.frontend.client.document;
 
 import java.util.Arrays;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.IgnoreAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIDocument;
 import com.logicaldoc.gui.common.client.i18n.I18N;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
@@ -93,18 +93,7 @@ public class DocumentCheckin extends Window {
 		addItem(layout);
 
 		// Just to clean the upload folder
-		DocumentService.Instance.get().cleanUploadedFileFolder(new AsyncCallback<>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				// Nothing to do
-			}
-
-			@Override
-			public void onSuccess(Void result) {
-				// Nothing to do
-			}
-		});
+		DocumentService.Instance.get().cleanUploadedFileFolder(new IgnoreAsyncCallback<>());
 	}
 
 	public void onSubmit() {
@@ -116,7 +105,7 @@ public class DocumentCheckin extends Window {
 		if (Boolean.FALSE.equals(vm.validate()))
 			return;
 
-		if ("true".equals(vm.getValueAsString(CHECKFILENAME)) && !uploader.getUploadedFile().equals(fileName)) {
+		if (Boolean.parseBoolean(vm.getValueAsString(CHECKFILENAME)) && !uploader.getUploadedFile().equals(fileName)) {
 			submitButton.setDisabled(true);
 			SC.warn(I18N.message("nosamefilename"));
 			return;
@@ -124,7 +113,7 @@ public class DocumentCheckin extends Window {
 
 		document.setComment(vm.getValueAsString("comment"));
 		UpdateDialog bulk = new UpdateDialog(Arrays.asList(document.getId()), document, UpdateDialog.CHECKIN,
-				"true".equals(vm.getValueAsString(MAJORVERSION)));
+				Boolean.valueOf(vm.getValueAsString(MAJORVERSION)));
 		bulk.show();
 		destroy();
 	}
@@ -134,6 +123,16 @@ public class DocumentCheckin extends Window {
 	}
 
 	public boolean getImportZip() {
-		return "true".equals(vm.getValueAsString("zip"));
+		return Boolean.valueOf(vm.getValueAsString("zip"));
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

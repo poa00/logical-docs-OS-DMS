@@ -2,10 +2,8 @@ package com.logicaldoc.core.folder;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -52,7 +50,7 @@ import com.logicaldoc.core.security.user.Group;
 import com.logicaldoc.core.security.user.User;
 import com.logicaldoc.core.security.user.UserDAO;
 import com.logicaldoc.core.security.user.UserGroup;
-import com.logicaldoc.core.store.Storer;
+import com.logicaldoc.core.store.Store;
 import com.logicaldoc.util.Context;
 import com.logicaldoc.util.StringUtil;
 import com.logicaldoc.util.html.HTMLSanitizer;
@@ -65,6 +63,8 @@ import com.logicaldoc.util.sql.SqlUtil;
  * @since 6.0
  */
 public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> implements FolderDAO {
+
+	private static final String ROOT_ID = "rootId";
 
 	private static final String TENANT_ID_EQUAL = ".tenantId=";
 
@@ -102,10 +102,10 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 	@Resource(name = "FolderHistoryDAO")
 	private FolderHistoryDAO historyDAO;
 
-	@Resource(name = "Storer")
-	private Storer storer;
+	@Resource(name = "Store")
+	private Store store;
 
-	@Resource(name = "FolderListenerManager")
+	@Resource(name = "folderListenerManager")
 	private FolderListenerManager listenerManager;
 
 	protected HibernateFolderDAO() {
@@ -123,8 +123,7 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 		if (!checkStoringAspect())
 			return;
 
-		if (folder.getId() != 0L && getCurrentSession().contains(folder))
-			getCurrentSession().merge(folder);
+		workspaceChecks(folder);
 
 		if (!folder.getName().equals(SLASH)) {
 			// To avoid java script and xml injection
@@ -158,8 +157,10 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 
 			AccessControlUtil.removeForbiddenPermissionsForGuests(folder);
 
-			if (folder.getTemplate() == null)
+			if (folder.getTemplate() == null) {
 				folder.setOcrTemplateId(null);
+				folder.setBarcodeTemplateId(null);
+			}
 
 			log.debug("Invoke listeners before store");
 			Map<String, Object> dictionary = new HashMap<>();
@@ -184,6 +185,23 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 			saveFolderHistory(new Folder(folder), transaction);
 		} catch (PersistenceException e) {
 			handleStoreError(transaction, e);
+		}
+	}
+
+	private void workspaceChecks(Folder folder) throws PersistenceException {
+		if (folder.getId() != 0L && folder.getType() == Folder.TYPE_WORKSPACE) {
+			Folder root = findRoot(folder.getTenantId());
+			if (root == null)
+				return;
+
+			if (folder.getParentId() != root.getId())
+				throw new PersistenceException("You cannot move a workspace");
+
+			long defaultWorkspaceId = queryForLong(
+					"select ld_id from ld_folder where ld_parentid = :rootId and ld_name = :name",
+					Map.of(ROOT_ID, root.getId(), "name", Folder.DEFAULTWORKSPACENAME));
+			if (folder.getId() == defaultWorkspaceId && !folder.getName().equals(Folder.DEFAULTWORKSPACENAME))
+				throw new PersistenceException("You cannot rename the default workspace");
 		}
 	}
 
@@ -252,7 +270,6 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 		}
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public List<Folder> findByUserId(long userId) throws PersistenceException {
 		List<Folder> folders = new ArrayList<>();
@@ -272,7 +289,7 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 			query.append(WHERE_GROUP_GROUPID_IN);
 			query.append(userGroups.stream().map(ug -> Long.toString(ug.getId())).collect(Collectors.joining(",")));
 			query.append(")");
-			folders = findByQuery(query.toString(), new HashMap<>(), null);
+			folders = findByObjectQuery(query.toString(), new HashMap<>(), null);
 
 			if (folders.isEmpty()) {
 				return folders;
@@ -301,7 +318,6 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 		return user;
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public List<Folder> findByUserId(long userId, long parentId) throws PersistenceException {
 		List<Folder> coll = new ArrayList<>();
@@ -325,9 +341,7 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 		query1.append(precoll.stream().map(ug -> Long.toString(ug.getId())).collect(Collectors.joining(",")));
 		query1.append(") " + AND + ENTITY + ".parentId = :parentId and " + ENTITY + ".id != " + ENTITY + ".parentId");
 
-		Map<String, Object> params = new HashMap<>();
-		params.put(PARENT_ID, parentId);
-		coll = findByQuery(query1.toString(), params, null);
+		coll = findByObjectQuery(query1.toString(), Map.of(PARENT_ID, parentId), null);
 
 		/*
 		 * Now search for all other folders that references accessible folders
@@ -341,8 +355,7 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 		query2.append(precoll.stream().map(ug -> Long.toString(ug.getId())).collect(Collectors.joining(",")));
 		query2.append("))");
 
-		params.put(PARENT_ID, parentId);
-		List<Folder> coll2 = findByQuery(query2.toString(), params, null);
+		List<Folder> coll2 = findByObjectQuery(query2.toString(), Map.of(PARENT_ID, parentId), null);
 		for (Folder folder : coll2) {
 			if (!coll.contains(folder))
 				coll.add(folder);
@@ -361,7 +374,6 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 				"order by " + ENTITY + ".name", max);
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public List<Folder> findChildren(long parentId, long userId) throws PersistenceException {
 		List<Folder> coll = new ArrayList<>();
@@ -386,7 +398,7 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 		query1.append(") " + AND + ENTITY + PARENTID_EQUAL + parent.getId());
 		query1.append(" and not(" + ENTITY + ".id=" + parent.getId() + ")");
 
-		coll = findByQuery(query1.toString(), (Map<String, Object>) null, null);
+		coll = findByObjectQuery(query1.toString(), (Map<String, Object>) null, null);
 
 		/*
 		 * Now search for all other folders that references accessible folders
@@ -403,7 +415,7 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 
 		Map<String, Object> params = new HashMap<>();
 		params.put(PARENT_ID, parent.getId());
-		List<Folder> coll2 = findByQuery(query2.toString(), params, null);
+		List<Folder> coll2 = findByQuery(query2.toString(), params, Folder.class, null);
 		for (Folder folder : coll2) {
 			if (!coll.contains(folder))
 				coll.add(folder);
@@ -514,7 +526,6 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 		return true;
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public List<Folder> findByGroupId(long groupId) throws PersistenceException {
 		// The administrators can see all folders
@@ -528,7 +539,7 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 		query.append(LEFT_JOIN + ENTITY + FOLDER_ACL_AS_GROUP);
 		query.append(WHERE + ENTITY + ".deleted=0 and _group.groupId =" + groupId);
 
-		List<Folder> coll = findByQuery(query.toString(), (Map<String, Object>) null, null);
+		List<Folder> coll = findByObjectQuery(query.toString(), (Map<String, Object>) null, null);
 
 		/*
 		 * Now search for all other folders that references the previous ones
@@ -545,7 +556,7 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 				first = false;
 			}
 			query2.append(")");
-			List<Folder> coll2 = findByQuery(query2.toString(), (Map<String, Object>) null, null);
+			List<Folder> coll2 = findByObjectQuery(query2.toString(), (Map<String, Object>) null, null);
 			for (Folder folder : coll2) {
 				if (!coll.contains(folder))
 					coll.add(folder);
@@ -555,7 +566,6 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 		return coll;
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public List<Long> findIdByUserId(long userId, long parentId) throws PersistenceException {
 		List<Long> ids = new ArrayList<>();
@@ -626,7 +636,6 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 		if (tenantId != null)
 			query.append(AND + "ld_tenantid = " + tenantId);
 
-		@SuppressWarnings("unchecked")
 		List<Long> ids = queryForList(query.toString(), Long.class);
 		List<Folder> folders = new ArrayList<>();
 		for (Long id : ids)
@@ -721,7 +730,7 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 		transaction.setFolderId(folder.getId());
 		transaction.setTenantId(folder.getTenantId());
 
-		Tenant tenant = ((TenantDAO) Context.get().getBean(TenantDAO.class)).findById(folder.getTenantId());
+		Tenant tenant = (Context.get(TenantDAO.class)).findById(folder.getTenantId());
 		if (tenant != null)
 			transaction.setTenant(tenant.getName());
 
@@ -829,7 +838,7 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 
 	@Override
 	public boolean isPermissionAllowed(Permission permission, long folderId, long userId) throws PersistenceException {
-		Set<Permission> permissions = getEnabledPermissions(folderId, userId);
+		Set<Permission> permissions = getAllowedPermissions(folderId, userId);
 		return permissions.contains(permission);
 	}
 
@@ -838,18 +847,18 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 		// The parent folder
 		Folder parent = findFolder(parentId);
 
-		int count = bulkUpdate("set ld_deleted=0, ld_parentid=" + parent.getId()
+		int count = jdbcUpdate("update ld_folder set ld_deleted=0, ld_parentid=" + parent.getId()
 				+ ", ld_lastmodified=CURRENT_TIMESTAMP where not ld_type=" + Folder.TYPE_WORKSPACE + " and ld_id="
-				+ folderId, (Map<String, Object>) null);
+				+ folderId);
 
 		if (count == 0) {
 			// The root of folders in the current tenant
 			Folder root = findRoot(parent.getTenantId());
 
 			// Workspaces must always be restored under the root
-			bulkUpdate("set ld_deleted=0, ld_parentid=" + root.getId()
+			jdbcUpdate("update ld_folder set ld_deleted=0, ld_parentid=" + root.getId()
 					+ ", ld_lastmodified=CURRENT_TIMESTAMP where ld_type=" + Folder.TYPE_WORKSPACE + " and ld_id="
-					+ folderId, (Map<String, Object>) null);
+					+ folderId);
 		}
 
 		Folder fld = findFolder(folderId);
@@ -862,8 +871,9 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 		Set<Long> treeIds = findFolderIdInTree(folderId, true);
 		if (!treeIds.isEmpty()) {
 			String idsStr = treeIds.toString().replace('[', '(').replace(']', ')');
-			bulkUpdate("set ld_deleted=0, ld_lastmodified=CURRENT_TIMESTAMP where ld_deleted=1 and ld_id in " + idsStr,
-					(Map<String, Object>) null);
+			jdbcUpdate(
+					"update ld_folder set ld_deleted=0, ld_lastmodified=CURRENT_TIMESTAMP where ld_deleted=1 and ld_id in "
+							+ idsStr);
 			jdbcUpdate(
 					"update ld_document set ld_deleted=0, ld_lastmodified=CURRENT_TIMESTAMP where ld_deleted=1 and ld_folderid in "
 							+ idsStr);
@@ -871,8 +881,8 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 	}
 
 	@Override
-	public Set<Permission> getEnabledPermissions(long folderId, long userId) throws PersistenceException {
-		Set<Permission> permissions = new HashSet<>();
+	public Set<Permission> getAllowedPermissions(long folderId, long userId) throws PersistenceException {
+		final Set<Permission> permissions = new HashSet<>();
 		User user = getExistingtUser(userId);
 
 		// If the user is an administrator bypass all controls
@@ -897,13 +907,13 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
                  ld_delete as LDDELETE, ld_rename as LDRENAME, ld_import as LDIMPORT, ld_export as LDEXPORT, ld_sign as LDSIGN, 
                  ld_archive as LDARCHIVE, ld_workflow as LDWORKFLOW, ld_download as LDDOWNLOAD, ld_calendar as LDCALENDAR, 
                  ld_subscription as LDSUBSCRIPTION, ld_print as LDPRINT, ld_password as LDPASSWORD, ld_move as LDMOVE, ld_email as LDEMAIL, 
-                 ld_automation LDAUTOMATION, ld_storage LDSTORAGE, ld_readingreq LDREADINGREQ, ld_preview LDPREVIEW, ld_customid LDCUSTOMID
+                 ld_automation LDAUTOMATION, ld_store LDSTORE, ld_readingreq LDREADINGREQ, ld_preview LDPREVIEW, ld_customid LDCUSTOMID
 """);
 		query.append(" from ld_folder_acl ");
 		query.append(WHERE);
 		query.append(" ld_folderid=" + id);
-		query.append(" and ld_groupid in (");
-		query.append(userGroups.stream().map(ug -> Long.toString(ug.getId())).collect(Collectors.joining(",")));
+		query.append(" and ld_groupid in (select ld_groupid from ld_usergroup where ld_userid=");
+		query.append(Long.toString(userId));
 		query.append(")");
 
 		Map<String, Permission> permissionColumn = new HashMap<>();
@@ -927,33 +937,25 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 		permissionColumn.put("LDMOVE", Permission.MOVE);
 		permissionColumn.put("LDEMAIL", Permission.EMAIL);
 		permissionColumn.put("LDAUTOMATION", Permission.AUTOMATION);
-		permissionColumn.put("LDSTORAGE", Permission.STORAGE);
+		permissionColumn.put("LDSTORE", Permission.STORE);
 		permissionColumn.put("LDREADINGREQ", Permission.READINGREQ);
 		permissionColumn.put("LDPREVIEW", Permission.PREVIEW);
 		permissionColumn.put("LDCUSTOMID", Permission.CUSTOMID);
 
-		/**
-		 * IMPORTANT: the connection MUST be explicitly closed, otherwise it is
-		 * probable that the connection pool will leave open it indefinitely.
-		 */
-		try (Connection con = getConnection();
-				Statement stmt = con.createStatement();
-				ResultSet rs = stmt.executeQuery(query.toString())) {
-			while (rs.next()) {
+		queryForResultSet(query.toString(), null, null, rows -> {
+			while (rows.next()) {
 				for (Entry<String, Permission> entry : permissionColumn.entrySet()) {
 					String column = entry.getKey();
 					Permission permission = entry.getValue();
-					if (rs.getInt(column) == 1)
+					if (rows.getInt(column) == 1)
 						permissions.add(permission);
 				}
 			}
-		} catch (SQLException se) {
-			throw new PersistenceException(se.getMessage(), se);
-		}
+		});
+
 		return permissions;
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public Collection<Long> findFolderIdByUserIdInPath(long userId, long parentId) throws PersistenceException {
 		/*
@@ -1041,7 +1043,6 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 		return ids;
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public Collection<Long> findFolderIdByUserIdAndPermission(long userId, Permission permission, Long parentId,
 			boolean tree) throws PersistenceException {
@@ -1157,7 +1158,7 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 		if (folderId == rootId)
 			throw new PersistenceException("You cannot delete folder " + folder.getName() + " - " + folderId);
 
-		if (folder.getName().equals("Default") && folder.getParentId() == rootId)
+		if (folder.getName().equals(Folder.DEFAULTWORKSPACENAME) && folder.getParentId() == rootId)
 			throw new PersistenceException("You cannot delete folder " + folder.getName() + " - " + folderId);
 	}
 
@@ -1255,15 +1256,10 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 		/*
 		 * Apply the securityRef
 		 */
-		Map<String, Object> params = new HashMap<>();
-		params.put("securityRef", securityRef);
-		params.put("lastModified", new Date());
-		params.put("rootId", rootId);
-
 		records = jdbcUpdate(
 				"update ld_folder set ld_securityref = :securityRef, ld_lastmodified = :lastModified where not ld_id = :rootId "
 						+ " and ld_id in " + treeIdsString,
-				params);
+				Map.of("securityRef", securityRef, "lastModified", new Date(), ROOT_ID, rootId));
 
 		log.warn("Applied security to {} folders in tree {}", records, rootId);
 
@@ -1271,7 +1267,7 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 		 * Delete all the specific rights associated to the folders in the tree
 		 */
 		jdbcUpdate("delete from ld_folder_acl where not ld_folderid = :rootId and ld_folderid in " + treeIdsString,
-				params);
+				Map.of(ROOT_ID, rootId));
 		log.warn("Removed {} specific rights in tree {}", records, rootId);
 
 		if (getSessionFactory().getCache() != null) {
@@ -1442,15 +1438,9 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 
 		while (st.hasMoreTokens()) {
 			String name = st.nextToken();
-
-			Map<String, Object> params = new HashMap<>();
-			params.put("folderId", folder.getId());
-			params.put("name", name);
-			params.put("tenantId", folder.getTenantId());
-
 			long child = queryForLong(
-					"SELECT ld_id FROM ld_folder WHERE ld_deleted=0 AND ld_parentid = :folderId AND ld_name = :name AND ld_tenantid = :tenantId",
-					params);
+					"select ld_id from ld_folder where ld_deleted=0 and ld_parentid = :folderId and ld_name = :name and ld_tenantid = :tenantId",
+					Map.of("folderId", folder.getId(), "name", name, "tenantId", folder.getTenantId()));
 
 			if (child == 0L) {
 				Folder folderVO = new Folder();
@@ -1488,7 +1478,6 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 		return folder;
 	}
 
-	@SuppressWarnings("unchecked")
 	private void setUniqueName(Folder folder) throws PersistenceException {
 		String folderName = folder.getName();
 		List<String> collisions = queryForList("select ld_name from ld_folder where ld_deleted=0 and ld_parentid="
@@ -1552,8 +1541,8 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 
 		replicateSecurityPolicies(source, securityOption, newFolder);
 
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
-		DocumentManager docMan = (DocumentManager) Context.get().getBean(DocumentManager.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
+		DocumentManager docMan = Context.get(DocumentManager.class);
 
 		// List source docs and create them in the new folder
 		if (!foldersOnly) {
@@ -1562,7 +1551,7 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 			 * query(findByFolder) to run properly without exception due to
 			 * template.templateGroups
 			 */
-			TemplateDAO tDao = (TemplateDAO) Context.get().getBean(TemplateDAO.class);
+			TemplateDAO tDao = Context.get(TemplateDAO.class);
 			List<Template> templates = tDao.findAll(source.getTenantId());
 			for (Template template : templates)
 				tDao.initialize(template);
@@ -1591,8 +1580,8 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 				documentTransaction.setComment(transaction.getComment());
 				documentTransaction.setEvent(DocumentEvent.STORED.toString());
 
-				String oldDocResource = storer.getResourceName(srcDoc, null, null);
-				try (InputStream is = storer.getStream(srcDoc.getId(), oldDocResource);) {
+				String oldDocResource = store.getResourceName(srcDoc, null, null);
+				try (InputStream is = store.getStream(srcDoc.getId(), oldDocResource);) {
 					docMan.create(is, newDoc, documentTransaction);
 				} catch (IOException e) {
 					log.error(e.getMessage(), e);
@@ -1747,7 +1736,6 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 		 * Check if in the folders to be deleted there is at least one immutable
 		 * document
 		 */
-		@SuppressWarnings("unchecked")
 		List<Long> ids = queryForList(
 				"select ld_folderid from ld_document where ld_deleted=0 and ld_immutable=1 and ld_folderid in "
 						+ treeIdsString,
@@ -1798,7 +1786,6 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 		return notDeletableFolders;
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public Set<Long> findFolderIdInTree(long rootId, boolean includeDeleted) {
 		log.debug("findFolderIdInTree, rootID: {}, includeDeleted: {}", rootId, includeDeleted);
@@ -1848,7 +1835,6 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 		return ids;
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public Set<Long> findFolderIdInPath(long rootId, boolean includeDeleted) throws PersistenceException {
 		Set<Long> ids = new HashSet<>();
@@ -1910,7 +1896,6 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 
 		// We do this way because if using the HQL we will have all the
 		// collections initialized
-		@SuppressWarnings("unchecked")
 		List<Long> wsIds = queryForList("select ld_id from ld_folder where (not ld_id=" + rootId
 				+ ") and ld_deleted=0 and ld_parentid=" + rootId + " and ld_type=" + Folder.TYPE_WORKSPACE
 				+ " and ld_tenantid=" + tenantId + " order by lower(ld_name)", Long.class);
@@ -1933,8 +1918,8 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 		if (folder.getAttributes() != null)
 			log.trace("Initialized {} attributes", folder.getAttributes().keySet().size());
 
-		if (folder.getStorages() != null)
-			log.trace("Initialized {} storages", folder.getStorages().keySet().size());
+		if (folder.getStores() != null)
+			log.trace("Initialized {} stores", folder.getStores().keySet().size());
 	}
 
 	@SuppressWarnings("unchecked")
@@ -1981,9 +1966,10 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 		if (root == null)
 			return null;
 
-		List<Folder> workspaces = findByWhere(ENTITY + PARENTID_EQUAL + root.getId() + AND + ENTITY + ".name = '"
-				+ SqlUtil.doubleQuotes(Folder.DEFAULTWORKSPACENAME) + "' and " + ENTITY + TENANT_ID_EQUAL + tenantId
-				+ AND + ENTITY + ".type=" + Folder.TYPE_WORKSPACE, null, null);
+		List<Folder> workspaces = findByWhere(
+				ENTITY + PARENTID_EQUAL + root.getId() + AND + ENTITY + ".name = :wfName" + " and " + ENTITY
+						+ TENANT_ID_EQUAL + tenantId + AND + ENTITY + ".type=" + Folder.TYPE_WORKSPACE,
+				Map.of("wfName", Folder.DEFAULTWORKSPACENAME), null, null);
 
 		if (workspaces.isEmpty())
 			return null;
@@ -2009,7 +1995,7 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 		store(f, transaction);
 
 		// Now all the folders that are referencing this one must be updated
-		bulkUpdate("set securityRef=" + securityRef + " where securityRef=" + folderId, (Map<String, Object>) null);
+		bulkUpdate("set securityRef=" + securityRef + " where securityRef=" + folderId, null);
 	}
 
 	@Override
@@ -2029,7 +2015,18 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 			return 0;
 		}
 	}
-
+	
+	@Override
+	public long countDocs(long folderId) {
+		try {
+			Folder folder= findFolder(folderId);
+			return queryForLong("SELECT COUNT(*) from ld_document WHERE ld_deleted=0 and ld_folderid="+folder.getId());
+		} catch (PersistenceException e) {
+			log.error(e.getMessage(), e);
+			return 0;
+		}
+	}
+	
 	@Override
 	public long computeTreeSize(long rootId) {
 		try {
@@ -2184,7 +2181,7 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 	}
 
 	@Override
-	public void applyStorageToTree(long id, FolderHistory transaction) throws PersistenceException {
+	public void applyStoreToTree(long id, FolderHistory transaction) throws PersistenceException {
 		Folder parent = getExistingFolder(id);
 		initialize(parent);
 
@@ -2193,10 +2190,10 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 		transaction.setNotifyEvent(false);
 
 		// Iterate over all children setting the template and field values
-		List<Folder> children = findChildren(id, null);
+		List<Folder> children = findByParentId(id);
 		for (Folder folder : children) {
 			initialize(folder);
-			folder.setStorage(parent.getStorage());
+			folder.setStore(parent.getStore());
 
 			FolderHistory tr = new FolderHistory(transaction);
 			tr.setFolderId(folder.getId());
@@ -2204,7 +2201,7 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 			store(folder, tr);
 			flush();
 
-			applyStorageToTree(folder.getId(), transaction);
+			applyStoreToTree(folder.getId(), transaction);
 		}
 	}
 
@@ -2217,7 +2214,7 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 		transaction.setNotifyEvent(false);
 
 		// Iterate over all children setting the template and field values
-		List<Folder> children = findChildren(id, null);
+		List<Folder> children = findByParentId(id);
 		for (Folder folder : children) {
 			initialize(folder);
 			folder.setOcrTemplateId(parent.getOcrTemplateId());
@@ -2233,7 +2230,6 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 		}
 	}
 
-	@SuppressWarnings("unchecked")
 	public List<Long> findFolderIdByTag(String tag) {
 		StringBuilder query = new StringBuilder(
 				"select distinct(A.ld_folderid) from ld_foldertag A, ld_folder B where A.ld_folderid=B.ld_id and B.ld_deleted= 0");
@@ -2284,7 +2280,6 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 
 			query.append(" AND D.ld_tag = '" + SqlUtil.doubleQuotes(tag) + "' ");
 
-			@SuppressWarnings("unchecked")
 			List<Long> folderIds = queryForList(query.toString(), Long.class);
 			ids.addAll(folderIds);
 		}
@@ -2292,7 +2287,6 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 		return ids;
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public List<Folder> findByUserIdAndTag(long userId, String tag, Integer max) throws PersistenceException {
 		List<Folder> coll = new ArrayList<>();
@@ -2306,14 +2300,13 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 		query.append(")");
 
 		try {
-			coll = findByQuery(query.toString(), (Map<String, Object>) null, max);
+			coll = findByObjectQuery(query.toString(), (Map<String, Object>) null, max);
 		} catch (PersistenceException e) {
 			log.error(e.getMessage(), e);
 		}
 		return coll;
 	}
 
-	@SuppressWarnings("unchecked")
 	public List<String> findTags(long folderId) {
 		try {
 			return queryForList("select ld_tag from ld_foldertag where ld_folderid=" + folderId + " order by ld_tag",
@@ -2372,7 +2365,7 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 
 	private void deleteEmptySourceFolders(Folder source, FolderHistory transaction) throws PersistenceException {
 		log.debug("delete the empty source folder {}", source);
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
 		if (docDao.findByFolder(source.getId(), null).isEmpty() && findByParentId(source.getId()).isEmpty())
 			delete(source.getId(), new FolderHistory(transaction));
 	}
@@ -2393,8 +2386,8 @@ public class HibernateFolderDAO extends HibernatePersistentObjectDAO<Folder> imp
 	private void moveDocumentsOnMerge(Folder source, Folder target, FolderHistory transaction, Session session)
 			throws PersistenceException {
 		log.debug("move documents fom folder {} to folder {}", source, target);
-		DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentManager manager = Context.get(DocumentManager.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
 		List<Document> docs = docDao.findByFolder(source.getId(), null);
 		for (Document document : docs) {
 			DocumentHistory hist = new DocumentHistory();

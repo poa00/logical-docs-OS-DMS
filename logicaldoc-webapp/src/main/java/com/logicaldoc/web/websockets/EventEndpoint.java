@@ -21,7 +21,6 @@ import org.slf4j.LoggerFactory;
 
 import com.google.gwt.user.client.rpc.SerializationException;
 import com.google.gwt.user.server.rpc.impl.ServerSerializationStreamWriter;
-import com.logicaldoc.core.History;
 import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.communication.EventCollector;
 import com.logicaldoc.core.communication.EventListener;
@@ -29,6 +28,7 @@ import com.logicaldoc.core.document.Document;
 import com.logicaldoc.core.document.DocumentDAO;
 import com.logicaldoc.core.document.DocumentEvent;
 import com.logicaldoc.core.folder.FolderEvent;
+import com.logicaldoc.core.history.History;
 import com.logicaldoc.core.security.TenantDAO;
 import com.logicaldoc.core.security.user.UserEvent;
 import com.logicaldoc.core.security.user.UserHistory;
@@ -111,7 +111,7 @@ public class EventEndpoint implements EventListener {
 	@OnOpen
 	public void onOpen(final Session session) {
 		if (!registered) {
-			EventCollector eventCollector = (EventCollector) Context.get().getBean(EventCollector.class);
+			EventCollector eventCollector = Context.get(EventCollector.class);
 			eventCollector.addListener(this);
 			registered = true;
 		}
@@ -142,7 +142,7 @@ public class EventEndpoint implements EventListener {
 
 		try {
 			if (event.getTenant() == null) {
-				TenantDAO tenantDAO = (TenantDAO) Context.get().getBean(TenantDAO.class);
+				TenantDAO tenantDAO = Context.get(TenantDAO.class);
 				event.setTenant(tenantDAO.getTenantName(event.getTenantId()));
 			}
 		} catch (PersistenceException e) {
@@ -174,6 +174,7 @@ public class EventEndpoint implements EventListener {
 		message.setComment(event.getComment());
 		message.setDate(event.getDate());
 		message.setId(event.getId());
+		message.setTenantId(event.getTenantId());
 
 		if (event instanceof UserHistory userHistory)
 			message.setAuthor(userHistory.getAuthor());
@@ -189,8 +190,8 @@ public class EventEndpoint implements EventListener {
 			message.setFolder(folder);
 
 		GUIDocument document = null;
-		if (event.getDocument() != null) {
-			Document clone = new Document(event.getDocument());
+		if (event.getDocument() != null && event.getDocument() instanceof Document doc) {
+			Document clone = new Document(doc);
 			// Report some attributes skipped by the clone method
 			clone.setCustomId(event.getDocument().getCustomId());
 			clone.setStatus(event.getDocument().getStatus());
@@ -201,7 +202,7 @@ public class EventEndpoint implements EventListener {
 			document = new DocumentServiceImpl().fromDocument(clone, null, null);
 			document.setId(event.getDocId());
 		} else if (event.getDocId() != null) {
-			DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+			DocumentDAO docDao = Context.get(DocumentDAO.class);
 			Document d = docDao.findById(event.getDocId());
 			if (d != null) {
 				document = new DocumentServiceImpl().fromDocument(d, null, null);
@@ -250,8 +251,13 @@ public class EventEndpoint implements EventListener {
 		try {
 			peer.getBasicRemote().sendText(serializedMessage);
 		} catch (Exception e) {
-			log.error("Error sending websocket message {} to peer {}", event, peer.getRequestURI());
-			log.error(e.getMessage(), e);
+			if (e.getMessage().contains("WebSocket session has been closed")) {
+				log.debug("Cannot send websocket message {} to peer {} because WebSocket session has been closed",
+						event, peer.getRequestURI());
+			} else {
+				log.error("Error sending websocket message {} to peer {}", event, peer.getRequestURI());
+				log.error(e.getMessage(), e);
+			}
 		}
 	}
 

@@ -2,10 +2,9 @@ package com.logicaldoc.gui.frontend.client.folder.copy;
 
 import java.util.Arrays;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIFolder;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.common.client.widgets.StickyWindow;
 import com.logicaldoc.gui.frontend.client.services.FolderService;
@@ -69,14 +68,7 @@ public class FolderCopyDetailsDialog extends StickyWindow {
 
 			LD.contactingServer();
 			FolderService.Instance.get().copyFolders(Arrays.asList(metadata.getId()), targetFolderId, foldersOnly,
-					securityPolicy, metadata, new AsyncCallback<>() {
-
-						@Override
-						public void onFailure(Throwable caught) {
-							LD.clearPrompt();
-							GuiLog.serverError(caught);
-						}
-
+					securityPolicy, metadata, new DefaultAsyncCallback<>() {
 						@Override
 						public void onSuccess(Void arg) {
 							LD.clearPrompt();
@@ -101,5 +93,15 @@ public class FolderCopyDetailsDialog extends StickyWindow {
 		content.setMembers(detailsPanel, savePanel);
 
 		addItem(content);
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

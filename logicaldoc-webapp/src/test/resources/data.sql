@@ -14,31 +14,41 @@ values (-1,0,0,4,'object', 'Object', 0, -1, 0, 0, 0);
 insert into ld_attributeset_ext(ld_attsetid, ld_mandatory, ld_type, ld_position, ld_name, ld_label, ld_editor, ld_setid, ld_hidden, ld_multiple, ld_readonly)
 values (-1,0,0,5,'coverage', 'Coverage', 0, -1, 0, 0, 0);
 insert into ld_attributeset_ext(ld_attsetid, ld_mandatory, ld_type, ld_position, ld_name, ld_label, ld_editor, ld_setid, ld_hidden, ld_multiple, ld_readonly)
-values (-1,0,0,6,'recipient', 'Recipient', 0, -1, 0, 0, 0);
+values (-1,0,0,6,'recipient', 'Recipient', 1, -1, 0, 0, 0);
 insert into ld_attributeset_ext(ld_attsetid, ld_mandatory, ld_type, ld_position, ld_name, ld_label, ld_editor, ld_setid, ld_hidden, ld_multiple, ld_readonly)
 values (-1,0,3,7,'sourceDate', 'Date', 0, -1, 0, 0, 0);
 insert into ld_attributeset_ext(ld_attsetid, ld_mandatory, ld_type, ld_position, ld_name, ld_label, ld_editor, ld_setid, ld_hidden, ld_multiple, ld_readonly)
 values (-1,0,3,7,'multi', 'Multi', 0, -1, 0, 1, 0);
 
+insert into ld_extoption (ld_id, ld_lastmodified, ld_creation, ld_recordversion, ld_deleted, ld_tenantid, ld_setid, ld_attribute, ld_value, ld_position)
+                  values (1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 1, 0, 1, -1, 'recipient', 'a', 1);       
+insert into ld_extoption (ld_id, ld_lastmodified, ld_creation, ld_recordversion, ld_deleted, ld_tenantid, ld_setid, ld_attribute, ld_value, ld_position)
+                  values (2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 1, 0, 1, -1, 'recipient', 'b', 2);
+insert into ld_extoption (ld_id, ld_lastmodified, ld_creation, ld_recordversion, ld_deleted, ld_tenantid, ld_setid, ld_attribute, ld_value, ld_position)
+                  values (3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 1, 0, 1, -1, 'recipient', 'c', 3);
+
 insert into ld_template
 			(ld_id, ld_lastmodified, ld_creation, ld_deleted, ld_name, ld_description, ld_readonly, ld_type, ld_tenantid, ld_recordversion)
 values (-1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0,'default','default',0,0,1,1);
+insert into ld_template_acl(ld_templateid, ld_groupid, ld_read, ld_write) values (-1, 3, 1, 0);
 
 insert into ld_template_ext(ld_templateid, ld_mandatory, ld_type, ld_position, ld_name, ld_label, ld_editor, ld_setid, ld_hidden, ld_multiple, ld_readonly)
 select -1, ld_mandatory, ld_type, ld_position, ld_name, ld_label, ld_editor, ld_setid, ld_hidden, ld_multiple, ld_readonly from ld_attributeset_ext where ld_setid=-1;
 
 insert into ld_user
            (ld_id,ld_lastmodified, ld_creation,ld_deleted,ld_enabled,ld_username,ld_password,ld_name,ld_firstname,ld_street,ld_postalcode,ld_city,ld_country,ld_language,ld_email,ld_telephone,ld_type,ld_passwordchanged,ld_passwordexpires,ld_source,ld_quota,ld_passwordexpired,ld_tenantid,ld_recordversion,ld_enforcewrktime,ld_evalform)
-values     (2,'2008-10-22 00:00:00','2008-10-22 00:00:00',0,1,'boss','d033e22ae348aeb566fc214aec3585c4da997','Meschieri','Marco','','','','','it','m.meschieri@logicalobjects.it','',0,null,0,0,-1,0,1,1,0,0);
+values     (2,'2008-10-22 00:00:00','2008-10-22 00:00:00',0,1,'boss','8C6976E5B5410415BDE908BD4DEE15DFB167A9C873FC4BB8A81F6F2AB448A918','Meschieri','Marco','','','','','it','m.meschieri@logicalobjects.it','',0,null,0,0,-1,0,1,1,0,0);
 insert into ld_group
            (ld_id,ld_lastmodified, ld_creation,ld_deleted,ld_tenantid,ld_name,ld_type,ld_recordversion)
 values     (-2,'2008-10-22 00:00:00','2008-10-22 00:00:00',0,1,'_user_2',1,1);
 insert into ld_usergroup
 values (-2,2);
+insert into ld_menu_acl (ld_menuid, ld_groupid, ld_read, ld_write) values (5,-2,1,0);
+
 
 insert into ld_user
            (ld_id,ld_lastmodified, ld_creation,ld_deleted,ld_enabled,ld_username,ld_password,ld_name,ld_firstname,ld_street,ld_postalcode,ld_city,ld_country,ld_language,ld_email,ld_telephone,ld_type,ld_passwordchanged,ld_passwordexpires,ld_source,ld_quota,ld_passwordexpired,ld_tenantid,ld_recordversion,ld_enforcewrktime,ld_evalform)
-values     (3,'2008-10-22 00:00:00','2008-10-22 00:00:00',0,1,'sebastian','d033e22ae348aeb566fc214aec3585c4da997','Sebastian','Stein','','','','','de','seb_stein@gmx.de','',0,null,0,0,0,0,1,1,0,0);
+values     (3,'2008-10-22 00:00:00','2008-10-22 00:00:00',0,1,'sebastian','8C6976E5B5410415BDE908BD4DEE15DFB167A9C873FC4BB8A81F6F2AB448A918','Sebastian','Stein','','','','','de','seb_stein@gmx.de','',0,null,0,0,0,0,1,1,0,0);
 insert into ld_group
            (ld_id,ld_lastmodified, ld_creation,ld_deleted,ld_tenantid,ld_name,ld_type,ld_recordversion)
 values     (-3,'2008-10-22 00:00:00','2008-10-22 00:00:00',0,1,'_user_3',1,1);
@@ -47,7 +57,7 @@ values (-3,3);
 
 insert into ld_user
            (ld_id,ld_lastmodified, ld_creation,ld_deleted,ld_enabled,ld_username,ld_password,ld_name,ld_firstname,ld_street,ld_postalcode,ld_city,ld_country,ld_language,ld_email,ld_telephone,ld_type,ld_passwordchanged,ld_passwordexpires,ld_source,ld_quota,ld_passwordexpired,ld_tenantid,ld_recordversion,ld_enforcewrktime,ld_evalform)
-values     (4,'2008-10-22 00:00:00','2008-10-22 00:00:00',0,1,'author','d033e22ae348aeb566fc214aec3585c4da997','Author','Author','','','','','de','author@acme.com','',0,null,0,0,-1,0,1,1,0,0);
+values     (4,'2008-10-22 00:00:00','2008-10-22 00:00:00',0,1,'author','8C6976E5B5410415BDE908BD4DEE15DFB167A9C873FC4BB8A81F6F2AB448A918','Author','Author','','','','','de','author@acme.com','',0,null,0,0,-1,0,1,1,0,0);
 insert into ld_group
            (ld_id,ld_lastmodified, ld_creation,ld_deleted,ld_tenantid,ld_name,ld_type,ld_recordversion)
 values     (-4,'2008-10-22 00:00:00','2008-10-22 00:00:00',0,1,'_user_4',1,1);
@@ -56,7 +66,7 @@ values (-4,4);
 
 insert into ld_user
            (ld_id,ld_lastmodified, ld_creation,ld_deleted,ld_enabled,ld_username,ld_password,ld_name,ld_firstname,ld_street,ld_postalcode,ld_city,ld_country,ld_language,ld_email,ld_telephone,ld_type,ld_passwordchanged,ld_passwordexpires,ld_source,ld_quota,ld_passwordexpired,ld_tenantid,ld_recordversion,ld_enforcewrktime,ld_evalform)
-values     (5,'2008-10-22 00:00:00','2008-10-22 00:00:00',0,0,'test','d033e22ae348aeb566fc214aec3585c4da997','test','Test','','','','','de','test@acme.com','',0,null,0,0,-1,0,1,1,0,0);
+values     (5,'2008-10-22 00:00:00','2008-10-22 00:00:00',0,0,'test','8C6976E5B5410415BDE908BD4DEE15DFB167A9C873FC4BB8A81F6F2AB448A918','test','Test','','','','','de','test@acme.com','',0,null,0,0,-1,0,1,1,0,0);
 insert into ld_group
            (ld_id,ld_lastmodified, ld_creation,ld_deleted,ld_tenantid,ld_name,ld_type,ld_recordversion)
 values     (-5,'2008-10-22 00:00:00','2008-10-22 00:00:00',0,1,'_user_5',1,1);
@@ -140,27 +150,30 @@ values     (10,'2008-10-22 00:00:00','2008-10-22 00:00:00',0,1,'testGroup',0,1);
 
 
 insert into ld_folder (ld_id,ld_lastmodified, ld_creation,ld_deleted,ld_name,ld_parentid,ld_type,ld_templocked,ld_tenantid,ld_recordversion,ld_position,ld_hidden)
-values (6,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0,'folder6',5,1,0,1,1,1,0);
+values (6,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0,'folder6',5,0,0,1,1,1,0);
 insert into ld_folder (ld_id,ld_lastmodified, ld_creation,ld_deleted,ld_name,ld_parentid,ld_type,ld_templocked,ld_tenantid,ld_recordversion,ld_position,ld_hidden)
-values (7,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0,'folder7',5,1,0,1,1,1,0);
+values (7,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0,'folder7',5,0,0,1,1,1,0);
 insert into ld_folder (ld_id,ld_lastmodified, ld_creation,ld_deleted,ld_name,ld_parentid,ld_type,ld_templocked,ld_tenantid,ld_recordversion,ld_position,ld_hidden)
-values (8,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,1,'folder8',7,1,0,1,1,1,0);
+values (8,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,1,'folder8',7,0,0,1,1,1,0);
 insert into ld_folder (ld_id,ld_lastmodified, ld_creation,ld_deleted,ld_name,ld_parentid,ld_type,ld_templocked,ld_tenantid,ld_recordversion,ld_position,ld_hidden)
-values (1200,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0,'test',5,1,0,1,1,1,0);
-insert into ld_folder_storage(ld_folderid, ld_nodeid, ld_storageid) values (1200, '', 2);
+values (9,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0,'folder9',7,0,0,1,1,1,0);
+insert into ld_folder (ld_id,ld_lastmodified, ld_creation,ld_deleted,ld_name,ld_parentid,ld_type,ld_templocked,ld_tenantid,ld_recordversion,ld_position,ld_hidden)
+values (1200,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0,'test',5,0,0,1,1,1,0);
+insert into ld_folder_store(ld_folderid, ld_nodeid, ld_storeid) values (1200, '', 2);
+
 
 insert into ld_folder (ld_id,ld_lastmodified, ld_creation,ld_deleted,ld_name,ld_parentid,ld_type,ld_templocked,ld_tenantid,ld_recordversion,ld_position,ld_hidden)
-values (1201,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0,'ABC',1200,1,0,1,1,1,0);
+values (1201,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0,'ABC',1200,0,0,1,1,1,0);
 insert into ld_folder (ld_id,ld_lastmodified, ld_creation,ld_deleted,ld_name,ld_parentid,ld_type,ld_templocked,ld_tenantid,ld_recordversion,ld_position,ld_hidden)
-values (1202,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0,'xyz',1201,1,0,1,1,1,0);
+values (1202,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0,'xyz',1201,0,0,1,1,1,0);
 insert into ld_folder (ld_id,ld_lastmodified, ld_creation,ld_deleted,ld_name,ld_parentid,ld_type,ld_templocked,ld_tenantid,ld_recordversion,ld_position,ld_hidden)
-values (1204,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,1,'deleted',1201,1,0,1,1,1,0);
+values (1204,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,1,'deleted',1201,0,0,1,1,1,0);
 
-insert into ld_folder_acl(ld_folderid, ld_groupid, ld_read, ld_write , ld_add, ld_security, ld_immutable, ld_delete, ld_rename, ld_import, ld_export, ld_sign, ld_archive, ld_workflow, ld_download, ld_calendar, ld_subscription, ld_print, ld_password, ld_move, ld_email, ld_automation, ld_storage, ld_readingreq, ld_preview, ld_customid)
+insert into ld_folder_acl(ld_folderid, ld_groupid, ld_read, ld_write , ld_add, ld_security, ld_immutable, ld_delete, ld_rename, ld_import, ld_export, ld_sign, ld_archive, ld_workflow, ld_download, ld_calendar, ld_subscription, ld_print, ld_password, ld_move, ld_email, ld_automation, ld_store, ld_readingreq, ld_preview, ld_customid)
 values (6,2,1,1,1,0,0,1,1,0,0,0,0,0,1,0,0,1,0,1,1,0,0,0,1,1);
-insert into ld_folder_acl(ld_folderid, ld_groupid, ld_read, ld_write , ld_add, ld_security, ld_immutable, ld_delete, ld_rename, ld_import, ld_export, ld_sign, ld_archive, ld_workflow, ld_download, ld_calendar, ld_subscription, ld_print, ld_password, ld_move, ld_email, ld_automation, ld_storage, ld_readingreq, ld_preview, ld_customid)
+insert into ld_folder_acl(ld_folderid, ld_groupid, ld_read, ld_write , ld_add, ld_security, ld_immutable, ld_delete, ld_rename, ld_import, ld_export, ld_sign, ld_archive, ld_workflow, ld_download, ld_calendar, ld_subscription, ld_print, ld_password, ld_move, ld_email, ld_automation, ld_store, ld_readingreq, ld_preview, ld_customid)
 values (6,3,1,1,1,0,0,1,1,0,0,0,0,0,1,0,0,1,0,1,1,0,0,0,1,1);
-insert into ld_folder_acl(ld_folderid, ld_groupid, ld_read, ld_write, ld_add, ld_security, ld_immutable, ld_delete, ld_rename, ld_import, ld_export, ld_sign, ld_archive, ld_workflow, ld_download, ld_calendar, ld_subscription, ld_print, ld_password, ld_move, ld_email, ld_automation, ld_storage, ld_readingreq, ld_preview, ld_customid)
+insert into ld_folder_acl(ld_folderid, ld_groupid, ld_read, ld_write, ld_add, ld_security, ld_immutable, ld_delete, ld_rename, ld_import, ld_export, ld_sign, ld_archive, ld_workflow, ld_download, ld_calendar, ld_subscription, ld_print, ld_password, ld_move, ld_email, ld_automation, ld_store, ld_readingreq, ld_preview, ld_customid)
 values (6,-3,1,1,1,0,0,1,1,0,0,0,0,0,1,0,0,1,0,1,1,0,0,0,1,1);
 
 insert into ld_document
@@ -230,7 +243,7 @@ insert into ld_tag(ld_docid, ld_tenantid, ld_tag)
 values     (1, 1,'ghi');
 
 insert into ld_tag(ld_docid, ld_tenantid, ld_tag)
-values     (2, 1,'ask');
+values     (3, 1,'ask');
 
 insert into ld_tag(ld_docid, ld_tenantid, ld_tag)
 values     (3, 1,'zzz');
@@ -280,13 +293,13 @@ insert into ld_recipient
 values     (3,'paperino','topolino','sms',2,0)
 
 insert into ld_link(ld_id, ld_lastmodified, ld_creation,ld_deleted, ld_docid1, ld_docid2,ld_type,ld_tenantid,ld_recordversion)
-values   (1,'2008-10-22 00:00:00','2008-10-22 00:00:00',0,1,2,'test',1,1);
+values   (1,'2008-10-22 00:00:00','2008-10-22 00:00:00',0,1,3,'test',1,1);
 insert into ld_link(ld_id, ld_lastmodified, ld_creation,ld_deleted, ld_docid1, ld_docid2,ld_type,ld_tenantid,ld_recordversion)
-values   (2,'2008-10-22 00:00:00','2008-10-22 00:00:00',0,2,1,'xyz',1,1);
+values   (2,'2008-10-22 00:00:00','2008-10-22 00:00:00',0,3,1,'xyz',1,1);
 insert into ld_link(ld_id, ld_lastmodified, ld_creation,ld_deleted, ld_docid1, ld_docid2,ld_type,ld_tenantid,ld_recordversion)
-values   (3,'2008-10-22 00:00:00','2008-10-22 00:00:00',0,1,2,'xxx',1,1);
+values   (3,'2008-10-22 00:00:00','2008-10-22 00:00:00',0,1,3,'xxx',1,1);
 insert into ld_link(ld_id, ld_lastmodified, ld_creation,ld_deleted, ld_docid1, ld_docid2,ld_type,ld_tenantid,ld_recordversion)
-values   (4,'2008-10-22 00:00:00','2008-10-22 00:00:00',0,2,1,'',1,1);
+values   (4,'2008-10-22 00:00:00','2008-10-22 00:00:00',0,3,1,'',1,1);
 
 insert into ld_template (ld_id, ld_lastmodified, ld_creation,ld_deleted, ld_name, ld_description, ld_readonly, ld_type, ld_tenantid,ld_recordversion)
 values (5, '2008-11-07 00:00:00', '2008-11-07 00:00:00',0,'test1','test1_desc',0,0,1,1);
@@ -345,7 +358,7 @@ create table ld_workflowhistory (ld_id bigint not null, ld_lastmodified timestam
                                  ld_deleted int not null, ld_tenantid bigint not null, ld_date timestamp, ld_event varchar(255), 
                                  ld_comment varchar(4000), ld_reason varchar(4000), ld_docid bigint, ld_folderid bigint, ld_userid bigint, 
                                  ld_username varchar(255), ld_templateid bigint not null, ld_userlogin varchar(255), 
-                                 ld_instanceid varchar(255), ld_sessionid varchar(255), ld_transition varchar(255),
+                                 ld_instanceid varchar(255), ld_sessionid varchar(255), ld_transition varchar(255), ld_keylabel varchar(255),
                                  ld_new int, ld_filename varchar(255), ld_taskname varchar(255), ld_taskid varchar(255), ld_taskdisplay varchar(255),
                                  ld_ip varchar(255), ld_path varchar(4000), ld_templateversion int not null, ld_workflowdisplay varchar(255),
                                  ld_geolocation varchar(255), ld_device varchar(255), ld_filesize bigint, primary key (ld_id));
@@ -364,7 +377,7 @@ create table ld_ocr_history (ld_id bigint not null, ld_lastmodified timestamp no
                              ld_username varchar(255), ld_userlogin varchar(255), primary key (ld_id));
 
 create table ld_webservicecall (ld_id bigint not null, ld_lastmodified timestamp not null, ld_creation timestamp not null, ld_recordversion bigint not null,
-                                ld_deleted int not null, ld_tenantid bigint not null, 
+                                ld_deleted int not null, ld_tenantid bigint not null, ld_keylabel varchar(255),
                                 ld_userid bigint, ld_date timestamp, ld_username varchar(255), ld_event varchar(255), 
                                 ld_comment varchar(4000), ld_path varchar(4000), ld_sessionid varchar(255),
                                 ld_userlogin varchar(255), ld_ip varchar(255), ld_geolocation varchar(255), 

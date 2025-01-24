@@ -54,7 +54,7 @@ public class DocumentsPreviewPanel extends VLayout {
 				child.destroy();
 			}
 
-			child = new com.logicaldoc.gui.common.client.widgets.preview.PreviewPanel(document);
+			child = new com.logicaldoc.gui.common.client.preview.PreviewPanel(document);
 			addMember(child);
 		} else {
 			reset();
@@ -72,7 +72,7 @@ public class DocumentsPreviewPanel extends VLayout {
 	}
 
 	protected void setInitialSize() {
-		if (!"true".equals(Session.get().getConfig("gui.preview.openpanel"))) {
+		if (!Session.get().getConfigAsBoolean("gui.preview.openpanel")) {
 			setWidth(0);
 		} else {
 			try {
@@ -85,5 +85,15 @@ public class DocumentsPreviewPanel extends VLayout {
 				setWidth(350);
 			}
 		}
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

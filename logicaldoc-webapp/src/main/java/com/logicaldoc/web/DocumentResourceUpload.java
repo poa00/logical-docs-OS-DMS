@@ -82,14 +82,14 @@ public class DocumentResourceUpload extends HttpServlet {
 		try {
 			Session session = ServletUtil.validateSession(request);
 
-			UserDAO udao = (UserDAO) Context.get().getBean(UserDAO.class);
+			UserDAO udao = Context.get(UserDAO.class);
 
 			// Load the user associated to the session
 			User user = udao.findByUsername(session.getUsername());
 			if (user == null)
 				return;
 
-			String docId = request.getParameter(DOC_ID);
+			long docId = Long.parseLong(request.getParameter(DOC_ID));
 
 			String suffix = request.getParameter(SUFFIX);
 
@@ -99,11 +99,11 @@ public class DocumentResourceUpload extends HttpServlet {
 
 			log.debug("Start Upload resource for document {}", docId);
 
-			FolderDAO fdao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+			FolderDAO fdao = Context.get(FolderDAO.class);
 
-			DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+			DocumentDAO docDao = Context.get(DocumentDAO.class);
 
-			Document doc = docDao.findById(Long.parseLong(docId));
+			Document doc = docDao.findById(docId);
 			Folder folder = doc.getFolder();
 			if (fdao.isPermissionAllowed(Permission.SIGN, folder.getId(), user.getId())) {
 				ServletUtil.uploadDocumentResource(request, docId, suffix, fileVersion, docVersion);
@@ -111,7 +111,7 @@ public class DocumentResourceUpload extends HttpServlet {
 					docDao.initialize(doc);
 					doc.setSigned(1);
 					docDao.store(doc);
-					VersionDAO vdao = (VersionDAO) Context.get().getBean(VersionDAO.class);
+					VersionDAO vdao = Context.get(VersionDAO.class);
 					Version version = null;
 					if (StringUtils.isNotEmpty(docVersion))
 						version = vdao.findByVersion(doc.getId(), docVersion);

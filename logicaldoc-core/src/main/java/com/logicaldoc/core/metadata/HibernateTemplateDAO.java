@@ -1,8 +1,5 @@
 package com.logicaldoc.core.metadata;
 
-import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -14,7 +11,6 @@ import javax.annotation.Resource;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.support.rowset.SqlRowSet;
 
 import com.logicaldoc.core.HibernatePersistentObjectDAO;
 import com.logicaldoc.core.PersistenceException;
@@ -114,7 +110,7 @@ public class HibernateTemplateDAO extends HibernatePersistentObjectDAO<Template>
 		super.store(template);
 
 		AccessControlUtil.removeForbiddenPermissionsForGuests(template);
-		
+
 		if (isNew) {
 			flush();
 			storeAclAsync(template);
@@ -199,15 +195,17 @@ public class HibernateTemplateDAO extends HibernatePersistentObjectDAO<Template>
 
 			// Manually initialize the collegtion of ACEs
 			template.getAccessControlList().clear();
-			SqlRowSet aclSet = queryForRowSet(
+
+			queryForResultSet(
 					"select ld_groupid,ld_write,ld_read from ld_template_acl where ld_templateid=" + template.getId(),
-					null);
-			while (aclSet.next()) {
-				AccessControlEntry ace = new AccessControlEntry(aclSet.getLong(1));
-				ace.setWrite(aclSet.getInt(2));
-				ace.setRead(aclSet.getInt(3));
-				template.addAccessControlEntry(ace);
-			}
+					null, null, rows -> {
+						while (rows.next()) {
+							AccessControlEntry ace = new AccessControlEntry(rows.getLong(1));
+							ace.setWrite(rows.getInt(2));
+							ace.setRead(rows.getInt(3));
+							template.addAccessControlEntry(ace);
+						}
+					});
 
 			log.trace("Initialized {} aces", template.getAccessControlList().size());
 		} catch (Exception e) {
@@ -219,7 +217,7 @@ public class HibernateTemplateDAO extends HibernatePersistentObjectDAO<Template>
 	private boolean isWriteOrReadEnable(long templateId, long userId, boolean write) {
 		boolean result = true;
 		try {
-			Set<Permission> permissions = getEnabledPermissions(templateId, userId);
+			Set<Permission> permissions = getAllowedPermissions(templateId, userId);
 			if (write)
 				return permissions.contains(Permission.WRITE);
 			else
@@ -244,7 +242,7 @@ public class HibernateTemplateDAO extends HibernatePersistentObjectDAO<Template>
 	}
 
 	@Override
-	public Set<Permission> getEnabledPermissions(long templateId, long userId) {
+	public Set<Permission> getAllowedPermissions(long templateId, long userId) {
 		Set<Permission> permissions = new HashSet<>();
 
 		try {
@@ -265,24 +263,17 @@ public class HibernateTemplateDAO extends HibernatePersistentObjectDAO<Template>
 			query.append(" from ld_template_acl ");
 			query.append(" where ");
 			query.append(" ld_templateid=" + templateId);
-			query.append(" and ld_groupid in (");
-			query.append(groups.stream().map(g -> Long.toString(g.getId())).collect(Collectors.joining(",")));
+			query.append(" and ld_groupid in (select ld_groupid from ld_usergroup where ld_userid=");
+			query.append(Long.toString(userId));
 			query.append(")");
 
-			/**
-			 * IMPORTANT: the connection MUST be explicitly closed, otherwise it
-			 * is probable that the connection pool will leave open it
-			 * indefinitely.
-			 */
-			try (Connection con = getConnection();
-					Statement stmt = con.createStatement();
-					ResultSet rs = stmt.executeQuery(query.toString())) {
-				while (rs.next()) {
+			queryForResultSet(query.toString(), null, null, rows -> {
+				while (rows.next()) {
 					permissions.add(Permission.READ);
-					if (rs.getInt("LDWRITE") == 1)
+					if (rows.getInt("LDWRITE") == 1)
 						permissions.add(Permission.WRITE);
 				}
-			}
+			});
 		} catch (Exception e) {
 			log.error(e.getMessage(), e);
 		}
@@ -304,8 +295,9 @@ public class HibernateTemplateDAO extends HibernatePersistentObjectDAO<Template>
 		clonedTemplate.setAttributes(originalTemplate.getAttributes().entrySet().stream()
 				.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
 		store(clonedTemplate);
-		jdbcUpdate("insert into ld_template_acl(ld_templateid, ld_groupid, ld_write) select " + clonedTemplate.getId()
-				+ ", ld_groupid, ld_write from ld_template_acl where ld_templateid=" + id);
+		jdbcUpdate("insert into ld_template_acl(ld_templateid, ld_groupid, ld_read, ld_write) select "
+				+ clonedTemplate.getId() + ", ld_groupid, ld_read, ld_write from ld_template_acl where ld_templateid="
+				+ id);
 		initialize(clonedTemplate);
 		return clonedTemplate;
 	}

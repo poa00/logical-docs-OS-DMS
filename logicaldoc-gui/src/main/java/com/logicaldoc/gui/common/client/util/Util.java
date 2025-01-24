@@ -45,6 +45,14 @@ import com.smartgwt.client.widgets.layout.Layout;
  */
 public abstract class Util {
 
+	private static final String HEIGHT = "&height=";
+
+	private static final String WIDTH = "' width='";
+
+	private static final String PX_HEIGHT = "px' height='";
+
+	private static final String IMG_SRC = "<img src='";
+
 	private static final String FORMAT_PATTERN_ONE_DIGIT = "###.#";
 
 	private static final String FORMAT_PATTERN_TWO_DIGITS = "###.##";
@@ -67,6 +75,8 @@ public abstract class Util {
 			".docxm", ".dotm", ".xlsx", ".pptx", ".rtf", ".odt", ".ods", ".odp", ".vsd", ".vsdx", ".mpp"));
 
 	private static final Set<String> spreadsheetExts = new HashSet<>(Arrays.asList(".xls", ".xlsm", ".xlsx", ".ods"));
+
+	private static final Set<String> presentationExts = new HashSet<>(Arrays.asList(".ppt", ".pptx", ".pptm", ".odp"));
 
 	private static final Set<String> imageExts = new HashSet<>(
 			Arrays.asList(".gif", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff", ".png", ".jfif", ".webp"));
@@ -167,6 +177,18 @@ public abstract class Util {
 		download(downloadTicketURL(ticketId));
 	}
 
+	public static String qrURL(String content, int size) {
+		return Util.contextPath() + "barcode?label=false&format=QR_CODE&width=" + size + HEIGHT + size + "&code="
+				+ content;
+	}
+
+	public static String qrImg(String content, int size) {
+		if (isCommunity())
+			return "";
+		else
+			return IMG_SRC + qrURL(content, size) + WIDTH + size + "' />";
+	}
+
 	public static String displayURL(Long docId, Long folderId) {
 		String url = contextPath() + "display?";
 		if (docId != null)
@@ -178,11 +200,11 @@ public abstract class Util {
 
 	public static String webEditorUrl(long docId, String fileName, int height) {
 		return contextPath() + "ckeditor/index.jsp?docId=" + docId + "&lang=" + I18N.getLocale() + "&fileName="
-				+ fileName + "&height=" + height + AND_SID_EQUAL + Session.get().getSid();
+				+ fileName + HEIGHT + height + AND_SID_EQUAL + Session.get().getSid();
 	}
 
 	public static String webEditorUrl(int height) {
-		return contextPath() + "ckeditor/index.jsp?docId=nodoc&lang=" + I18N.getLocale() + "&height=" + height
+		return contextPath() + "ckeditor/index.jsp?docId=nodoc&lang=" + I18N.getLocale() + HEIGHT + height
 				+ AND_SID_EQUAL + Session.get().getSid();
 	}
 
@@ -259,7 +281,7 @@ public abstract class Util {
 		if (height != null)
 			style += "height:" + height + "px; ";
 
-		return "<img src='" + thumbnailUrl(docId, fileVersion) + "' style='" + style + "' />";
+		return IMG_SRC + thumbnailUrl(docId, fileVersion) + "' style='" + style + "' />";
 	}
 
 	public static String tileUrl(long docId, String fileVersion) {
@@ -273,18 +295,50 @@ public abstract class Util {
 		if (height != null)
 			style += "height:" + height + "px; ";
 
-		return "<img src='" + tileUrl(docId, fileVersion) + "' style='" + style + "' />";
+		return IMG_SRC + tileUrl(docId, fileVersion) + "' style='" + style + "' />";
 	}
 
 	public static String imageUrl(String imageName) {
 		return imagePrefix() + imageName;
 	}
 
+	public static String fileIconUrl(String iconName) {
+		return imagePrefix() + "FileIcons/" + iconName;
+	}
+
 	public static String fileNameIcon(String iconName, int size) {
-		if (!iconName.toLowerCase().endsWith(".png"))
-			iconName += ".png";
-		return "<img class='filenameIcon' src='" + imageUrl(iconName) + "' width='" + size + "px' height='" + size
-				+ "px' />";
+
+		StringBuilder sb = new StringBuilder("<div class='icon-container filenameIcon'>");
+
+		if (iconName.contains("-")) {
+			String baseIconName = iconName.substring(0, iconName.indexOf('-'));
+
+			if (iconName.contains("-shortcut")) {
+				long shortcutSize = Math.round(size * 0.625D);
+				long shortcutMarginTop = Math.round(size * 0.4375D);
+				long shortcutMarginLeft = Math.round(size * 0.6D);
+				sb.append(IMG_SRC + fileIconUrl("shortcut.svg") + WIDTH + shortcutSize + PX_HEIGHT + shortcutSize
+						+ "px' style='position:absolute; z-index:1; margin-top: " + shortcutMarginTop
+						+ "px; margin-left:" + shortcutMarginLeft + "px'/>");
+			}
+
+			if (iconName.contains("-clip")) {
+				long clipSize = Math.round(size * 0.625D);
+				long clipMarginTop = Math.round(size * 0.125D);
+				long clipMarginLeft = 0;
+				sb.append(IMG_SRC + fileIconUrl("clip.svg") + WIDTH + clipSize + PX_HEIGHT + clipSize
+						+ "px' style='position:absolute; z-index:2; margin-top: " + clipMarginTop + "px; margin-left:"
+						+ clipMarginLeft + "px'/>");
+			}
+
+			iconName = baseIconName;
+		}
+
+		sb.append("<img class='filenameIcon' src='" + fileIconUrl(iconName + ".svg") + WIDTH + size + PX_HEIGHT + size
+				+ "px' />");
+
+		sb.append(END_DIV);
+		return sb.toString();
 	}
 
 	public static String iconWithFilename(String iconName, String fileName) {
@@ -309,7 +363,7 @@ public abstract class Util {
 
 	public static String avatarImg(String userIdOrName, int size) {
 		String url = avatarUrl(userIdOrName != null ? "" + userIdOrName : "0", false);
-		return "<img class='avatarIcon' src='" + url + "' width='" + size + "px' height='" + size + "px' />";
+		return "<img class='avatarIcon' src='" + url + WIDTH + size + PX_HEIGHT + size + "px' />";
 	}
 
 	public static String avatarUrl(long userId) {
@@ -402,6 +456,10 @@ public abstract class Util {
 		return !Feature.enabled(Feature.ADDITIONAL_FORMATS);
 	}
 
+	public static boolean isCommercial() {
+		return Feature.enabled(Feature.ADDITIONAL_FORMATS);
+	}
+
 	public static boolean isOfficeFileType(String type) {
 		return officeExts.stream().anyMatch(type::equalsIgnoreCase);
 	}
@@ -412,6 +470,10 @@ public abstract class Util {
 
 	public static boolean isSpreadsheetFile(String fileName) {
 		return spreadsheetExts.stream().anyMatch(ext -> fileName.toLowerCase().endsWith(ext));
+	}
+
+	public static boolean isPresentationFile(String fileName) {
+		return presentationExts.stream().anyMatch(ext -> fileName.toLowerCase().endsWith(ext));
 	}
 
 	public static boolean isDICOMFile(String fileName) {
@@ -467,22 +529,21 @@ public abstract class Util {
 		writeToClipboard(text);
 		GuiLog.info(I18N.message("texthascopied"));
 	}
-	
+
 	/**
 	 * Writes a text into the client's clipboard
 	 * 
 	 * @param text the content to put into the clipboards
-	 * @return The formated file size.
 	 */
-	private static native void writeToClipboard(String text) /*-{
-  		 navigator.clipboard.writeText(text);
+	public static native void writeToClipboard(String text) /*-{		
+		$wnd.copy(text);
 	}-*/;
 
 	/**
 	 * Format file size in Bytes, KBytes, MBytes or GBytes.
 	 * 
-	 * @param size The file size in bytes.
-	 * @return The formated file size.
+	 * @param size The file size in bytes S
+	 * @return The formated file size
 	 */
 	public static native String formatSize(double size) /*-{
 		if (size / 1024 < 1) {
@@ -551,14 +612,14 @@ public abstract class Util {
 	public static String formatSizeKB(Object value) {
 		if (value == null)
 			return null;
-		if (value instanceof Double)
-			return Util.formatSizeKB(((Double) value).doubleValue());
-		if (value instanceof Long)
-			return Util.formatSizeKB(((Long) value).doubleValue());
-		else if (value instanceof Integer)
-			return Util.formatSizeKB(((Integer) value).doubleValue());
-		if (value instanceof String)
-			return Util.formatSizeKB(Long.parseLong(value.toString()));
+		if (value instanceof Double doubleVal)
+			return Util.formatSizeKB(doubleVal.doubleValue());
+		if (value instanceof Long longVal)
+			return Util.formatSizeKB(longVal.doubleValue());
+		else if (value instanceof Integer intVal)
+			return Util.formatSizeKB(intVal.doubleValue());
+		if (value instanceof String str)
+			return Util.formatSizeKB(Long.parseLong(str));
 		else
 			return Util.formatSizeKB(0L);
 	}
@@ -595,16 +656,14 @@ public abstract class Util {
 	public static String formatSizeW7(Object value) {
 		if (value == null)
 			return null;
-		if (value instanceof Float)
-			return Util.formatSizeKB(((Float) value).doubleValue());
-		if (value instanceof Long)
-			return Util.formatSizeW7(((Long) value).doubleValue());
-		else if (value instanceof Integer)
-			return Util.formatSizeW7(((Integer) value).doubleValue());
-		else if (value instanceof Float)
-			return Util.formatSizeW7(((Float) value).doubleValue());
-		if (value instanceof String)
-			return Util.formatSizeW7(Long.parseLong(value.toString()));
+		if (value instanceof Float floatVal)
+			return Util.formatSizeKB(floatVal.doubleValue());
+		if (value instanceof Long longVal)
+			return Util.formatSizeW7(longVal.doubleValue());
+		else if (value instanceof Integer intVal)
+			return Util.formatSizeW7(intVal.doubleValue());
+		if (value instanceof String str)
+			return Util.formatSizeW7(Long.parseLong(str));
 		else
 			return Util.formatSizeW7(0L);
 	}
@@ -1116,7 +1175,7 @@ public abstract class Util {
 	}
 
 	/**
-	 * Converts some HTML specific cahrd into it's entity
+	 * Converts some HTML specific chars into it's entity
 	 * 
 	 * @param originalText the original string to filter
 	 * 
@@ -1176,9 +1235,31 @@ public abstract class Util {
 		}
 	}
 
+	public static GUIParameter getParameter(List<GUIParameter> params, String name) {
+		try {
+			return params.stream().filter(param -> param.getName().equals(Session.get().getTenantName() + "." + name)
+					|| param.getName().equals(name)).findFirst().orElse(null);
+		} catch (RuntimeException re) {
+			return null;
+		}
+	}
+
 	public static String getParameterValue(List<GUIParameter> params, String name) {
-		return params.stream().filter(param -> param.getName().equals(Session.get().getTenantName() + "." + name)
-				|| param.getName().equals(name)).map(p -> p.getValue()).findFirst().orElse(null);
+		try {
+			GUIParameter param = getParameter(params, name);
+			return param != null ? param.getValue() : null;
+		} catch (RuntimeException re) {
+			return null;
+		}
+	}
+
+	public static Boolean getParameterValueAsBoolean(List<GUIParameter> params, String name) {
+		try {
+			GUIParameter param = getParameter(params, name);
+			return param != null ? param.getValueAsBoolean() : null;
+		} catch (RuntimeException re) {
+			return Boolean.FALSE;
+		}
 	}
 
 	public static void removeChildren(Layout container) {

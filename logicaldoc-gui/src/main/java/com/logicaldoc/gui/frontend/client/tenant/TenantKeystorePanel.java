@@ -1,13 +1,10 @@
 package com.logicaldoc.gui.frontend.client.tenant;
 
-import java.util.Map;
-
-import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.logicaldoc.gui.common.client.Constants;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIKeystore;
 import com.logicaldoc.gui.common.client.beans.GUITenant;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.common.client.util.Util;
@@ -21,11 +18,11 @@ import com.smartgwt.client.widgets.Label;
 import com.smartgwt.client.widgets.form.DynamicForm;
 import com.smartgwt.client.widgets.form.ValuesManager;
 import com.smartgwt.client.widgets.form.fields.PasswordItem;
-import com.smartgwt.client.widgets.form.fields.RadioGroupItem;
 import com.smartgwt.client.widgets.form.fields.RichTextItem;
 import com.smartgwt.client.widgets.form.fields.SpinnerItem;
 import com.smartgwt.client.widgets.form.fields.StaticTextItem;
 import com.smartgwt.client.widgets.form.fields.TextItem;
+import com.smartgwt.client.widgets.form.fields.ToggleItem;
 import com.smartgwt.client.widgets.form.validator.MatchesFieldValidator;
 import com.smartgwt.client.widgets.layout.HLayout;
 import com.smartgwt.client.widgets.layout.VLayout;
@@ -61,13 +58,7 @@ public class TenantKeystorePanel extends VLayout {
 			setHeight100();
 			setMembersMargin(20);
 
-			SignService.Instance.get().loadKeystore(tenantId, new AsyncCallback<>() {
-
-				@Override
-				public void onFailure(Throwable caught) {
-					GuiLog.serverError(caught);
-				}
-
+			SignService.Instance.get().loadKeystore(tenantId, new DefaultAsyncCallback<>() {
 				@Override
 				public void onSuccess(GUIKeystore keystore) {
 					TenantKeystorePanel.this.keystore = keystore;
@@ -145,8 +136,7 @@ public class TenantKeystorePanel extends VLayout {
 		TextItem width = ItemFactory.newTextItem("width", keystore != null ? keystore.getSignWidth() : "");
 		width.setWidth(300);
 
-		final RadioGroupItem visual = ItemFactory.newBooleanSelector("visual");
-		visual.setValue(keystore != null && keystore.isSignVisual() ? "yes" : "no");
+		ToggleItem visual = ItemFactory.newToggleItem("visual", keystore != null && keystore.isSignVisual());
 
 		SpinnerItem opacity = ItemFactory.newSpinnerItem("opacity", keystore != null ? keystore.getSignOpacity() : 100,
 				1, 100);
@@ -307,12 +297,7 @@ public class TenantKeystorePanel extends VLayout {
 		delete.setAutoFit(true);
 		delete.addClickHandler(event -> SC.ask(I18N.message("deletekeystorewarn"), answer -> {
 			if (Boolean.TRUE.equals(answer))
-				SignService.Instance.get().deleteKeystore(tenantId, new AsyncCallback<>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				SignService.Instance.get().deleteKeystore(tenantId, new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Void arg) {
 						initGUI();
@@ -337,13 +322,7 @@ public class TenantKeystorePanel extends VLayout {
 				return;
 
 			LD.contactingServer();
-			SignService.Instance.get().saveKeystore(keystore, new AsyncCallback<>() {
-				@Override
-				public void onFailure(Throwable caught) {
-					LD.clearPrompt();
-					GuiLog.serverError(caught);
-				}
-
+			SignService.Instance.get().saveKeystore(keystore, new DefaultAsyncCallback<>() {
 				@Override
 				public void onSuccess(Void arg) {
 					LD.clearPrompt();
@@ -360,13 +339,7 @@ public class TenantKeystorePanel extends VLayout {
 			if (!validate())
 				return;
 			LD.contactingServer();
-			SignService.Instance.get().generateNewKeystore(keystore, new AsyncCallback<>() {
-				@Override
-				public void onFailure(Throwable caught) {
-					LD.clearPrompt();
-					GuiLog.serverError(caught);
-				}
-
+			SignService.Instance.get().generateNewKeystore(keystore, new DefaultAsyncCallback<>() {
 				@Override
 				public void onSuccess(Void arg) {
 					LD.clearPrompt();
@@ -377,30 +350,28 @@ public class TenantKeystorePanel extends VLayout {
 		return createNew;
 	}
 
-	@SuppressWarnings("unchecked")
 	boolean validate() {
 		vm.validate();
 		if (Boolean.FALSE.equals(vm.hasErrors())) {
-			Map<String, Object> values = vm.getValues();
 			keystore.setTenantId(tenantId);
-			keystore.setOrganizationAlias((String) values.get("localCAalias"));
-			keystore.setValidity(Integer.parseInt(values.get("validity").toString()));
-			keystore.setSignX((String) values.get("exprx"));
-			keystore.setSignY((String) values.get("expry"));
-			keystore.setSignWidth((String) values.get("width"));
-			keystore.setSignVisual("yes".equals(values.get("visual").toString()));
-			keystore.setSignOpacity(Integer.parseInt(values.get("opacity").toString()));
-			keystore.setSignText((String) values.get("text"));
-			keystore.setPassword((String) values.get("password"));
-			keystore.setKeytoolPath((String) values.get("keytoolCommand"));
-			keystore.setOpenSSLPath((String) values.get("opensslCommand"));
+			keystore.setOrganizationAlias(vm.getValueAsString("localCAalias"));
+			keystore.setValidity(Integer.parseInt(vm.getValueAsString("validity")));
+			keystore.setSignX(vm.getValueAsString("exprx"));
+			keystore.setSignY(vm.getValueAsString("expry"));
+			keystore.setSignWidth(vm.getValueAsString("width"));
+			keystore.setSignVisual(Boolean.valueOf(vm.getValueAsString("visual")));
+			keystore.setSignOpacity(Integer.parseInt(vm.getValueAsString("opacity")));
+			keystore.setSignText(vm.getValueAsString("text"));
+			keystore.setPassword(vm.getValueAsString("password"));
+			keystore.setKeytoolPath(vm.getValueAsString("keytoolCommand"));
+			keystore.setOpenSSLPath(vm.getValueAsString("opensslCommand"));
 			try {
-				keystore.setOrganizationDN("O=" + values.get("organization") + ",OU=" + values.get("organizationalunit")
-						+ ",C=" + values.get("countrycode").toString().toUpperCase());
+				keystore.setOrganizationDN(
+						"O=" + vm.getValueAsString("organization") + ",OU=" + vm.getValueAsString("organizationalunit")
+								+ ",C=" + vm.getValueAsString("countrycode").toUpperCase());
 			} catch (Exception t) {
 				// Nothing to do
 			}
-
 		}
 		return !vm.hasErrors();
 	}
@@ -411,5 +382,15 @@ public class TenantKeystorePanel extends VLayout {
 
 	public long getTenantId() {
 		return tenantId;
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

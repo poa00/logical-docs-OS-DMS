@@ -19,9 +19,9 @@ import com.logicaldoc.util.Context;
 
 /**
  * This class represents the key concept of security of documents. The Folder is
- * used as an element to build hierarchies. With the AccessControlList you can associate
- * groups to a given folder and grant some permissions. Also setting the
- * recurityRef you can specify another reference folder that contains the
+ * used as an element to build hierarchies. With the AccessControlList you can
+ * associate groups to a given folder and grant some permissions. Also setting
+ * the recurityRef you can specify another reference folder that contains the
  * security policies.
  * <p>
  * Folders have a type: 0 for standard folders, 1 for workspaces.
@@ -83,10 +83,10 @@ public class Folder extends SecurableExtensibleObject implements Comparable<Fold
 	private Long foldRef;
 
 	/**
-	 * The default storages to use for this folder in the nodes(key: nodeId -
-	 * value: storageId)
+	 * The default stores to use for this folder in the nodes(key: nodeId -
+	 * value: storeId)
 	 */
-	private Map<String, Integer> storages = new HashMap<>();
+	private Map<String, Integer> stores = new HashMap<>();
 
 	private Integer maxVersions;
 
@@ -152,7 +152,7 @@ public class Folder extends SecurableExtensibleObject implements Comparable<Fold
 		this.quotaThreshold = source.quotaThreshold;
 		this.quotaAlertRecipients = source.quotaAlertRecipients;
 		this.foldRef = source.foldRef;
-		this.storages = source.storages;
+		this.stores = source.stores;
 		this.maxVersions = source.maxVersions;
 		this.color = source.color;
 		this.tags = source.tags;
@@ -195,10 +195,10 @@ public class Folder extends SecurableExtensibleObject implements Comparable<Fold
 			// may happen do nothing
 		}
 
-		setStorages(new HashMap<>());
+		setStores(new HashMap<>());
 		try {
-			for (String nodeId : source.getStorages().keySet()) {
-				getStorages().put(nodeId, source.getStorages().get(nodeId));
+			for (String nodeId : source.getStores().keySet()) {
+				getStores().put(nodeId, source.getStores().get(nodeId));
 			}
 		} catch (LazyInitializationException x) {
 			// may happen do nothing
@@ -219,22 +219,6 @@ public class Folder extends SecurableExtensibleObject implements Comparable<Fold
 
 	public void setParentId(long parentId) {
 		this.parentId = parentId;
-	}
-
-	@Override
-	public int compareTo(Folder o) {
-		int comparison = Integer.compare(this.position, o.position);
-		if (comparison != 0)
-			return comparison;
-		return this.name.compareTo(o.name);
-	}
-
-	@Override
-	public boolean equals(Object obj) {
-		if (!(obj instanceof Folder))
-			return false;
-		Folder other = (Folder) obj;
-		return other.getId() == this.getId();
 	}
 
 	public String getName() {
@@ -342,30 +326,30 @@ public class Folder extends SecurableExtensibleObject implements Comparable<Fold
 	}
 
 	/**
-	 * Gets the default storage to use from this folder in the current node
+	 * Gets the default store to use from this folder in the current node
 	 * 
-	 * @return identifier of the default storage
+	 * @return identifier of the default store
 	 */
-	public Integer getStorage() {
+	public Integer getStore() {
 		try {
-			return storages.get(Context.get().getProperties().get("id"));
+			return stores.get(Context.get().getProperties().get("id"));
 		} catch (Exception t) {
 			return null;
 		}
 	}
 
 	/**
-	 * Gets the default storage to use from this folder in the current node
+	 * Gets the default store to use from this folder in the current node
 	 * 
-	 * @param storage identifier of the default storage
+	 * @param store identifier of the default store
 	 */
-	public void setStorage(Integer storage) {
+	public void setStore(Integer store) {
 		try {
 			String nodeId = Context.get().getProperties().getProperty("id");
-			if (storage == null)
-				storages.remove(nodeId);
+			if (store == null)
+				stores.remove(nodeId);
 			else
-				storages.put(nodeId, storage);
+				stores.put(nodeId, store);
 		} catch (Exception t) {
 			// Nothing to do
 		}
@@ -563,12 +547,12 @@ public class Folder extends SecurableExtensibleObject implements Comparable<Fold
 		return getName() + "(" + getId() + ")";
 	}
 
-	public Map<String, Integer> getStorages() {
-		return storages;
+	public Map<String, Integer> getStores() {
+		return stores;
 	}
 
-	public void setStorages(Map<String, Integer> storages) {
-		this.storages = storages;
+	public void setStores(Map<String, Integer> stores) {
+		this.stores = stores;
 	}
 
 	public String getTile() {
@@ -577,5 +561,42 @@ public class Folder extends SecurableExtensibleObject implements Comparable<Fold
 
 	public void setTile(String tile) {
 		this.tile = tile;
+	}
+
+	@Override
+	public int compareTo(Folder other) {
+		if (this.equals(other))
+			return 0;
+
+		int comparison = Integer.compare(this.position, other.position);
+		if (comparison != 0)
+			return comparison;
+		return this.name.compareTo(other.name);
+	}
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = super.hashCode();
+		result = prime * result + ((name == null) ? 0 : name.hashCode());
+		result = prime * result + (int) (parentId ^ (parentId >>> 32));
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (!super.equals(obj))
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		Folder other = (Folder) obj;
+		if (name == null) {
+			if (other.name != null)
+				return false;
+		} else if (!name.equals(other.name))
+			return false;
+		return parentId == other.parentId;
 	}
 }

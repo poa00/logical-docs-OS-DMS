@@ -2,9 +2,8 @@ package com.logicaldoc.core.searchengine;
 
 import java.util.List;
 
-import javax.annotation.Resource;
-
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import com.logicaldoc.core.PersistenceException;
@@ -13,32 +12,29 @@ import com.logicaldoc.core.task.Task;
 import com.logicaldoc.core.task.TaskException;
 
 /**
- * This task optimises all indexes
+ * This task optimizes all indexes
  * 
  * @author Marco Meschieri - LogicalDOC
  * @since 3.5.0
  */
-@Component("IndexOptimizer")
+@Component("indexOptimizer")
 public class IndexOptimizer extends Task {
 	public static final String NAME = "IndexOptimizer";
 
-	@Resource(name = "SearchEngine")
 	private SearchEngine indexer;
 
-	@Resource(name = "DocumentDAO")
 	private DocumentDAO documentDao;
 
-	public IndexOptimizer() {
+	@Autowired
+	public IndexOptimizer(SearchEngine indexer, DocumentDAO documentDao) {
 		super(NAME);
 		log = LoggerFactory.getLogger(IndexOptimizer.class);
+		this.indexer = indexer;
+		this.documentDao = documentDao;
 	}
 
 	public SearchEngine getIndexer() {
 		return indexer;
-	}
-
-	public void setIndexer(SearchEngine indexer) {
-		this.indexer = indexer;
 	}
 
 	@Override
@@ -78,9 +74,5 @@ public class IndexOptimizer extends Task {
 	@Override
 	public boolean isConcurrent() {
 		return true;
-	}
-
-	public void setDocumentDao(DocumentDAO documentDao) {
-		this.documentDao = documentDao;
 	}
 }

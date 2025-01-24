@@ -23,7 +23,7 @@ public class EchoServlet extends HttpServlet {
 
 	private static final long serialVersionUID = -6956612970433309888L;
 
-	protected static Logger log = LoggerFactory.getLogger(EchoServlet.class);
+	protected static Logger log = LoggerFactory.getLogger("console");
 
 	/**
 	 * Constructor of the object.
@@ -35,9 +35,9 @@ public class EchoServlet extends HttpServlet {
 	@Override
 	protected void service(HttpServletRequest request, HttpServletResponse response)
 			throws ServletException, IOException {
-		if (Context.get().getProperties().getBoolean("echo.enabled", false)) {
-			System.out.println(getUrl(request));
-			System.out.println(getContent(request));
+		if (Context.get().getProperties().getBoolean("echo.enabled", false) && log.isInfoEnabled()) {
+			log.info(getUrl(request));
+			log.info(getContent(request));
 		}
 	}
 

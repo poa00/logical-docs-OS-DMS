@@ -20,7 +20,7 @@ import com.logicaldoc.i18n.I18N;
  * @author Marco Meschieri - LogicalDOC
  * @since 6.4
  */
-@Component("DigestProcessor")
+@Component("digestProcessor")
 public class DigestProcessor extends Task {
 	public static final String NAME = "DigestProcessor";
 
@@ -34,10 +34,6 @@ public class DigestProcessor extends Task {
 	public DigestProcessor() {
 		super(NAME);
 		log = LoggerFactory.getLogger(DigestProcessor.class);
-	}
-
-	public void setDocumentDao(DocumentDAO documentDao) {
-		this.documentDao = documentDao;
 	}
 
 	@Override
@@ -70,7 +66,7 @@ public class DigestProcessor extends Task {
 			if (max != null && max.intValue() < 1)
 				max = null;
 
-			log.info("Found a total of {} documents to be processed", size);
+			log.info("Found a total of {} documents to process", size);
 
 			List<Long> ids = documentDao.findIdsByWhere(PersistentObjectDAO.ENTITY + ".docRef is null and "
 					+ PersistentObjectDAO.ENTITY + ".digest is null and deleted = 0", null, max);

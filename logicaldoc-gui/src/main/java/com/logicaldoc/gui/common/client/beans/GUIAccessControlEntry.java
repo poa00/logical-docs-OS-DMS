@@ -67,12 +67,12 @@ public class GUIAccessControlEntry implements Serializable {
 
 	public static final String PERMISSION_AUTOMATION = "automation";
 
-	public static final String PERMISSION_STORAGE = "storage";
+	public static final String PERMISSION_STORE = "store";
 
 	public static final String PERMISSION_READINGREQ = "readingreq";
 
 	public static final String PERMISSION_PRINT = "print";
-	
+
 	public static final String PERMISSION_CUSTOMID = "customid";
 
 	public GUIAccessControlEntry() {
@@ -82,14 +82,14 @@ public class GUIAccessControlEntry implements Serializable {
 		this.entityId = entityId;
 		permissions.clear();
 		for (String permission : allowedPermissions) {
-			permissions.add(new GUIValue(permission.toLowerCase(), "true"));
+			permissions.add(new GUIValue(permission.toLowerCase(), Boolean.TRUE.toString()));
 		}
 	}
 
 	public GUIAccessControlEntry(String... allowedPermissions) {
 		permissions.clear();
 		for (String permission : allowedPermissions) {
-			permissions.add(new GUIValue(permission.toLowerCase(), "true"));
+			permissions.add(new GUIValue(permission.toLowerCase(), Boolean.TRUE.toString()));
 		}
 	}
 
@@ -286,12 +286,12 @@ public class GUIAccessControlEntry implements Serializable {
 		setPermissionValue(PERMISSION_AUTOMATION, automation);
 	}
 
-	public boolean isStorage() {
-		return isPermissionAllowed(PERMISSION_STORAGE);
+	public boolean isStore() {
+		return isPermissionAllowed(PERMISSION_STORE);
 	}
 
-	public void setStorage(boolean storage) {
-		setPermissionValue(PERMISSION_STORAGE, storage);
+	public void setStore(boolean store) {
+		setPermissionValue(PERMISSION_STORE, store);
 	}
 
 	public boolean isReadingreq() {
@@ -301,11 +301,11 @@ public class GUIAccessControlEntry implements Serializable {
 	public void setReadingreq(boolean readingreq) {
 		setPermissionValue(PERMISSION_READINGREQ, readingreq);
 	}
-	
+
 	public boolean isCustomid() {
 		return isPermissionAllowed(PERMISSION_CUSTOMID);
 	}
-	
+
 	public void setCustomid(boolean customid) {
 		setPermissionValue(PERMISSION_CUSTOMID, customid);
 	}
@@ -315,7 +315,7 @@ public class GUIAccessControlEntry implements Serializable {
 	}
 
 	public Set<String> getAllowedPermissions() {
-		return permissions.stream().filter(e -> "true".equals(e.getValue())).map(e -> e.getCode().toLowerCase())
+		return permissions.stream().filter(e -> Boolean.valueOf(e.getValue())).map(e -> e.getCode().toLowerCase())
 				.collect(Collectors.toSet());
 	}
 

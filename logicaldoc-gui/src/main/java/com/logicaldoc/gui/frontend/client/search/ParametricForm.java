@@ -8,15 +8,14 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import com.google.gwt.core.client.JavaScriptObject;
-import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.logicaldoc.gui.common.client.Constants;
 import com.logicaldoc.gui.common.client.Feature;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIAttribute;
 import com.logicaldoc.gui.common.client.beans.GUICriterion;
 import com.logicaldoc.gui.common.client.beans.GUISearchOptions;
 import com.logicaldoc.gui.common.client.beans.GUITemplate;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.widgets.DocumentSelector;
 import com.logicaldoc.gui.common.client.widgets.FolderSelector;
@@ -163,12 +162,7 @@ public class ParametricForm extends VLayout {
 			template.addChangedHandler(event -> {
 				if (event.getValue() != null && !"".equals(event.getValue())) {
 					TemplateService.Instance.get().getTemplate(Long.parseLong((String) event.getValue()),
-							new AsyncCallback<>() {
-								@Override
-								public void onFailure(Throwable caught) {
-									GuiLog.serverError(caught);
-								}
-
+							new DefaultAsyncCallback<>() {
 								@Override
 								public void onSuccess(GUITemplate result) {
 									selectedTemplate = result;
@@ -305,12 +299,12 @@ public class ParametricForm extends VLayout {
 		// type.
 		if (condition.getValueFieldItem() instanceof IntegerItem)
 			fieldValue = Long.parseLong(fieldValue.toString());
-		if (condition.getValueFieldItem() instanceof UserSelector)
-			fieldValue = ((UserSelector) condition.getValueFieldItem()).getUser().getId();
-		if (condition.getValueFieldItem() instanceof FolderSelector)
-			fieldValue = ((FolderSelector) condition.getValueFieldItem()).getFolder().getId();
-		if (condition.getValueFieldItem() instanceof DocumentSelector)
-			fieldValue = ((DocumentSelector) condition.getValueFieldItem()).getDocument().getId();
+		if (condition.getValueFieldItem() instanceof UserSelector selector)
+			fieldValue = selector.getUser().getId();
+		if (condition.getValueFieldItem() instanceof FolderSelector selector)
+			fieldValue = selector.getFolder().getId();
+		if (condition.getValueFieldItem() instanceof DocumentSelector selector)
+			fieldValue = selector.getDocument().getId();
 
 		String fieldName = criterion.getField();
 
@@ -336,20 +330,20 @@ public class ParametricForm extends VLayout {
 	}
 
 	private void setCriterionValue(Object fieldValue, GUICriterion criterion) {
-		if (fieldValue instanceof Date)
-			criterion.setDateValue((Date) fieldValue);
-		else if (fieldValue instanceof Integer)
-			criterion.setLongValue(Long.valueOf((Integer) fieldValue));
-		else if (fieldValue instanceof Long)
-			criterion.setLongValue((Long) fieldValue);
-		else if (fieldValue instanceof Float)
-			criterion.setDoubleValue(((Float) fieldValue).doubleValue());
-		else if (fieldValue instanceof Double)
-			criterion.setDoubleValue((Double) fieldValue);
-		else if (fieldValue instanceof String)
-			criterion.setStringValue((String) fieldValue);
-		else if (fieldValue instanceof JavaScriptObject) {
-			JSOHelper.convertToMap((JavaScriptObject) fieldValue);
+		if (fieldValue instanceof Date dateVal)
+			criterion.setDateValue(dateVal);
+		else if (fieldValue instanceof Integer intVal)
+			criterion.setLongValue(intVal.longValue());
+		else if (fieldValue instanceof Long longVal)
+			criterion.setLongValue(longVal);
+		else if (fieldValue instanceof Float floatVal)
+			criterion.setDoubleValue(floatVal.doubleValue());
+		else if (fieldValue instanceof Double doubleVal)
+			criterion.setDoubleValue(doubleVal);
+		else if (fieldValue instanceof String str)
+			criterion.setStringValue(str);
+		else if (fieldValue instanceof JavaScriptObject js) {
+			JSOHelper.convertToMap(js);
 		}
 	}
 
@@ -409,5 +403,15 @@ public class ParametricForm extends VLayout {
 	@Override
 	protected void onDraw() {
 		initGUI();
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

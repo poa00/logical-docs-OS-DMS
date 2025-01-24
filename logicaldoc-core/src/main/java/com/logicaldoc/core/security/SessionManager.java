@@ -1,6 +1,7 @@
 package com.logicaldoc.core.security;
 
 import java.nio.charset.StandardCharsets;
+import java.security.NoSuchAlgorithmException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -25,12 +26,15 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
 import com.logicaldoc.core.PersistenceException;
+import com.logicaldoc.core.security.apikey.ApiKeyDAO;
 import com.logicaldoc.core.security.authentication.AuthenticationChain;
 import com.logicaldoc.core.security.authentication.AuthenticationException;
 import com.logicaldoc.core.security.spring.LDAuthenticationToken;
 import com.logicaldoc.core.security.spring.LDSecurityContextRepository;
 import com.logicaldoc.core.security.user.User;
+import com.logicaldoc.core.security.user.UserDAO;
 import com.logicaldoc.util.Context;
+import com.logicaldoc.util.crypt.CryptUtil;
 import com.logicaldoc.util.sql.SqlUtil;
 
 /**
@@ -39,12 +43,14 @@ import com.logicaldoc.util.sql.SqlUtil;
  * @author Marco Meschieri - LogicalDOC
  * @since 4.6
  */
-@Component("SessionManager")
+@Component("sessionManager")
 public class SessionManager extends ConcurrentHashMap<String, Session> {
 
 	public static final String COOKIE_SID = "ldoc-sid";
 
 	public static final String PARAM_SID = "sid";
+
+	public static final String HEADER_APIKEY = "X-API-KEY";
 
 	private static Logger log = LoggerFactory.getLogger(SessionManager.class);
 
@@ -53,11 +59,17 @@ public class SessionManager extends ConcurrentHashMap<String, Session> {
 	// The maximum number of closed session maintained in memory
 	private static final int MAX_CLOSED_SESSIONS = 50;
 
-	@Resource(name = "AuthenticationChain")
+	@Resource(name = "authenticationChain")
 	private transient AuthenticationChain authenticationChain;
 
 	@Resource(name = "SessionDAO")
 	private transient SessionDAO sessionDao;
+
+	@Resource(name = "ApiKeyDAO")
+	private transient ApiKeyDAO apiKeyDao;
+
+	@Resource(name = "UserDAO")
+	private transient UserDAO userDao;
 
 	private transient SessionTimeoutWatchDog timeoutWatchDog = new SessionTimeoutWatchDog();
 
@@ -69,7 +81,7 @@ public class SessionManager extends ConcurrentHashMap<String, Session> {
 	}
 
 	public static final SessionManager get() {
-		return (SessionManager) Context.get().getBean(SessionManager.class);
+		return Context.get(SessionManager.class);
 	}
 
 	/**
@@ -79,20 +91,32 @@ public class SessionManager extends ConcurrentHashMap<String, Session> {
 	 * @param username the username
 	 * @param password the passowrd
 	 * @param key the secret key
-	 * @param client client informations
+	 * @param request the current request
 	 * 
 	 * @return the session created after the successful login
 	 *
 	 * @throws AuthenticationException raised in case of failed login
 	 */
-	public synchronized Session newSession(String username, String password, String key, Client client)
+	public synchronized Session newSession(String username, String password, String key, HttpServletRequest request)
 			throws AuthenticationException {
-		User user = authenticationChain.authenticate(username, password, key, client);
-		if (user == null)
-			return null;
-		else {
-			return createSession(user, password, key, client);
-		}
+		return newSession(username, password, key, buildClient(request));
+	}
+
+	/**
+	 * Creates a new session by authenticating the given user and stores it in
+	 * the pool of opened sessions
+	 * 
+	 * @param username the username
+	 * @param password the passowrd
+	 * @param request the current request
+	 * 
+	 * @return the session created after the successful login
+	 *
+	 * @throws AuthenticationException raised in case of failed login
+	 */
+	public synchronized Session newSession(String username, String password, HttpServletRequest request)
+			throws AuthenticationException {
+		return newSession(username, password, buildClient(request));
 	}
 
 	/**
@@ -122,9 +146,75 @@ public class SessionManager extends ConcurrentHashMap<String, Session> {
 	 * @param client client informations
 	 * 
 	 * @return the session created after the successful login
+	 *
+	 * @throws AuthenticationException raised in case of failed login
 	 */
-	private synchronized Session createSession(User user, String password, String key, Client client) {
-		Session session = new Session(user, password, key, client);
+	public synchronized Session newSession(String username, String password, String key, Client client)
+			throws AuthenticationException {
+		try {
+			User user = authenticationChain.authenticate(username, password, key, client);
+			if (user == null)
+				return null;
+			else {
+				return createSession(user, key, client);
+			}
+		} catch (AuthenticationException e) {
+			LoginThrottle.recordFailure(username, key, client, e);
+			throw e;
+		}
+	}
+
+	/**
+	 * Creates a new session by authenticating through an API Key and stores it
+	 * in the pool of opened sessions
+	 * 
+	 * @param apikey the API Key
+	 * @param client client informations
+	 * 
+	 * @return the session created after the successful login
+	 *
+	 * @throws AuthenticationException raised in case of failed login
+	 */
+	public synchronized Session newSession(String apikey, Client client) throws AuthenticationException {
+		try {
+			User user = authenticationChain.authenticate("", "", apikey, client);
+			if (user == null)
+				return null;
+			else
+				return createSession(user, apikey, client);
+		} catch (AuthenticationException e) {
+			LoginThrottle.recordFailure(null, apikey, client, e);
+			throw e;
+		}
+	}
+
+	/**
+	 * Creates a new session by authenticating through an API Key and stores it
+	 * in the pool of opened sessions
+	 * 
+	 * @param apikey the API Key
+	 * @param request the current request
+	 * 
+	 * @return the session created after the successful login
+	 *
+	 * @throws AuthenticationException raised in case of failed login
+	 */
+	public synchronized Session newSession(String apikey, HttpServletRequest request) throws AuthenticationException {
+		return newSession(apikey, buildClient(request));
+	}
+
+	/**
+	 * Creates a new session for the given user and stores it in the pool of
+	 * opened sessions
+	 * 
+	 * @param username the username
+	 * @param key the secret key
+	 * @param client client informations
+	 * 
+	 * @return the session created after the successful login
+	 */
+	private synchronized Session createSession(User user, String key, Client client) {
+		Session session = new Session(user, key, client);
 		put(session.getSid(), session);
 		log.warn("Created new session {} for user {}", session.getSid(), user.getUsername());
 		cleanClosedSessions();
@@ -139,23 +229,10 @@ public class SessionManager extends ConcurrentHashMap<String, Session> {
 		return session;
 	}
 
-	/**
-	 * Creates a new session by authenticating the given user and stores it in
-	 * the pool of opened sessions
-	 * 
-	 * @param user the user
-	 * @param client client informations
-	 * 
-	 * @return the session created after the successful login
-	 */
-	public synchronized Session createSession(User user, Client client) throws AuthenticationException {
-		return createSession(user, null, null, client);
-	}
-
 	private void storeSession(Session session) {
 		try {
 			if (session.getId() == 0L) {
-				Session dbSession = session.getClone();
+				Session dbSession = new Session(session);
 				sessionDao.store(dbSession);
 				session.setId(dbSession.getId());
 			} else {
@@ -295,12 +372,7 @@ public class SessionManager extends ConcurrentHashMap<String, Session> {
 	 * @return the session
 	 */
 	public Session getByDictionaryValue(String key, Object value) {
-		for (Session session : getSessions()) {
-			if (value.equals(session.getDictionary().get(key)))
-				return session;
-		}
-
-		return null;
+		return getSessions().stream().filter(s -> value.equals(s.getDictionary().get(key))).findFirst().orElse(null);
 	}
 
 	/**
@@ -374,12 +446,13 @@ public class SessionManager extends ConcurrentHashMap<String, Session> {
 	 * Gets the Session ID specification from the current request following this
 	 * lookup strategy:
 	 * <ol>
-	 * <li>Session attribute <code>PARAM_SID</code></li>
-	 * <li>Request attribute <code>PARAM_SID</code></li>
 	 * <li>Request parameter <code>PARAM_SID</code></li>
 	 * <li>Request header <code>PARAM_SID</code></li>
+	 * <li>Request attribute <code>PARAM_SID</code></li>
+	 * <li>Session attribute <code>PARAM_SID</code></li>
 	 * <li>Cookie <code>COOKIE_SID</code></li>
 	 * <li>Spring SecurityContextHolder</li>
+	 * <li>Client ID</li>
 	 * </ol>
 	 * 
 	 * @param request The current request to inspect
@@ -395,11 +468,36 @@ public class SessionManager extends ConcurrentHashMap<String, Session> {
 		if (auth instanceof LDAuthenticationToken ldAuthenticationToken)
 			return ldAuthenticationToken.getSid();
 
-		if (request != null) {
-			Client client = buildClient(request);
-			Session session = getByClientId(client.getId());
-			if (session != null && isOpen(session.getSid()))
-				return session.getSid();
+		return getSessionIdFromClient(request);
+	}
+
+	private String getSessionIdFromClient(HttpServletRequest request) {
+		if (request == null || !Context.get().getProperties().getBoolean("security.useclientid", false))
+			return null;
+
+		Client client = buildClient(request);
+		Session session = getByClientId(client.getId());
+
+		/*
+		 * In case of ClienID match, we must check the session provides Basic
+		 * Authentication and refers to the same username
+		 */
+		if (session != null && isOpen(session.getSid()) && session.getUsername().equals(client.getUsername())) {
+			String[] credentials = getBasicCredentials(request);
+			if (credentials.length == 2) {
+				try {
+					/*
+					 * In case the current user has defined a password, also
+					 * check it matches with the basic authentication
+					 */
+					final String sessionUserPassword = session.getUser().getPassword();
+					if (StringUtils.isEmpty(sessionUserPassword)
+							|| CryptUtil.encryptSHA256(credentials[1]).equals(sessionUserPassword))
+						return session.getSid();
+				} catch (NoSuchAlgorithmException e) {
+					log.error("Unable to check credentials", e);
+				}
+			}
 		}
 
 		return null;
@@ -410,20 +508,20 @@ public class SessionManager extends ConcurrentHashMap<String, Session> {
 			return null;
 
 		String sid = null;
-		if (request.getSession(true).getAttribute(PARAM_SID) != null
-				&& StringUtils.isNotEmpty((String) request.getSession(true).getAttribute(PARAM_SID)))
-			sid = (String) request.getSession(true).getAttribute(PARAM_SID);
-		else if (request.getAttribute(PARAM_SID) != null
-				&& StringUtils.isNotEmpty((String) request.getAttribute(PARAM_SID)))
-			sid = (String) request.getAttribute(PARAM_SID);
-		else if (StringUtils.isNotEmpty(request.getParameter(PARAM_SID))
+		if (StringUtils.isNotEmpty(request.getParameter(PARAM_SID))
 				&& Context.get().getProperties().getBoolean("security.acceptsid", false))
 			sid = request.getParameter(PARAM_SID);
 		else if (StringUtils.isNotEmpty(request.getHeader(PARAM_SID)))
 			sid = request.getHeader(PARAM_SID);
-		else {
+		else if (request.getAttribute(PARAM_SID) != null
+				&& StringUtils.isNotEmpty((String) request.getAttribute(PARAM_SID)))
+			sid = (String) request.getAttribute(PARAM_SID);
+		else if (request.getSession(true).getAttribute(PARAM_SID) != null
+				&& StringUtils.isNotEmpty((String) request.getSession(true).getAttribute(PARAM_SID)))
+			sid = (String) request.getSession(true).getAttribute(PARAM_SID);
+		else
 			sid = getSessionIdFromCookie(request);
-		}
+
 		return sid;
 	}
 
@@ -511,11 +609,15 @@ public class SessionManager extends ConcurrentHashMap<String, Session> {
 		String[] credentials = getBasicCredentials(request);
 		if (credentials.length > 0 && credentials[0] != null)
 			client.setUsername(credentials[0]);
-		if (credentials.length > 1)
-			client.setId(String.format("%s-%s-%s", credentials[0],
-					credentials[1] != null ? "0" : credentials[1].hashCode(), request.getRemoteAddr()));
-		return client;
 
+		String authorization = request.getHeader("Authorization");
+		String apiKey = request.getHeader(HEADER_APIKEY);
+
+		client.setId(String.format("%s-%s-%s-%s-%s", StringUtils.defaultString(client.getUsername(), "0"),
+				StringUtils.isNotEmpty(authorization) ? Integer.toString(authorization.hashCode()) : "0",
+				StringUtils.isNotEmpty(apiKey) ? Integer.toString(apiKey.hashCode()) : "0", request.getRemoteAddr(),
+				StringUtils.defaultString(request.getHeader("user-agent"))));
+		return client;
 	}
 
 	private static String[] getBasicCredentials(HttpServletRequest req) {
@@ -617,5 +719,38 @@ public class SessionManager extends ConcurrentHashMap<String, Session> {
 
 	public synchronized void removeListener(SessionListener listener) {
 		listeners.remove(listener);
+	}
+
+	public void setApiKeyDao(ApiKeyDAO apiKeyDao) {
+		this.apiKeyDao = apiKeyDao;
+	}
+
+	public void setUserDao(UserDAO userDao) {
+		this.userDao = userDao;
+	}
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = super.hashCode();
+		result = prime * result + ((listeners == null) ? 0 : listeners.hashCode());
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (!super.equals(obj))
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		SessionManager other = (SessionManager) obj;
+		if (listeners == null) {
+			if (other.listeners != null)
+				return false;
+		} else if (!listeners.equals(other.listeners))
+			return false;
+		return true;
 	}
 }

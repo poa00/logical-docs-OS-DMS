@@ -97,13 +97,13 @@ public class Feature {
 
 	public static final int FOLDER_TEMPLATE = 42;
 
-	public static final int GDRIVE = 43;
+	public static final int GOOGLE_DRIVE = 43;
 
-	public static final int SMB_STORAGE = 44;
+	public static final int SMB_STORE = 44;
 
 	public static final int FORMAT_CONVERSION = 45;
 
-	public static final int CLOUD_STORAGE = 46;
+	public static final int CLOUD_STORE = 46;
 
 	public static final int VIA = 47;
 
@@ -115,7 +115,7 @@ public class Feature {
 
 	public static final int PREVIEW = 51;
 
-	public static final int MULTI_STORAGE = 52;
+	public static final int MULTI_STORE = 52;
 
 	public static final int BOOKMARKS = 53;
 
@@ -216,6 +216,14 @@ public class Feature {
 	public static final int READING_CONFIRMATION = 102;
 
 	public static final int TECHNICAL_SUPPORT = 103;
+
+	public static final int CHATGPT = 104;
+
+	public static final int GOOGLE_CALENDAR = 105;
+	
+	public static final int SCANNER = 106;
+
+	public static final int ONLYOFFICE = 107;
 
 	private static Set<String> features = new HashSet<>();
 

@@ -1,6 +1,6 @@
 package com.logicaldoc.gui.frontend.client.document;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIAccessControlEntry;
 import com.logicaldoc.gui.common.client.beans.GUIDocument;
@@ -9,9 +9,8 @@ import com.logicaldoc.gui.common.client.controllers.DocumentController;
 import com.logicaldoc.gui.common.client.controllers.FolderController;
 import com.logicaldoc.gui.common.client.data.DocumentsDS;
 import com.logicaldoc.gui.common.client.data.DocumentsDSParameters;
-import com.logicaldoc.gui.common.client.log.GuiLog;
+import com.logicaldoc.gui.common.client.preview.PreviewPopup;
 import com.logicaldoc.gui.common.client.util.DocUtil;
-import com.logicaldoc.gui.common.client.widgets.preview.PreviewPopup;
 import com.logicaldoc.gui.frontend.client.document.grid.ContextMenu;
 import com.logicaldoc.gui.frontend.client.document.grid.Cursor;
 import com.logicaldoc.gui.frontend.client.document.grid.DocumentGridUtil;
@@ -38,10 +37,6 @@ public class DocumentsListPanel extends VLayout {
 	private boolean filters;
 
 	protected int visualizationMode = DocumentsGrid.MODE_LIST;
-
-	public DocumentsListPanel(GUIFolder folder) {
-		this(folder, DocumentsGrid.MODE_LIST);
-	}
 
 	public DocumentsListPanel(GUIFolder folder, int visualizationMode) {
 		this.visualizationMode = visualizationMode;
@@ -93,8 +88,7 @@ public class DocumentsListPanel extends VLayout {
 					doc.setDocRef(doc.getId());
 					doc.setId(aliasId);
 				}
-				PreviewPopup iv = new PreviewPopup(doc);
-				iv.show();
+				new PreviewPopup(doc).show();
 			}
 			event.cancel();
 		});
@@ -102,18 +96,14 @@ public class DocumentsListPanel extends VLayout {
 		registerSelectionHandler();
 
 		documentsGrid.registerCellContextClickHandler(click -> {
-			DocumentService.Instance.get().getAllowedPermissions(documentsGrid.getSelectedIds(), new AsyncCallback<>() {
-
-				@Override
-				public void onFailure(Throwable caught) {
-					GuiLog.serverError(caught);
-				}
-
-				@Override
-				public void onSuccess(GUIAccessControlEntry enabledPermissions) {
-					new ContextMenu(FolderController.get().getCurrentFolder(), documentsGrid, enabledPermissions).showContextMenu();
-				}
-			});
+			DocumentService.Instance.get().getAllowedPermissions(documentsGrid.getSelectedIds(),
+					new DefaultAsyncCallback<>() {
+						@Override
+						public void onSuccess(GUIAccessControlEntry enabledPermissions) {
+							new ContextMenu(FolderController.get().getCurrentFolder(), documentsGrid,
+									enabledPermissions).showContextMenu();
+						}
+					});
 			if (click != null)
 				click.cancel();
 		});
@@ -125,12 +115,7 @@ public class DocumentsListPanel extends VLayout {
 			if (documentsGrid.getSelectedCount() != 1)
 				return;
 			GUIDocument selectedDocument = documentsGrid.getSelectedDocument();
-			DocumentService.Instance.get().getById(selectedDocument.getId(), new AsyncCallback<>() {
-				@Override
-				public void onFailure(Throwable caught) {
-					GuiLog.serverError(caught);
-				}
-
+			DocumentService.Instance.get().getById(selectedDocument.getId(), new DefaultAsyncCallback<>() {
 				@Override
 				public void onSuccess(GUIDocument doc) {
 					DocumentController.get().setCurrentDocument(doc);
@@ -160,9 +145,7 @@ public class DocumentsListPanel extends VLayout {
 
 		DocumentsDSParameters params = new DocumentsDSParameters(folder.getId(), null,
 				documentsGrid.getGridCursor().getPageSize(), documentsGrid.getGridCursor().getCurrentPage(),
-				documentsGrid instanceof DocumentsListGrid
-						? DocumentGridUtil.getSortSpec((DocumentsListGrid) documentsGrid)
-						: null);
+				documentsGrid instanceof DocumentsListGrid listGrid ? DocumentGridUtil.getSortSpec(listGrid) : null);
 		DocumentsDS dataSource = new DocumentsDS(params);
 		documentsGrid.fetchNewData(dataSource);
 		documentsGrid.setCanDrag(folder.isMove());
@@ -181,5 +164,15 @@ public class DocumentsListPanel extends VLayout {
 	public void toggleFilters() {
 		documentsGrid.showFilters(!filters);
 		filters = !filters;
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+	
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

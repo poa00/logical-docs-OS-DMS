@@ -5,8 +5,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.logicaldoc.gui.common.client.Constants;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIParameter;
 import com.logicaldoc.gui.common.client.i18n.I18N;
@@ -19,8 +19,8 @@ import com.smartgwt.client.types.TitleOrientation;
 import com.smartgwt.client.widgets.IButton;
 import com.smartgwt.client.widgets.form.DynamicForm;
 import com.smartgwt.client.widgets.form.ValuesManager;
-import com.smartgwt.client.widgets.form.fields.RadioGroupItem;
 import com.smartgwt.client.widgets.form.fields.TextItem;
+import com.smartgwt.client.widgets.form.fields.ToggleItem;
 import com.smartgwt.client.widgets.layout.VLayout;
 
 /**
@@ -35,8 +35,6 @@ public class TwoFactorsAuthenticationSettings extends AdminPanel {
 
 	private static final String TWOFA_STAR = ".2fa.*";
 
-	private static final String FALSE = "false";
-
 	private static final String ENABLED = ".enabled";
 
 	private static final String ALLOWTRUSTED = "allowtrusted";
@@ -47,13 +45,7 @@ public class TwoFactorsAuthenticationSettings extends AdminPanel {
 		super("twofactorsauth");
 
 		SettingService.Instance.get().loadSettingsByNames(Arrays.asList(Session.get().getTenantName() + TWOFA_STAR),
-				new AsyncCallback<>() {
-
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(List<GUIParameter> params) {
 						init(params);
@@ -69,18 +61,14 @@ public class TwoFactorsAuthenticationSettings extends AdminPanel {
 		form.setNumCols(1);
 
 		Map<String, String> settings = Util.convertToMap(parameters);
-		final RadioGroupItem enable2fa = ItemFactory.newBooleanSelector("enable2fa");
-		enable2fa.setValue("true".equals(settings.get("enabled")) ? "yes" : "no");
+		ToggleItem enable2fa = ItemFactory.newToggleItem("enable2fa", Boolean.valueOf(settings.get("enabled")));
 		enable2fa.setWrapTitle(false);
-		enable2fa.setWrap(false);
 		enable2fa.setRequired(true);
 		enable2fa.setDisabled(Session.get().isDemo());
 
-		final RadioGroupItem allowTrustedDevices = ItemFactory.newBooleanSelector(ALLOWTRUSTED,
-				I18N.message("alwaysallowtrusteddev"));
-		allowTrustedDevices.setValue("true".equals(settings.get(ALLOWTRUSTED)) ? "yes" : "no");
+		ToggleItem allowTrustedDevices = ItemFactory.newToggleItem(ALLOWTRUSTED, I18N.message("alwaysallowtrusteddev"),
+				Boolean.valueOf(settings.get("ALLOWTRUSTED")));
 		allowTrustedDevices.setWrapTitle(false);
-		allowTrustedDevices.setWrap(false);
 		allowTrustedDevices.setRequired(true);
 
 		form.setFields(enable2fa, allowTrustedDevices);
@@ -95,11 +83,9 @@ public class TwoFactorsAuthenticationSettings extends AdminPanel {
 		emailForm.setGroupTitle("Email Authenticator");
 		emailForm.setNumCols(1);
 
-		final RadioGroupItem enableEmail = ItemFactory.newBooleanSelector("enableEmail",
-				I18N.message("enableemailthenticator"));
-		enableEmail.setValue("true".equals(settings.get(Constants.TWOFA_EMAIL_AUTHENTICATOR + ENABLED)) ? "yes" : "no");
+		ToggleItem enableEmail = ItemFactory.newToggleItem("enableEmail", I18N.message("enableemailthenticator"),
+				Boolean.valueOf(settings.get(Constants.TWOFA_EMAIL_AUTHENTICATOR + ENABLED)));
 		enableEmail.setWrapTitle(false);
-		enableEmail.setWrap(false);
 		enableEmail.setRequired(true);
 		enableEmail.setDisabled(Session.get().isDemo());
 		emailForm.setFields(enableEmail);
@@ -114,12 +100,9 @@ public class TwoFactorsAuthenticationSettings extends AdminPanel {
 		googleForm.setGroupTitle("Google Authenticator");
 		googleForm.setNumCols(1);
 
-		final RadioGroupItem enableGoolge = ItemFactory.newBooleanSelector("enableGoolge",
-				I18N.message("enablegoogleauthenticator"));
-		enableGoolge
-				.setValue("true".equals(settings.get(Constants.TWOFA_GOOGLE_AUTHENTICATOR + ENABLED)) ? "yes" : "no");
+		ToggleItem enableGoolge = ItemFactory.newToggleItem("enableGoolge", I18N.message("enablegoogleauthenticator"),
+				Boolean.valueOf(settings.get(Constants.TWOFA_GOOGLE_AUTHENTICATOR + ENABLED)));
 		enableGoolge.setWrapTitle(false);
-		enableGoolge.setWrap(false);
 		enableGoolge.setRequired(true);
 		enableGoolge.setDisabled(Session.get().isDemo());
 		googleForm.setFields(enableGoolge);
@@ -134,11 +117,9 @@ public class TwoFactorsAuthenticationSettings extends AdminPanel {
 		yubikeyForm.setGroupTitle("YubiKey");
 		yubikeyForm.setNumCols(1);
 
-		final RadioGroupItem enableYubikey = ItemFactory.newBooleanSelector("enableYubikey",
-				I18N.message("enableyubikey"));
-		enableYubikey.setValue("true".equals(settings.get("yubikey.enabled")) ? "yes" : "no");
+		ToggleItem enableYubikey = ItemFactory.newToggleItem("enableYubikey",
+				Boolean.valueOf(settings.get("yubikey.enabled")));
 		enableYubikey.setWrapTitle(false);
-		enableYubikey.setWrap(false);
 		enableYubikey.setRequired(true);
 		enableYubikey.setDisabled(Session.get().isDemo());
 		yubikeyForm.setFields(enableYubikey);
@@ -153,10 +134,9 @@ public class TwoFactorsAuthenticationSettings extends AdminPanel {
 		duoForm.setGroupTitle("Duo");
 		duoForm.setNumCols(1);
 
-		RadioGroupItem enableDuo = ItemFactory.newBooleanSelector("enableDuo", I18N.message("enableduo"));
-		enableDuo.setValue("true".equals(settings.get(Constants.TWOFA_DUO + ENABLED)) ? "yes" : "no");
+		ToggleItem enableDuo = ItemFactory.newToggleItem("enableDuo", I18N.message("enableduo"),
+				Boolean.valueOf(settings.get(Constants.TWOFA_DUO + ENABLED)));
 		enableDuo.setWrapTitle(false);
-		enableDuo.setWrap(false);
 		enableDuo.setRequired(true);
 		enableDuo.setDisabled(Session.get().isDemo());
 
@@ -192,18 +172,16 @@ public class TwoFactorsAuthenticationSettings extends AdminPanel {
 
 			String tenant = Session.get().getTenantName();
 			final List<GUIParameter> params = new ArrayList<>();
-			params.add(new GUIParameter(tenant + ".2fa.enabled",
-					vm.getValueAsString("enable2fa").equals("yes") ? "true" : FALSE));
-			params.add(new GUIParameter(tenant + ".2fa.allowtrusted",
-					vm.getValueAsString(ALLOWTRUSTED).equals("yes") ? "true" : FALSE));
+			params.add(new GUIParameter(tenant + ".2fa.enabled", vm.getValueAsString("enable2fa")));
+			params.add(new GUIParameter(tenant + ".2fa.allowtrusted", vm.getValueAsString(ALLOWTRUSTED)));
 			params.add(new GUIParameter(tenant + TWOFA + Constants.TWOFA_GOOGLE_AUTHENTICATOR + ENABLED,
-					vm.getValueAsString("enableGoolge").equals("yes") ? "true" : FALSE));
+					vm.getValueAsString("enableGoolge")));
 			params.add(new GUIParameter(tenant + TWOFA + Constants.TWOFA_YUBIKEY + ENABLED,
-					vm.getValueAsString("enableYubikey").equals("yes") ? "true" : FALSE));
+					vm.getValueAsString("enableYubikey")));
 			params.add(new GUIParameter(tenant + TWOFA + Constants.TWOFA_EMAIL_AUTHENTICATOR + ENABLED,
-					vm.getValueAsString("enableEmail").equals("yes") ? "true" : FALSE));
-			params.add(new GUIParameter(tenant + TWOFA + Constants.TWOFA_DUO + ENABLED,
-					vm.getValueAsString("enableDuo").equals("yes") ? "true" : FALSE));
+					vm.getValueAsString("enableEmail")));
+			params.add(
+					new GUIParameter(tenant + TWOFA + Constants.TWOFA_DUO + ENABLED, vm.getValueAsString("enableDuo")));
 			params.add(new GUIParameter(tenant + TWOFA + Constants.TWOFA_DUO + ".integrationkey",
 					vm.getValueAsString("duoIntegrationKey")));
 			params.add(new GUIParameter(tenant + TWOFA + Constants.TWOFA_DUO + ".secretkey",
@@ -216,18 +194,22 @@ public class TwoFactorsAuthenticationSettings extends AdminPanel {
 	}
 
 	private void doSaveSettings(final List<GUIParameter> params) {
-		SettingService.Instance.get().saveSettings(params, new AsyncCallback<>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
+		SettingService.Instance.get().saveSettings(params, new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(Void arg) {
 				Session.get().updateConfig(params);
 				GuiLog.info(I18N.message("settingssaved"), null);
 			}
 		});
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

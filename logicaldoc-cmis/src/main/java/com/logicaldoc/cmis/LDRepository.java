@@ -147,7 +147,7 @@ import com.logicaldoc.core.security.authorization.PermissionException;
 import com.logicaldoc.core.security.user.Group;
 import com.logicaldoc.core.security.user.User;
 import com.logicaldoc.core.security.user.UserDAO;
-import com.logicaldoc.core.store.Storer;
+import com.logicaldoc.core.store.Store;
 import com.logicaldoc.util.Context;
 import com.logicaldoc.util.LocaleUtil;
 import com.logicaldoc.util.config.ContextProperties;
@@ -230,14 +230,14 @@ public class LDRepository {
 		if (root == null)
 			throw new IllegalArgumentException("Invalid root folder!");
 
-		userDao = (UserDAO) Context.get().getBean(UserDAO.class);
-		folderDao = (FolderDAO) Context.get().getBean(FolderDAO.class);
-		documentDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
-		documentManager = (DocumentManager) Context.get().getBean(DocumentManager.class);
-		templateDao = (TemplateDAO) Context.get().getBean(TemplateDAO.class);
-		versionDao = (VersionDAO) Context.get().getBean(VersionDAO.class);
-		historyDao = (DocumentHistoryDAO) Context.get().getBean(DocumentHistoryDAO.class);
-		folderHistoryDao = (FolderHistoryDAO) Context.get().getBean(FolderHistoryDAO.class);
+		userDao = Context.get(UserDAO.class);
+		folderDao = Context.get(FolderDAO.class);
+		documentDao = Context.get(DocumentDAO.class);
+		documentManager = Context.get(DocumentManager.class);
+		templateDao = Context.get(TemplateDAO.class);
+		versionDao = Context.get(VersionDAO.class);
+		historyDao = Context.get(DocumentHistoryDAO.class);
+		folderHistoryDao = Context.get(FolderHistoryDAO.class);
 
 		ContextProperties config = Context.get().getProperties();
 
@@ -549,14 +549,14 @@ public class LDRepository {
 
 		NumberFormat nd = new DecimalFormat("0000000000");
 
-		Storer storer = (Storer) Context.get().getBean(Storer.class);
+		Store store = Context.get(Store.class);
 
 		File chunksFolder = getChunksFolder(documentId);
-		String resourceName = storer.getResourceName(doc.getId(), doc.getFileVersion(), null);
+		String resourceName = store.getResourceName(doc.getId(), doc.getFileVersion(), null);
 		if (FileUtils.isEmptyDirectory(chunksFolder)) {
 			// Copy the current file's content
 			File firstChunk = new File(chunksFolder, "chunk-" + nd.format(1));
-			storer.writeToFile(doc.getId(), resourceName, firstChunk);
+			store.writeToFile(doc.getId(), resourceName, firstChunk);
 		}
 
 		int totalChunks = chunksFolder.list().length;
@@ -566,7 +566,7 @@ public class LDRepository {
 		if (isLastChunk) {
 			try {
 				File mergeFile = getMergedContent(chunksFolder);
-				DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+				DocumentManager manager = Context.get(DocumentManager.class);
 
 				DocumentHistory transaction = new DocumentHistory();
 				transaction.setUser(getSessionUser(context));
@@ -1187,13 +1187,13 @@ public class LDRepository {
 			AbstractDocument doc = getDocument(objectId);
 
 			InputStream stream = null;
-			Storer storer = (Storer) Context.get().getBean(Storer.class);
+			Store store = Context.get(Store.class);
 			InputStream is = null;
 			if (doc instanceof Document document) {
-				is = storer.getStream(doc.getId(), storer.getResourceName(document, null, null));
+				is = store.getStream(doc.getId(), store.getResourceName(document, null, null));
 			} else {
 				Version v = (Version) doc;
-				is = storer.getStream(v.getDocId(), storer.getResourceName(v.getDocId(), v.getFileVersion(), null));
+				is = store.getStream(v.getDocId(), store.getResourceName(v.getDocId(), v.getFileVersion(), null));
 			}
 			stream = new BufferedInputStream(is, BUFFER_SIZE);
 
@@ -1237,7 +1237,7 @@ public class LDRepository {
 
 	private void saveHistory(DocumentHistory transaction) {
 		try {
-			DocumentHistoryDAO historyDAO = (DocumentHistoryDAO) Context.get().getBean(DocumentHistoryDAO.class);
+			DocumentHistoryDAO historyDAO = Context.get(DocumentHistoryDAO.class);
 			historyDAO.store(transaction);
 		} catch (PersistenceException t) {
 			log.warn(t.getMessage(), t);
@@ -1512,7 +1512,7 @@ public class LDRepository {
 		String filename = expr;
 		log.debug("filename: {}", filename);
 
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
 		List<Document> docs = docDao.findByFileNameAndParentFolderId(null, filename, null, getSessionUser().getId(),
 				maxItems);
 
@@ -1569,8 +1569,7 @@ public class LDRepository {
 		// Iterate through the list of results
 		for (Hit hit : hits) {
 			try {
-				// filtro i risultati (lasciando solo le colonne
-				// richieste)
+				// filer the results (leaving just required columns)
 				ObjectData result = compileObjectType(null, hit, filter, false, false, null);
 				results.add(result);
 			} catch (Exception t) {
@@ -1643,7 +1642,7 @@ public class LDRepository {
 	}
 
 	private void checkReadEnable(User user, long folderId) throws PermissionException, PersistenceException {
-		FolderDAO dao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+		FolderDAO dao = Context.get(FolderDAO.class);
 		if (!dao.isReadAllowed(folderId, user.getId())) {
 			String message = "User " + user.getUsername() + " doesn't have read permission on folder " + folderId;
 			log.error(message);

@@ -1,6 +1,5 @@
 package com.logicaldoc.webservice.rest.client;
 
-import org.apache.cxf.jaxrs.client.JAXRSClientFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,15 +14,12 @@ import com.logicaldoc.webservice.rest.AuthService;
  * @author Alessandro Gasparini - LogicalDOC
  * @since 6.9
  */
-public class RestAuthClient extends AbstractRestClient implements AuthService {
+public class RestAuthClient extends AbstractRestClient<AuthService> implements AuthService {
 
 	protected static Logger log = LoggerFactory.getLogger(RestAuthClient.class);
 
-	private AuthService proxy = null;
-
 	public RestAuthClient(String endpoint) throws AuthenticationException {
-		super(endpoint, null, null);
-		proxy = JAXRSClientFactory.create(endpoint, AuthService.class);
+		super(AuthService.class, endpoint, null);
 	}
 
 	public String login(String username, String password) {
@@ -49,4 +45,8 @@ public class RestAuthClient extends AbstractRestClient implements AuthService {
 		return proxy.loginForm(username, password);
 	}
 
+	@Override
+	public String loginApiKey(String apiKey) {
+		return proxy.loginApiKey(apiKey);
+	}
 }

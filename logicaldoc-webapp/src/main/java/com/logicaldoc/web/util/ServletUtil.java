@@ -1,3 +1,4 @@
+
 package com.logicaldoc.web.util;
 
 import java.io.BufferedInputStream;
@@ -24,6 +25,7 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.fileupload.FileItem;
+import org.apache.commons.fileupload.FileUploadException;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.fileupload.servlet.ServletFileUpload;
 import org.apache.commons.io.FileUtils;
@@ -47,7 +49,7 @@ import com.logicaldoc.core.security.menu.MenuDAO;
 import com.logicaldoc.core.security.user.Group;
 import com.logicaldoc.core.security.user.User;
 import com.logicaldoc.core.security.user.UserDAO;
-import com.logicaldoc.core.store.Storer;
+import com.logicaldoc.core.store.Store;
 import com.logicaldoc.util.Context;
 import com.logicaldoc.util.MimeType;
 import com.logicaldoc.util.io.FileUtil;
@@ -99,23 +101,30 @@ public class ServletUtil {
 	public static User getSessionUser(HttpServletRequest request) throws InvalidSessionException {
 		Session session = validateSession(request);
 		User user = (User) session.getDictionary().get(USER);
-		UserDAO userDao = (UserDAO) Context.get().getBean(UserDAO.class);
-		userDao.initialize(user);
+		initializeUser(user);
 		return user;
 	}
 
 	public static User getSessionUser(String sid) throws InvalidSessionException {
 		Session session = validateSession(sid);
 		User user = (User) session.getDictionary().get(USER);
-		UserDAO userDao = (UserDAO) Context.get().getBean(UserDAO.class);
-		userDao.initialize(user);
+		initializeUser(user);
 		return user;
+	}
+
+	private static void initializeUser(User user) {
+		UserDAO userDao = Context.get(UserDAO.class);
+		try {
+			userDao.initialize(user);
+		} catch (PersistenceException e) {
+			Log.warn(e.getMessage(), e);
+		}
 	}
 
 	public static Session checkMenu(HttpServletRequest request, long menuId)
 			throws ServletException, InvalidSessionException {
 		Session session = validateSession(request);
-		MenuDAO dao = (MenuDAO) Context.get().getBean(MenuDAO.class);
+		MenuDAO dao = Context.get(MenuDAO.class);
 		if (!dao.isReadEnable(menuId, session.getUserId())) {
 			String message = "User " + session.getUsername() + " cannot access the menu " + menuId;
 			throw new ServletException(message);
@@ -138,7 +147,7 @@ public class ServletUtil {
 	public static Session checkEvenOneMenu(HttpServletRequest request, long... menuIds)
 			throws ServletException, InvalidSessionException {
 		Session session = validateSession(request);
-		MenuDAO dao = (MenuDAO) Context.get().getBean(MenuDAO.class);
+		MenuDAO dao = Context.get(MenuDAO.class);
 		for (long menuId : menuIds) {
 			if (dao.isReadEnable(menuId, session.getUserId()))
 				return session;
@@ -226,18 +235,18 @@ public class ServletUtil {
 
 		String filename = getFilename(fileName, suffix, document);
 
-		Storer storer = (Storer) Context.get().getBean(Storer.class);
-		String resource = storer.getResourceName(document, fileVersion, null);
-		if (!storer.exists(document.getId(), resource)) {
+		Store store = Context.get(Store.class);
+		String resource = store.getResourceName(document, fileVersion, null);
+		if (!store.exists(document.getId(), resource)) {
 			throw new FileNotFoundException(resource);
 		}
 
 		if (StringUtils.isNotEmpty(suffix)) {
-			resource = storer.getResourceName(document, fileVersion, suffix);
+			resource = store.getResourceName(document, fileVersion, suffix);
 			filename = filename + "." + suffix.substring(suffix.lastIndexOf('.') + 1);
 		}
 
-		long length = storer.size(document.getId(), resource);
+		long length = store.size(document.getId(), resource);
 		String contentType = MimeType.getByFilename(filename);
 		long lastModified = document.getDate().getTime();
 		String eTag = document.getId() + "_" + document.getVersion() + "_" + lastModified;
@@ -280,7 +289,7 @@ public class ServletUtil {
 			if (gstreamRequired) {
 				// The browser accepts GZIP, so GZIP the content.
 				response.setHeader("Content-Encoding", "gzip");
-				storer.writeToStream(docId, resource, output);
+				store.writeToStream(docId, resource, output);
 			} else if (ranges.size() == 1) {
 				// Return single part of file.
 				Range r = ranges.get(0);
@@ -292,7 +301,7 @@ public class ServletUtil {
 					response.setStatus(HttpServletResponse.SC_PARTIAL_CONTENT); // 206.
 
 				// Copy single part range.
-				storer.writeToStream(docId, resource, output, r.start, r.length);
+				store.writeToStream(docId, resource, output, r.start, r.length);
 			} else {
 				// Return multiple parts of file.
 				response.setContentType("multipart/byteranges; boundary=" + MULTIPART_BOUNDARY);
@@ -312,7 +321,7 @@ public class ServletUtil {
 					sos.println("Content-Range: bytes " + r.start + "-" + r.end + "/" + r.total);
 
 					// Copy single part range of multi part range.
-					storer.writeToStream(docId, resource, sos, r.start, r.length);
+					store.writeToStream(docId, resource, sos, r.start, r.length);
 
 					// End with multipart boundary.
 					sos.println();
@@ -330,8 +339,7 @@ public class ServletUtil {
 	private static void initUser(User user) {
 		if (user != null)
 			try {
-				UserDAO udao = (UserDAO) Context.get().getBean(UserDAO.class);
-				udao.initialize(user);
+				initializeUser(user);
 			} catch (Exception e) {
 				// Nothing to do
 			}
@@ -433,7 +441,7 @@ public class ServletUtil {
 			history.setSessionId(sid);
 		}
 
-		FolderDAO fdao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+		FolderDAO fdao = Context.get(FolderDAO.class);
 		history.setPath(fdao.computePathExtended(document.getFolder().getId()));
 		if ("preview".equals(request.getParameter("control")))
 			history.setEvent(DocumentEvent.VIEWED.toString());
@@ -445,7 +453,7 @@ public class ServletUtil {
 		 * we will not save if there is another view in the same session asked
 		 * since 30 seconds.
 		 */
-		DocumentHistoryDAO hdao = (DocumentHistoryDAO) Context.get().getBean(DocumentHistoryDAO.class);
+		DocumentHistoryDAO hdao = Context.get(DocumentHistoryDAO.class);
 		List<DocumentHistory> oldHistories = hdao.findByUserIdAndEvent(user.getId(), history.getEvent(),
 				session != null ? session.getSid() : sid);
 		Calendar cal = Calendar.getInstance();
@@ -500,7 +508,7 @@ public class ServletUtil {
 	}
 
 	private static Document getDocument(long docId, User user) throws PersistenceException, FileNotFoundException {
-		DocumentDAO dao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO dao = Context.get(DocumentDAO.class);
 		Document doc = dao.findById(docId);
 		if (doc == null || (user != null && !user.isMemberOf(Group.GROUP_ADMIN) && !user.isMemberOf("publisher")
 				&& !doc.isPublishing()))
@@ -636,7 +644,7 @@ public class ServletUtil {
 		response.setCharacterEncoding(StandardCharsets.UTF_8.displayName());
 
 		// get document
-		DocumentDAO ddao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO ddao = Context.get(DocumentDAO.class);
 		Document doc = ddao.findById(docId);
 
 		if (doc == null) {
@@ -655,12 +663,11 @@ public class ServletUtil {
 
 		setContentDisposition(request, response, doc.getFileName() + ".txt");
 
-		UserDAO udao = (UserDAO) Context.get().getBean(UserDAO.class);
-		udao.initialize(user);
+		initializeUser(user);
 		if (!user.isMemberOf(Group.GROUP_ADMIN) && !user.isMemberOf("publisher") && !doc.isPublishing())
 			throw new FileNotFoundException("Document not published");
 
-		SearchEngine indexer = (SearchEngine) Context.get().getBean(SearchEngine.class);
+		SearchEngine indexer = Context.get(SearchEngine.class);
 
 		String content = indexer.getHit(docId).getContent();
 		if (content == null)
@@ -693,9 +700,9 @@ public class ServletUtil {
 	 * @throws PersistenceException error at data layer
 	 */
 	public static void downloadDocument(HttpServletRequest request, HttpServletResponse response, String sid,
-			String docId, String fileVersion, String fileName, User user)
+			long docId, String fileVersion, String fileName, User user)
 			throws IOException, NumberFormatException, ServletException, PersistenceException {
-		downloadDocument(request, response, sid, Integer.parseInt(docId), fileVersion, fileName, null, user);
+		downloadDocument(request, response, sid, docId, fileVersion, fileName, null, user);
 	}
 
 	/**
@@ -713,13 +720,13 @@ public class ServletUtil {
 	 *        will returned
 	 * @param docVersion id of the doc version; if null the latest version will
 	 *        returned
-	 * 
-	 * @throws Exception a generic error
+	 * @throws PersistenceException Error in the data layer
+	 * @throws IOException I/O error during the upload
 	 */
-	public static void uploadDocumentResource(HttpServletRequest request, String docId, String suffix,
-			String fileVersion, String docVersion) throws Exception {
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
-		Document doc = docDao.findById(Long.parseLong(docId));
+	public static void uploadDocumentResource(HttpServletRequest request, long docId, String suffix, String fileVersion,
+			String docVersion) throws PersistenceException, IOException {
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
+		Document doc = docDao.findById(docId);
 
 		String ver = docVersion;
 		if (StringUtils.isEmpty(ver))
@@ -727,30 +734,47 @@ public class ServletUtil {
 		if (StringUtils.isEmpty(ver))
 			ver = doc.getFileVersion();
 
-		Storer storer = (Storer) Context.get().getBean(Storer.class);
+		Store store = Context.get(Store.class);
 
 		DiskFileItemFactory factory = new DiskFileItemFactory();
+		
 		// Configure the factory here, if desired.
 		ServletFileUpload upload = new ServletFileUpload(factory);
+		
 		// Configure the uploader here, if desired.
-		List<FileItem> fileItems = upload.parseRequest(request);
+		List<FileItem> fileItems = getUploadFileItems(request, upload);
+		
 		for (FileItem item : fileItems) {
 			if (!item.isFormField()) {
-				File savedFile = FileUtil.createTempFile("", "");
-				item.write(savedFile);
-
-				InputStream is = null;
-				try {
-					is = item.getInputStream();
-					storer.store(item.getInputStream(), Long.parseLong(docId),
-							storer.getResourceName(doc, ver, suffix));
+				File savedFile = writeItemToFile(item);
+				try (InputStream is = item.getInputStream();) {
+					store.store(item.getInputStream(), docId, store.getResourceName(doc, ver, suffix));
 				} finally {
-					if (is != null)
-						is.close();
 					FileUtils.forceDelete(savedFile);
 				}
 			}
 		}
+	}
+
+	private static File writeItemToFile(FileItem item) throws IOException {
+		File savedFile = FileUtil.createTempFile("upload", "");
+		try {
+			item.write(savedFile);
+		} catch (Exception e) {
+			throw new IOException(e);
+		}
+		return savedFile;
+	}
+
+	private static List<FileItem> getUploadFileItems(HttpServletRequest request, ServletFileUpload upload)
+			throws IOException {
+		List<FileItem> fileItems;
+		try {
+			fileItems = upload.parseRequest(request);
+		} catch (FileUploadException e) {
+			throw new IOException(e);
+		}
+		return fileItems;
 	}
 
 	/**

@@ -1,7 +1,5 @@
 package com.logicaldoc.gui.frontend.client.impex.email;
 
-import java.util.Map;
-
 import com.logicaldoc.gui.common.client.beans.GUIEmailAccount;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.smartgwt.client.types.TitleOrientation;
@@ -35,7 +33,7 @@ public class EmailAccountAutomationPanel extends EmailAccountDetailsTab {
 		form.clearErrors(false);
 		form.destroy();
 
-		if (Boolean.TRUE.equals(container.contains(form))) 
+		if (Boolean.TRUE.equals(container.contains(form)))
 			container.removeChild(form);
 
 		form = new DynamicForm();
@@ -44,33 +42,48 @@ public class EmailAccountAutomationPanel extends EmailAccountDetailsTab {
 		form.setNumCols(1);
 		form.setTitleOrientation(TitleOrientation.TOP);
 
-		TextAreaItem automationBefore = ItemFactory.newTextAreaItemForAutomation("automationBefore", "whenemailprocessing",
-				account.getAutomation(), changedHandler, false);
+		TextAreaItem automationBefore = ItemFactory.newTextAreaItemForAutomation("automationBefore",
+				"whenemailprocessing", account.getAutomation(), changedHandler, false);
 		automationBefore.setRequired(false);
 		automationBefore.setWidth("*");
 		automationBefore.setHeight("*");
 		automationBefore.addChangedHandler(changedHandler);
 
-		TextAreaItem automationAfter = ItemFactory.newTextAreaItemForAutomation("automationAfter", "afteremailprocessed",
-				account.getAutomationAfter(), changedHandler, false);
+		TextAreaItem automationAfter = ItemFactory.newTextAreaItemForAutomation("automationAfter",
+				"afteremailprocessed", account.getAutomationAfter(), changedHandler, false);
 		automationAfter.setRequired(false);
 		automationAfter.setWidth("*");
 		automationAfter.setHeight("*");
 		automationAfter.addChangedHandler(changedHandler);
-		
-		form.setItems(automationBefore, automationAfter);
+
+		TextAreaItem automationEnd = ItemFactory.newTextAreaItemForAutomation("automationEnd", "aftercrawlingprocessed",
+				account.getAutomationEnd(), changedHandler, false);
+		automationEnd.setRequired(false);
+		automationEnd.setWidth("*");
+		automationEnd.setHeight("*");
+		automationEnd.addChangedHandler(changedHandler);
+
+		form.setItems(automationBefore, automationAfter, automationEnd);
 
 		container.addMember(form);
 	}
 
-	@SuppressWarnings("unchecked")
 	boolean validate() {
-		Map<String, Object> values = form.getValues();
-		form.validate();
-		if (Boolean.FALSE.equals(form.hasErrors())) {
-			account.setAutomation((String) values.get("automationBefore"));
-			account.setAutomationAfter((String) values.get("automationAfter"));
+		if (form.validate()) {
+			account.setAutomation(form.getValueAsString("automationBefore"));
+			account.setAutomationAfter(form.getValueAsString("automationAfter"));
+			account.setAutomationEnd(form.getValueAsString("automationEnd"));
 		}
 		return !form.hasErrors();
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

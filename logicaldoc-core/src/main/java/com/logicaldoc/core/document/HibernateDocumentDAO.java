@@ -3,10 +3,8 @@ package com.logicaldoc.core.document;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.NoSuchAlgorithmException;
-import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -32,7 +30,6 @@ import org.apache.commons.lang.StringUtils;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.BeanPropertyRowMapper;
 import org.springframework.jdbc.core.RowMapper;
-import org.springframework.jdbc.support.rowset.SqlRowSet;
 
 import com.logicaldoc.core.HibernatePersistentObjectDAO;
 import com.logicaldoc.core.PersistenceException;
@@ -52,7 +49,7 @@ import com.logicaldoc.core.security.TenantDAO;
 import com.logicaldoc.core.security.user.Group;
 import com.logicaldoc.core.security.user.User;
 import com.logicaldoc.core.security.user.UserDAO;
-import com.logicaldoc.core.store.Storer;
+import com.logicaldoc.core.store.Store;
 import com.logicaldoc.util.Context;
 import com.logicaldoc.util.config.ContextProperties;
 import com.logicaldoc.util.io.FileUtil;
@@ -94,11 +91,11 @@ public class HibernateDocumentDAO extends HibernatePersistentObjectDAO<Document>
 	@Resource(name = "DocumentLinkDAO")
 	private DocumentLinkDAO linkDAO;
 
-	@Resource(name = "DocumentListenerManager")
+	@Resource(name = "documentListenerManager")
 	private DocumentListenerManager listenerManager;
 
-	@Resource(name = "Storer")
-	private Storer storer;
+	@Resource(name = "Store")
+	private Store store;
 
 	@Resource(name = "ContextProperties")
 	private ContextProperties config;
@@ -215,7 +212,6 @@ public class HibernateDocumentDAO extends HibernatePersistentObjectDAO<Document>
 		return findIdsByWhere(query.toString(), null, null);
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public List<Document> findByLockUserAndStatus(Long userId, Integer status) {
 		StringBuilder sb = new StringBuilder(
@@ -245,7 +241,6 @@ public class HibernateDocumentDAO extends HibernatePersistentObjectDAO<Document>
 		}
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public List<Long> findDocIdByTag(String tag) throws PersistenceException {
 		StringBuilder query = new StringBuilder(
@@ -309,6 +304,11 @@ public class HibernateDocumentDAO extends HibernatePersistentObjectDAO<Document>
 				log.debug("Aspect customId is disabled so force the the Custom ID to a random UUID");
 			}
 
+			/*
+			 * Check maximum number of documents per folder
+			 */
+			checkMaxDocsPerFolder(doc);
+
 			log.debug("Invoke listeners before store");
 			Map<String, Object> dictionary = new HashMap<>();
 			for (DocumentListener listener : listenerManager.getListeners())
@@ -349,6 +349,15 @@ public class HibernateDocumentDAO extends HibernatePersistentObjectDAO<Document>
 			updateAliases(doc);
 		} catch (Exception e) {
 			handleStoreError(transaction, e);
+		}
+	}
+
+	private void checkMaxDocsPerFolder(Document document) throws PersistenceException {
+		long maxDocsPerFolder = config.getLong("maxdocsperfolder", -1L);
+		if (document.getId() == 0L && maxDocsPerFolder > 0) {
+			long count = folderDAO.countDocs(document.getFolder().getId());
+			if (count >= maxDocsPerFolder)
+				throw new TooManyDocumentsException(document.getFolder(), maxDocsPerFolder);
 		}
 	}
 
@@ -497,8 +506,10 @@ public class HibernateDocumentDAO extends HibernatePersistentObjectDAO<Document>
 
 	/**
 	 * Avoid file name duplications in the same folder
+	 * 
+	 * @throws PersistenceException Error in the data layer
 	 */
-	private void setUniqueFilename(Document doc) {
+	private void setUniqueFilename(Document doc) throws PersistenceException {
 		if (!RunLevel.current().aspectEnabled("uniquenessFilename"))
 			return;
 
@@ -523,17 +534,13 @@ public class HibernateDocumentDAO extends HibernatePersistentObjectDAO<Document>
 		query.append(Long.toString(doc.getId()));
 
 		// Execute the query to populate the sets
-		try {
-			SqlRowSet rs = queryForRowSet(query.toString(), null);
-			if (rs != null)
-				while (rs.next()) {
-					String file = rs.getString(1);
-					if (file != null && !fileNames.contains(file))
-						fileNames.add(file.toLowerCase());
-				}
-		} catch (PersistenceException e) {
-			log.error(e.getMessage(), e);
-		}
+		queryForResultSet(query.toString(), null, null, rs -> {
+			while (rs.next()) {
+				String file = rs.getString(1);
+				if (file != null && !fileNames.contains(file))
+					fileNames.add(file.toLowerCase());
+			}
+		});
 
 		int counter = 1;
 		while (fileNames.contains(doc.getFileName().toLowerCase()))
@@ -542,9 +549,9 @@ public class HibernateDocumentDAO extends HibernatePersistentObjectDAO<Document>
 
 	@Override
 	public void updateDigest(Document doc) throws PersistenceException {
-		String resource = storer.getResourceName(doc, doc.getFileVersion(), null);
-		if (storer.exists(doc.getId(), resource)) {
-			try (InputStream in = storer.getStream(doc.getId(), resource);) {
+		String resource = store.getResourceName(doc, doc.getFileVersion(), null);
+		if (store.exists(doc.getId(), resource)) {
+			try (InputStream in = store.getStream(doc.getId(), resource);) {
 				doc.setDigest(FileUtil.computeDigest(in));
 			} catch (IOException e) {
 				log.error("Cannot retrieve the content of document {}", doc);
@@ -566,7 +573,6 @@ public class HibernateDocumentDAO extends HibernatePersistentObjectDAO<Document>
 		}
 	}
 
-	@SuppressWarnings("unchecked")
 	public List<Document> findLastModifiedByUserId(long userId, int maxElements) throws PersistenceException {
 		List<Document> coll = new ArrayList<>();
 
@@ -576,7 +582,7 @@ public class HibernateDocumentDAO extends HibernatePersistentObjectDAO<Document>
 
 		List<Long> results = new ArrayList<>();
 		try {
-			results = findByQuery(query.toString(), (Map<String, Object>) null, null);
+			results = findByQuery(query.toString(), (Map<String, Object>) null, Long.class, null);
 		} catch (PersistenceException e) {
 			log.error(e.getMessage(), e);
 		}
@@ -593,7 +599,6 @@ public class HibernateDocumentDAO extends HibernatePersistentObjectDAO<Document>
 		return coll;
 	}
 
-	@SuppressWarnings("unchecked")
 	public List<String> findTags(long docId) throws PersistenceException {
 		return queryForList("select ld_tag from ld_tag where ld_docid=" + docId + " order by ld_tag", String.class);
 	}
@@ -623,7 +628,6 @@ public class HibernateDocumentDAO extends HibernatePersistentObjectDAO<Document>
 		return map;
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public List<String> findAllTags(String firstLetter, Long tenantId) throws PersistenceException {
 		StringBuilder sb = new StringBuilder("select ld_tag from ld_uniquetag where 1=1 ");
@@ -640,7 +644,6 @@ public class HibernateDocumentDAO extends HibernatePersistentObjectDAO<Document>
 		return queryForList(sb.toString(), params, String.class, null);
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public List<Document> findByUserIdAndTag(long userId, String tag, Integer max) throws PersistenceException {
 		List<Document> coll = new ArrayList<>();
@@ -651,7 +654,7 @@ public class HibernateDocumentDAO extends HibernatePersistentObjectDAO<Document>
 			query.append(ids.stream().map(Object::toString).collect(Collectors.joining(",")));
 			query.append(")");
 			try {
-				coll = findByQuery(query.toString(), (Map<String, Object>) null, max);
+				coll = findByObjectQuery(query.toString(), (Map<String, Object>) null, max);
 			} catch (PersistenceException e) {
 				log.error(e.getMessage(), e);
 			}
@@ -659,7 +662,6 @@ public class HibernateDocumentDAO extends HibernatePersistentObjectDAO<Document>
 		return coll;
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public List<Long> findDocIdByUserIdAndTag(long userId, String tag) throws PersistenceException {
 		List<Long> ids = new ArrayList<>();
@@ -703,9 +705,8 @@ public class HibernateDocumentDAO extends HibernatePersistentObjectDAO<Document>
 		query.append(" and event = '" + DocumentEvent.DOWNLOADED + "' ");
 		query.append(" order by date desc");
 
-		@SuppressWarnings("unchecked")
-		List<Long> results = findByQuery(query.toString(), (Map<String, Object>) null, null);
-		ArrayList<Long> tmpal = new ArrayList<>(results);
+		ArrayList<Long> tmpal = new ArrayList<>(
+				findByQuery(query.toString(), (Map<String, Object>) null, Long.class, null));
 		List<Long> docIds = tmpal;
 
 		if (docIds.isEmpty())
@@ -728,8 +729,7 @@ public class HibernateDocumentDAO extends HibernatePersistentObjectDAO<Document>
 		query.append(")");
 
 		// execute the query
-		@SuppressWarnings("unchecked")
-		List<Document> unorderdColl = findByQuery(query.toString(), (Map<String, Object>) null, null);
+		List<Document> unorderdColl = findByQuery(query.toString(), (Map<String, Object>) null, Document.class, null);
 
 		// put all elements in a map
 		HashMap<Long, Document> hm = new HashMap<>();
@@ -748,7 +748,6 @@ public class HibernateDocumentDAO extends HibernatePersistentObjectDAO<Document>
 		return coll;
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public List<Long> findDocIdByFolder(long folderId, Integer max) throws PersistenceException {
 		String sql = "select ld_id from ld_document where ld_deleted=0 and ld_folderid = " + folderId
@@ -784,7 +783,6 @@ public class HibernateDocumentDAO extends HibernatePersistentObjectDAO<Document>
 		Map<String, Object> params = new HashMap<>();
 		params.put("docId", docId);
 
-		@SuppressWarnings("unchecked")
 		List<Long> ids = queryForList(query.toString(), params, Long.class, null);
 
 		if (ids.isEmpty())
@@ -828,7 +826,6 @@ public class HibernateDocumentDAO extends HibernatePersistentObjectDAO<Document>
 			log.trace("Initialized {} aces", doc.getAccessControlList().size());
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public List<Long> findDeletedDocIds() throws PersistenceException {
 		String query = "select ld_id from ld_document where ld_deleted=1 order by ld_lastmodified desc";
@@ -1069,7 +1066,6 @@ public class HibernateDocumentDAO extends HibernatePersistentObjectDAO<Document>
 		Map<String, Object> params = new HashMap<>();
 		params.put("now", new Date());
 
-		@SuppressWarnings("unchecked")
 		Collection<Long> buf = queryForList(query.toString(), params, Long.class, null);
 		Set<Long> ids = new HashSet<>();
 		for (Long id : buf) {
@@ -1079,7 +1075,6 @@ public class HibernateDocumentDAO extends HibernatePersistentObjectDAO<Document>
 		return ids;
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public void cleanExpiredTransactions() throws PersistenceException {
 		// Retrieve the actual registered locks on transactions
@@ -1124,8 +1119,7 @@ public class HibernateDocumentDAO extends HibernatePersistentObjectDAO<Document>
 			log.debug("Clean unique tags of tenant {}", tenantId);
 
 			// Collect the currently unique used tags
-			@SuppressWarnings("unchecked")
-			Set<String> currentlyUsedTags = ((Map<String, String>) queryForList(
+			Set<String> currentlyUsedTags = (queryForList(
 					"select distinct(B.ld_tag) from ld_tag B, ld_document C where B.ld_tenantid=" + tenantId
 							+ " and C.ld_id=B.ld_docid and C.ld_deleted=0 "
 							+ " UNION select distinct(D.ld_tag) from ld_foldertag D, ld_folder E where D.ld_tenantid="
@@ -1170,7 +1164,6 @@ public class HibernateDocumentDAO extends HibernatePersistentObjectDAO<Document>
 		jdbcUpdate(insertStatement.toString());
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public void updateCountUniqueTags() throws PersistenceException {
 		List<Long> tenantIds = tenantDAO.findAllIds();
@@ -1197,10 +1190,9 @@ public class HibernateDocumentDAO extends HibernatePersistentObjectDAO<Document>
 		}
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public List<TagCloud> getTagCloud(long tenantId, int maxTags) throws PersistenceException {
-		GenericDAO gendao = (GenericDAO) Context.get().getBean(GenericDAO.class);
+		GenericDAO gendao = Context.get(GenericDAO.class);
 
 		List<TagCloud> list = gendao.query(
 				"select ld_tag, ld_count from ld_uniquetag where ld_tenantid=" + tenantId + " order by ld_count desc",
@@ -1332,7 +1324,6 @@ public class HibernateDocumentDAO extends HibernatePersistentObjectDAO<Document>
 		return null;
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public List<String> findDuplicatedDigests(Long tenantId, Long folderId) throws PersistenceException {
 		// First of all, find all duplicates digests.
@@ -1402,15 +1393,15 @@ public class HibernateDocumentDAO extends HibernatePersistentObjectDAO<Document>
 
 	@Override
 	public Set<Permission> getAllowedPermissions(long docId, long userId) throws PersistenceException {
+		final Set<Permission> permissions = new HashSet<>();
 		User user = getExistingtUser(userId);
 		userDAO.initialize(user);
 
 		// If the user is an administrator bypass all controls
-		if (user.isMemberOf(Group.GROUP_ADMIN)) {
+		if (user.isAdmin()) {
 			return Permission.all();
 		}
 
-		Set<Permission> permissions = new HashSet<>();
 		StringBuilder query = new StringBuilder("""
 						select ld_read as LDREAD, ld_write as LDWRITE, ld_security as LDSECURITY, ld_immutable as LDIMMUTABLE, ld_delete as LDDELETE,
 						ld_rename as LDRENAME, ld_sign as LDSIGN, ld_archive as LDARCHIVE, ld_workflow as LDWORKFLOW, ld_download as LDDOWNLOAD,
@@ -1419,11 +1410,11 @@ public class HibernateDocumentDAO extends HibernatePersistentObjectDAO<Document>
 						ld_customid as LDCUSTOMID from ld_document_acl where ld_docid=
 						""");
 		query.append(Long.toString(docId));
-		query.append(" and ld_groupid in (");
-		query.append(user.getGroups().stream().map(ug -> Long.toString(ug.getId())).collect(Collectors.joining(",")));
+		query.append(" and ld_groupid in (select ld_groupid from ld_usergroup where ld_userid=");
+		query.append(Long.toString(userId));
 		query.append(")");
 
-		Map<String, Permission> permissionColumn = new HashMap<>();
+		final Map<String, Permission> permissionColumn = new HashMap<>();
 		permissionColumn.put("LDDELETE", Permission.DELETE);
 		permissionColumn.put("LDIMMUTABLE", Permission.IMMUTABLE);
 		permissionColumn.put("LDSECURITY", Permission.SECURITY);
@@ -1445,33 +1436,25 @@ public class HibernateDocumentDAO extends HibernatePersistentObjectDAO<Document>
 		permissionColumn.put("LDPREVIEW", Permission.PREVIEW);
 		permissionColumn.put("LDCUSTOMID", Permission.CUSTOMID);
 
-		/**
-		 * IMPORTANT: the connection MUST be explicitly closed, otherwise it is
-		 * probable that the connection pool will leave open it indefinitely.
-		 */
-		try (Connection con = getConnection();
-				Statement stmt = con.createStatement();
-				ResultSet rs = stmt.executeQuery(query.toString())) {
-			while (rs.next()) {
+		queryForResultSet(query.toString(), null, null, rows -> {
+			while (rows.next()) {
 				for (Entry<String, Permission> entry : permissionColumn.entrySet()) {
 					String column = entry.getKey();
 					Permission permission = entry.getValue();
-					if (rs.getInt(column) == 1)
+					if (rows.getInt(column) == 1)
 						permissions.add(permission);
 				}
 			}
-		} catch (SQLException se) {
-			throw new PersistenceException(se.getMessage(), se);
-		}
+		});
 
 		if (permissions.isEmpty()) {
 			// The document does not specify its own permissions so use the
 			// folder's ones
 			long folderId = queryForLong("select ld_folderid from ld_document where ld_id = " + docId);
-			permissions = folderDAO.getEnabledPermissions(folderId, userId);
+			return folderDAO.getAllowedPermissions(folderId, userId);
+		} else {
+			return permissions;
 		}
-
-		return permissions;
 	}
 
 	@Override

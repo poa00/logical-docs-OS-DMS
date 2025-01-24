@@ -31,7 +31,7 @@ public class UserTool {
 	 * @return the user object
 	 */
 	public User getUser(String username) {
-		UserDAO userDao = (UserDAO) Context.get().getBean(UserDAO.class);
+		UserDAO userDao = Context.get(UserDAO.class);
 		try {
 			return StringUtils.isNotEmpty(username) ? userDao.findByUsername(username)
 					: userDao.findByUsername("_system");
@@ -49,12 +49,26 @@ public class UserTool {
 	 * @return the user object
 	 */
 	public User getUser(long userId) {
-		UserDAO userDao = (UserDAO) Context.get().getBean(UserDAO.class);
+		UserDAO userDao = Context.get(UserDAO.class);
 		try {
 			return userDao.findById(userId);
 		} catch (PersistenceException e) {
 			log.error(e.getMessage(), e);
 			return null;
+		}
+	}
+
+	/**
+	 * Initializes lazy loaded collections
+	 * 
+	 * @param user the user to initialize
+	 */
+	public void initialize(User user) {
+		UserDAO uDao = Context.get(UserDAO.class);
+		try {
+			uDao.initialize(user);
+		} catch (PersistenceException e) {
+			log.error(e.getMessage(), e);
 		}
 	}
 

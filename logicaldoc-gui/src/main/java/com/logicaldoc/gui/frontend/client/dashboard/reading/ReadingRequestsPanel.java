@@ -5,26 +5,27 @@ import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIDocument;
 import com.logicaldoc.gui.common.client.beans.GUIReadingRequest;
 import com.logicaldoc.gui.common.client.controllers.ReadingRequestController;
 import com.logicaldoc.gui.common.client.controllers.ReadingRequestObserver;
 import com.logicaldoc.gui.common.client.data.ReadingRequestsDS;
+import com.logicaldoc.gui.common.client.grid.DateListGridField;
+import com.logicaldoc.gui.common.client.grid.DateListGridField.DateCellFormatter;
+import com.logicaldoc.gui.common.client.grid.FileNameListGridField;
+import com.logicaldoc.gui.common.client.grid.FileVersionListGridField;
+import com.logicaldoc.gui.common.client.grid.IdListGridField;
+import com.logicaldoc.gui.common.client.grid.RefreshableListGrid;
+import com.logicaldoc.gui.common.client.grid.TypeIconGridField;
+import com.logicaldoc.gui.common.client.grid.UserListGridField;
 import com.logicaldoc.gui.common.client.i18n.I18N;
 import com.logicaldoc.gui.common.client.log.GuiLog;
+import com.logicaldoc.gui.common.client.preview.PreviewPopup;
 import com.logicaldoc.gui.common.client.util.DocUtil;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.LD;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField.DateCellFormatter;
-import com.logicaldoc.gui.common.client.widgets.grid.FileNameListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.FileVersionListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.IconGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.RefreshableListGrid;
-import com.logicaldoc.gui.common.client.widgets.grid.UserListGridField;
-import com.logicaldoc.gui.common.client.widgets.preview.PreviewPopup;
 import com.logicaldoc.gui.frontend.client.document.DocumentsPanel;
 import com.logicaldoc.gui.frontend.client.services.DocumentService;
 import com.logicaldoc.gui.frontend.client.services.ReadingRequestService;
@@ -97,8 +98,7 @@ public class ReadingRequestsPanel extends VLayout implements ReadingRequestObser
 		toolStrip.addFill();
 		addMember(toolStrip);
 
-		ListGridField id = new ListGridField("id", I18N.getAttributeLabel("id"), 60);
-		id.setHidden(true);
+		ListGridField id = new IdListGridField();
 		ListGridField recipient = new UserListGridField("user", "userId", "recipient");
 		ListGridField requestor = new UserListGridField("requestor", "requestorId", "requestor");
 		ListGridField date = new DateListGridField("date", "date", DateCellFormatter.FORMAT_LONG);
@@ -106,7 +106,7 @@ public class ReadingRequestsPanel extends VLayout implements ReadingRequestObser
 		ListGridField message = new ListGridField("message", I18N.message("message"));
 		FileNameListGridField fileName = new FileNameListGridField();
 		ListGridField fileVersion = new FileVersionListGridField();
-		ListGridField icon = new IconGridField();
+		ListGridField icon = new TypeIconGridField();
 
 		readingsGrid = new RefreshableListGrid(new ReadingRequestsDS(true, null)) {
 			@Override
@@ -123,12 +123,7 @@ public class ReadingRequestsPanel extends VLayout implements ReadingRequestObser
 		readingsGrid.setSelectionType(SelectionStyle.SINGLE);
 		readingsGrid.setFields(id, date, icon, fileName, confirmed, fileVersion, recipient, requestor, message);
 		readingsGrid.addSelectionChangedHandler(event -> DocumentService.Instance.get()
-				.getById(event.getSelectedRecord().getAttributeAsLong(DOC_ID), new AsyncCallback<>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				.getById(event.getSelectedRecord().getAttributeAsLong(DOC_ID), new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(GUIDocument document) {
 						previewPanel.setDocument(document);
@@ -180,27 +175,20 @@ public class ReadingRequestsPanel extends VLayout implements ReadingRequestObser
 
 		MenuItem preview = new MenuItem();
 		preview.setTitle(I18N.message("preview"));
-		preview.addClickHandler(event -> DocumentService.Instance.get().getById(selectedDocId, new AsyncCallback<>() {
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
+		preview.addClickHandler(
+				event -> DocumentService.Instance.get().getById(selectedDocId, new DefaultAsyncCallback<>() {
 
-			@Override
-			public void onSuccess(GUIDocument document) {
-				new PreviewPopup(document).show();
-			}
-		}));
+					@Override
+					public void onSuccess(GUIDocument document) {
+						new PreviewPopup(document).show();
+					}
+				}));
 
 		MenuItem delete = new MenuItem();
 		delete.setTitle(I18N.message("ddelete"));
 		delete.addClickHandler(event -> LD.ask(I18N.message("question"), I18N.message("confirmdelete"), value -> {
 			if (Boolean.TRUE.equals(value)) {
-				ReadingRequestService.Instance.get().delete(selectedReadingId, new AsyncCallback<>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
+				ReadingRequestService.Instance.get().delete(selectedReadingId, new DefaultAsyncCallback<>() {
 
 					@Override
 					public void onSuccess(Void result) {
@@ -213,11 +201,7 @@ public class ReadingRequestsPanel extends VLayout implements ReadingRequestObser
 		MenuItem invite = new MenuItem();
 		invite.setTitle(I18N.message("inviteandremind"));
 		invite.addClickHandler(event -> ReadingRequestService.Instance.get().notityReadingRequest(selectedReadingId,
-				new AsyncCallback<>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
+				new DefaultAsyncCallback<>() {
 
 					@Override
 					public void onSuccess(Void arg) {
@@ -256,5 +240,15 @@ public class ReadingRequestsPanel extends VLayout implements ReadingRequestObser
 	@Override
 	public void onNewReadingRequests(List<GUIReadingRequest> requests) {
 		refresh();
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

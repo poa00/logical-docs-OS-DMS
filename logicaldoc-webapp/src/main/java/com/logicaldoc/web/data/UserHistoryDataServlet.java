@@ -30,19 +30,26 @@ import com.logicaldoc.util.Context;
  */
 public class UserHistoryDataServlet extends AbstractDataServlet {
 
+	private static final String TENANT_ID = "tenantId";
+
 	private static final long serialVersionUID = 1L;
 
 	@Override
 	protected void service(HttpServletRequest request, HttpServletResponse response, Session session, Integer max,
 			Locale locale) throws PersistenceException, IOException {
 
-		MenuDAO mDao = (MenuDAO) Context.get().getBean(MenuDAO.class);
+		MenuDAO mDao = Context.get(MenuDAO.class);
 		boolean showSid = mDao.isReadEnable(Menu.SESSIONS, session.getUserId());
 
-		long userId = Long.parseLong(request.getParameter("id"));
+		Long userId = StringUtils.isNotEmpty(request.getParameter("id")) ? Long.parseLong(request.getParameter("id"))
+				: null;
+		Long tenantId = StringUtils.isNotEmpty(request.getParameter(TENANT_ID))
+				? Long.parseLong(request.getParameter(TENANT_ID))
+				: null;
+		String comment = request.getParameter("comment");
 		String event = request.getParameter("event");
 
-		List<Object> records = executeQuery(max, userId, event);
+		List<?> records = executeQuery(max, tenantId, userId, event, comment);
 
 		PrintWriter writer = response.getWriter();
 		writer.write("<list>");
@@ -52,45 +59,62 @@ public class UserHistoryDataServlet extends AbstractDataServlet {
 		/*
 		 * Iterate over the collection of user histories
 		 */
-		for (Object gridRecord : records) {
-			Object[] cols = (Object[]) gridRecord;
+		for (Object gridRecord : records)
+			printHistory(writer, (Object[]) gridRecord, locale, showSid, df);
 
-			writer.print("<history>");
-			writer.print("<id>" + cols[0] + "</id>");
-			writer.print("<user><![CDATA[" + cols[1] + "]]></user>");
-			writer.print("<event><![CDATA[" + I18N.message((String) cols[2], locale) + "]]></event>");
-			writer.print("<date>" + df.format((Date) cols[3]) + "</date>");
-			if (cols[4] != null)
-				writer.print("<comment><![CDATA[" + cols[4] + "]]></comment>");
-			if (cols[5] != null)
-				writer.print("<reason><![CDATA[" + cols[5] + "]]></reason>");
-			if (cols[6] != null && showSid)
-				writer.print("<sid><![CDATA[" + cols[6] + "]]></sid>");
-			writer.print("<userId>" + cols[7] + "</userId>");
-			if (cols[8] != null)
-				writer.print("<ip><![CDATA[" + cols[8] + "]]></ip>");
-			if (cols[9] != null)
-				writer.print("<device><![CDATA[" + cols[9] + "]]></device>");
-			if (cols[10] != null)
-				writer.print("<geolocation><![CDATA[" + cols[10] + "]]></geolocation>");
-			writer.print("</history>");
-		}
 		writer.write("</list>");
 	}
 
-	private List<Object> executeQuery(Integer max, long userId, String event) throws PersistenceException {
+	private void printHistory(PrintWriter writer, Object[] columns, Locale locale, boolean showSid, DateFormat df) {
+		writer.print("<history>");
+		writer.print("<id>" + columns[0] + "</id>");
+		writer.print("<user><![CDATA[" + columns[1] + "]]></user>");
+		writer.print("<event><![CDATA[" + I18N.message((String) columns[2], locale) + "]]></event>");
+		writer.print("<date>" + df.format((Date) columns[3]) + "</date>");
+		if (columns[4] != null)
+			writer.print("<comment><![CDATA[" + columns[4] + "]]></comment>");
+		if (columns[5] != null)
+			writer.print("<reason><![CDATA[" + columns[5] + "]]></reason>");
+		if (columns[6] != null && showSid)
+			writer.print("<sid><![CDATA[" + columns[6] + "]]></sid>");
+		writer.print("<userId>" + columns[7] + "</userId>");
+		if (columns[8] != null)
+			writer.print("<ip><![CDATA[" + columns[8] + "]]></ip>");
+		if (columns[9] != null)
+			writer.print("<device><![CDATA[" + columns[9] + "]]></device>");
+		if (columns[10] != null)
+			writer.print("<geolocation><![CDATA[" + columns[10] + "]]></geolocation>");
+		if (columns[11] != null)
+			writer.print("<geolocation><![CDATA[" + columns[11] + "]]></geolocation>");
+		writer.print("</history>");
+	}
+
+	private List<?> executeQuery(Integer max, Long tenantId, Long userId, String event, String comment)
+			throws PersistenceException {
 		Map<String, Object> params = new HashMap<>();
-		params.put("userId", userId);
 
 		StringBuilder query = new StringBuilder(
-				"select A.id, A.username, A.event, A.date, A.comment, A.reason, A.sessionId, A.userId, A.ip, A.device, A.geolocation from UserHistory A where A.deleted = 0 and A.userId = :userId ");
+				"select A.id, A.username, A.event, A.date, A.comment, A.reason, A.sessionId, A.userId, A.ip, A.device, A.geolocation, A.keyLabel from UserHistory A where A.deleted = 0 ");
 		if (StringUtils.isNotEmpty(event)) {
 			query.append(" and A.event = :event ");
 			params.put("event", event);
 		}
+		if (tenantId != null) {
+			query.append(" and A.tenantId = :tenantId ");
+			params.put(TENANT_ID, tenantId);
+		}
+		if (userId != null) {
+			query.append(" and A.userId = :userId ");
+			params.put("userId", userId);
+		}
+		if (StringUtils.isNotEmpty(comment)) {
+			query.append(" and A.comment like :comment ");
+			params.put("comment", comment + "%");
+		}
+
 		query.append(" order by A.date desc ");
 
-		UserHistoryDAO dao = (UserHistoryDAO) Context.get().getBean(UserHistoryDAO.class);
-		return dao.findByQuery(query.toString(), params, max != null ? max : 100);
+		return Context.get(UserHistoryDAO.class).findByQuery(query.toString(), params,
+				max != null ? max : 100);
 	}
 }

@@ -1,17 +1,20 @@
 package com.logicaldoc.core;
 
+import java.sql.ResultSet;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
 import org.springframework.jdbc.core.RowMapper;
-import org.springframework.jdbc.support.rowset.SqlRowSet;
 
 /**
  * Interface for DAOs that operate on persistent objects
  * 
  * @author Marco Meschieri - LogicalDOC
  * @since 4.0
+ *
+ * @param <T> Class of the implementation of a {@link PersistentObject} this DAO
+ *        handles
  */
 public interface PersistentObjectDAO<T extends PersistentObject> {
 
@@ -148,7 +151,21 @@ public interface PersistentObjectDAO<T extends PersistentObject> {
 	 * 
 	 * @throws PersistenceException raised in case of errors in the database
 	 */
-	public List<Object> findByQuery(String query, Map<String, Object> parameters, Integer max)
+	public List<Object[]> findByQuery(String query, Map<String, Object> parameters, Integer max) throws PersistenceException;
+
+	/**
+	 * Find everything you want from the DB using the ORM query language
+	 * 
+	 * @param query The query to execute
+	 * @param parameters The map of the parameters
+	 * @param requiredType The type of the elements in the result
+	 * @param max Maximum results number (optional)
+	 * 
+	 * @return Query result
+	 * 
+	 * @throws PersistenceException raised in case of errors in the database
+	 */
+	public <R> List<R> findByQuery(String query, Map<String, Object> parameters, Class<R> requiredType, Integer max)
 			throws PersistenceException;
 
 	/**
@@ -186,8 +203,10 @@ public interface PersistentObjectDAO<T extends PersistentObject> {
 	 * Initialises lazy loaded data such as collections
 	 * 
 	 * @param entity The entity to be initialised
+	 * 
+	 * @throws PersistenceException raised in case of errors in the database
 	 */
-	public void initialize(T entity);
+	public void initialize(T entity) throws PersistenceException;
 
 	/**
 	 * Query given SQL to create a prepared statement from SQL and a list of
@@ -202,8 +221,7 @@ public interface PersistentObjectDAO<T extends PersistentObject> {
 	 * 
 	 * @throws PersistenceException raised in case of errors in the database
 	 */
-	@SuppressWarnings("rawtypes")
-	public List query(String sql, RowMapper rowMapper, Integer maxRows) throws PersistenceException;
+	public <P> List<P> query(String sql, RowMapper<P> rowMapper, Integer maxRows) throws PersistenceException;
 
 	/**
 	 * Query given SQL to create a prepared statement from SQL and a list of
@@ -221,39 +239,26 @@ public interface PersistentObjectDAO<T extends PersistentObject> {
 	 * 
 	 * @throws PersistenceException raised in case of errors in the database
 	 */
-	@SuppressWarnings("rawtypes")
-	public List query(String sql, Map<String, Object> parameters, RowMapper rowMapper, Integer maxRows)
+	public <P> List<P> query(String sql, Map<String, Object> parameters, RowMapper<P> rowMapper, Integer maxRows)
 			throws PersistenceException;
 
 	/**
 	 * Query given SQL to create a prepared statement from SQL and a list of
-	 * arguments to bind to the query, returns a navigable RowSet
+	 * arguments to bind to the query, you can give your own worker to iterate
+	 * the {@link ResultSet}.
 	 * 
 	 * @param sql SQL query to execute (for parameters please use JPA-style:
 	 *        :paramA, :paramB ...)
 	 * @param parameters Parameters used in the where expression (map
 	 *        name-value)
 	 * @param maxRows the new max rows limit; null means there is no limit
-	 * 
-	 * @return the result row set
+	 * @param worker an implementation that receive the {@link ResultSet} to
+	 *        iterate
 	 * 
 	 * @throws PersistenceException raised in case of errors in the database
 	 */
-	public SqlRowSet queryForRowSet(String sql, Map<String, Object> parameters, Integer maxRows)
+	public void queryForResultSet(String sql, Map<String, Object> parameters, Integer maxRows, ResultSetWalker worker)
 			throws PersistenceException;
-
-	/**
-	 * Query given SQL to create a prepared statement from SQL and a list of
-	 * arguments to bind to the query, returns a navigable RowSet
-	 * 
-	 * @param sql SQL query to execute
-	 * @param maxRows the new max rows limit; null means there is no limit
-	 * 
-	 * @return the result row set
-	 * 
-	 * @throws PersistenceException raised in case of errors in the database
-	 */
-	public SqlRowSet queryForRowSet(String sql, Integer maxRows) throws PersistenceException;
 
 	/**
 	 * Query given SQL to create a prepared statement from SQL and a list of
@@ -265,7 +270,7 @@ public interface PersistentObjectDAO<T extends PersistentObject> {
 	 *        :paramA, :paramB ...)
 	 * @param parameters Parameters used in the where expression (map
 	 *        name-value)
-	 * @param elementType the required type of element in the result list (for
+	 * @param requiredType the required type of element in the result list (for
 	 *        example, Integer.class)
 	 * @param maxRows maximum number of returned records
 	 * 
@@ -273,8 +278,7 @@ public interface PersistentObjectDAO<T extends PersistentObject> {
 	 * 
 	 * @throws PersistenceException raised in case of errors in the database
 	 */
-	@SuppressWarnings("rawtypes")
-	public List queryForList(String sql, Map<String, Object> parameters, Class elementType, Integer maxRows)
+	public <R> List<R> queryForList(String sql, Map<String, Object> parameters, Class<R> requiredType, Integer maxRows)
 			throws PersistenceException;
 
 	/**
@@ -286,7 +290,7 @@ public interface PersistentObjectDAO<T extends PersistentObject> {
 	 * element type.
 	 * 
 	 * @param sql SQL query to execute
-	 * @param elementType the required type of element in the result list (for
+	 * @param requiredType the required type of element in the result list (for
 	 *        example, Integer.class)
 	 * @param maxRows maximum number of returned records
 	 * 
@@ -294,8 +298,7 @@ public interface PersistentObjectDAO<T extends PersistentObject> {
 	 * 
 	 * @throws PersistenceException raised in case of errors in the database
 	 */
-	@SuppressWarnings("rawtypes")
-	public List queryForList(String sql, Class elementType, Integer maxRows) throws PersistenceException;
+	public <R> List<R> queryForList(String sql, Class<R> requiredType, Integer maxRows) throws PersistenceException;
 
 	/**
 	 * Query given SQL to create a prepared statement from SQL and a list of
@@ -304,15 +307,14 @@ public interface PersistentObjectDAO<T extends PersistentObject> {
 	 * them matching the specified element type.
 	 * 
 	 * @param sql SQL query to execute
-	 * @param elementType the required type of element in the result list (for
+	 * @param requiredType the required type of element in the result list (for
 	 *        example, Integer.class)
 	 * 
 	 * @return a List of objects that match the specified element type
 	 * 
 	 * @throws PersistenceException raised in case of errors in the database
 	 */
-	@SuppressWarnings("rawtypes")
-	public List queryForList(String sql, Class elementType) throws PersistenceException;
+	public <R> List<R> queryForList(String sql, Class<R> requiredType) throws PersistenceException;
 
 	/**
 	 * Execute a query that results in an int value, given static SQL. Uses a
@@ -329,6 +331,24 @@ public interface PersistentObjectDAO<T extends PersistentObject> {
 	 * @throws PersistenceException raised in case of errors in the database
 	 */
 	public int queryForInt(String sql) throws PersistenceException;
+
+	/**
+	 * Execute a query that results in an int value, given static SQL. Uses a
+	 * JDBC Statement, not a PreparedStatement. If you want to execute a static
+	 * query with a PreparedStatement, use the overloaded queryForInt method
+	 * with null as argument array. This method is useful for running static SQL
+	 * with a known outcome. The query is expected to be a single row/single
+	 * column query that results in an int value.
+	 * 
+	 * @param sql SQL query to execute
+	 * @param parameters Parameters used in the where expression (map
+	 *        name-value)
+	 * 
+	 * @return the int value, or 0 in case of SQL NULL
+	 * 
+	 * @throws PersistenceException raised in case of errors in the database
+	 */
+	public int queryForInt(String sql, Map<String, Object> parameters) throws PersistenceException;
 
 	/**
 	 * Execute a query that results in an long value, given static SQL. Uses a
@@ -364,7 +384,7 @@ public interface PersistentObjectDAO<T extends PersistentObject> {
 	 * @throws PersistenceException raised in case of errors in the database
 	 */
 	public long queryForLong(String sql, Map<String, Object> parameters) throws PersistenceException;
-	
+
 	/**
 	 * Execute a query that results in a double value, given static SQL. Uses a
 	 * JDBC Statement, not a PreparedStatement. If you want to execute a static
@@ -380,7 +400,7 @@ public interface PersistentObjectDAO<T extends PersistentObject> {
 	 * @throws PersistenceException raised in case of errors in the database
 	 */
 	public double queryForDouble(String sql) throws PersistenceException;
-	
+
 	/**
 	 * Execute a query that results in a double value, given static SQL. Uses a
 	 * JDBC Statement, not a PreparedStatement. If you want to execute a static
@@ -424,14 +444,31 @@ public interface PersistentObjectDAO<T extends PersistentObject> {
 	 * column query that results in a object value.
 	 * 
 	 * @param sql SQL query to execute
-	 * @param type The type of the returned value
+	 * @param requiredType The type of the returned value
 	 * 
 	 * @return the object value
 	 * 
 	 * @throws PersistenceException raised in case of errors in the database
 	 */
-	public Object queryForObject(String sql, @SuppressWarnings("rawtypes")
-	Class type) throws PersistenceException;
+	public <R> R queryForObject(String sql, Class<R> requiredType) throws PersistenceException;
+
+	/**
+	 * Execute a query that results in a Object value, given static SQL. Uses a
+	 * JDBC Statement, not a PreparedStatement. If you want to execute a static
+	 * query with a PreparedStatement. This method is useful for running static
+	 * SQL with a known outcome. The query is expected to be a single row/single
+	 * column query that results in a object value.
+	 * 
+	 * @param sql SQL query to execute
+	 * @param parameters Optional map of parameters
+	 * @param requiredType The type of the returned value
+	 * 
+	 * @return the object value
+	 * 
+	 * @throws PersistenceException raised in case of errors in the database
+	 */
+	public <R> R queryForObject(String sql, Map<String, Object> parameters, Class<R> requiredType)
+			throws PersistenceException;
 
 	/**
 	 * This method deletes an entity. Same as delete(id, 1)
@@ -472,7 +509,7 @@ public interface PersistentObjectDAO<T extends PersistentObject> {
 	public void deleteAll(Collection<T> entities, int code) throws PersistenceException;
 
 	/**
-	 * Executes a bulk update as specified by the given expression
+	 * Executes a bulk update as specified by the given HQL expression
 	 * 
 	 * @param expression The update expression.
 	 * @param parameters Optional map of parameters
@@ -486,20 +523,20 @@ public interface PersistentObjectDAO<T extends PersistentObject> {
 	/**
 	 * Executes the given SQL update statement
 	 * 
-	 * @param statement the SQL statement to execute against the database
+	 * @param sql the SQL statement to execute against the database
 	 * 
 	 * @return the value returned by the database after execution
 	 * 
 	 * @throws PersistenceException raised in case of errors in the database
 	 */
-	public int jdbcUpdate(String statement) throws PersistenceException;
+	public int jdbcUpdate(String sql) throws PersistenceException;
 
 	/**
 	 * Issue a single SQL update operation (such as an insert, update or delete
 	 * statement) via a prepared statement, binding the given arguments
 	 * 
-	 * @param statement SQL statement to execute (for parameters please use
-	 *        JPA-style: :paramA, :paramB ...)
+	 * @param sql SQL statement to execute (for parameters please use JPA-style:
+	 *        :paramA, :paramB ...)
 	 * @param parameters Parameters used in the where expression (map
 	 *        name-value)
 	 * 
@@ -507,7 +544,7 @@ public interface PersistentObjectDAO<T extends PersistentObject> {
 	 * 
 	 * @throws PersistenceException raised in case of errors in the database
 	 */
-	public int jdbcUpdate(String statement, Map<String, Object> parameters) throws PersistenceException;
+	public int jdbcUpdate(String sql, Map<String, Object> parameters) throws PersistenceException;
 
 	/**
 	 * Get the DBMS name currently connected(possible values are: <b>mysql</b>,
@@ -519,6 +556,8 @@ public interface PersistentObjectDAO<T extends PersistentObject> {
 	public String getDbms();
 
 	public boolean isOracle();
+
+	public boolean isMySQL();
 
 	/**
 	 * Retrieves the metadata from the database

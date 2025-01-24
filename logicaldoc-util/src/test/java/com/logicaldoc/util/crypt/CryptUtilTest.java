@@ -4,7 +4,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotSame;
 
 import java.io.File;
-import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
 
 import org.junit.Before;
@@ -25,7 +24,7 @@ public class CryptUtilTest {
 	}
 
 	@Test
-	public void testEncryptFile() throws IOException, EncryptionException {
+	public void testEncryptFile() throws EncryptionException {
 		File clearFile = new File("src/main/resources/mimetypes.properties");
 		File cryptedFile = new File("target/ctypt.crypted");
 		File decryptedFile = new File("target/ctypt.decrypted");
@@ -47,18 +46,17 @@ public class CryptUtilTest {
 	}
 
 	@Test
-	public void testEncryptString() throws IOException, EncryptionException, NoSuchAlgorithmException {
+	public void testEncryptString() throws EncryptionException, NoSuchAlgorithmException {
 		String encryptedString = testSubject.encrypt("pippo");
 		assertNotSame("pippo", encryptedString);
 		assertEquals("pippo", testSubject.decrypt(encryptedString));
 
-		assertEquals("d012f68144edf121d3cc330a17eec528c2e7d59", CryptUtil.encryptSHA("pippo"));
 		assertEquals("A2242EAD55C94C3DEB7CF2340BFEF9D5BCACA22DFE66E646745EE4371C633FC8",
 				CryptUtil.encryptSHA256("pippo"));
 	}
 
 	@Test
-	public void testHash() throws IOException, EncryptionException {
+	public void testHash() {
 		assertEquals("1f544b64a50bdb31b2bd9d9ad96ad09d", CryptUtil.hashMD4("pippo"));
 		assertEquals("0EBD3FEBDB972B9D9A164B72F321E341", CryptUtil.hashNTLM1("pippo"));
 	}

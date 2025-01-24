@@ -2,7 +2,7 @@ package com.logicaldoc.gui.frontend.client.document;
 
 import java.util.List;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIArchive;
 import com.logicaldoc.gui.common.client.i18n.I18N;
 import com.logicaldoc.gui.common.client.log.GuiLog;
@@ -43,7 +43,7 @@ public class SendToArchiveDialog extends Window {
 		setShowModalMask(true);
 		centerInPage();
 
-		SelectItem archive = ItemFactory.newArchiveSelector(GUIArchive.MODE_EXPORT, GUIArchive.STATUS_OPENED);
+		SelectItem archive = ItemFactory.newArchiveSelector(GUIArchive.MODE_EXPORT, GUIArchive.STATUS_OPEN);
 		archive.setTitle(I18N.message("selectopenarchive"));
 		archive.setWrapTitle(false);
 		archive.setRequired(true);
@@ -64,13 +64,7 @@ public class SendToArchiveDialog extends Window {
 
 		if (document)
 			ImpexService.Instance.get().addDocuments(Long.parseLong(form.getValueAsString("archive")), ids,
-					new AsyncCallback<>() {
-
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
-						}
-
+					new DefaultAsyncCallback<>() {
 						@Override
 						public void onSuccess(Void result) {
 							GuiLog.info(I18N.message("documentsaddedtoarchive"), null);
@@ -80,14 +74,7 @@ public class SendToArchiveDialog extends Window {
 		else {
 			LD.contactingServer();
 			ImpexService.Instance.get().addFolder(Long.parseLong(form.getValueAsString("archive")), ids.get(0),
-					new AsyncCallback<>() {
-
-						@Override
-						public void onFailure(Throwable caught) {
-							LD.clearPrompt();
-							GuiLog.serverError(caught);
-						}
-
+					new DefaultAsyncCallback<>() {
 						@Override
 						public void onSuccess(Void result) {
 							LD.clearPrompt();
@@ -96,5 +83,15 @@ public class SendToArchiveDialog extends Window {
 						}
 					});
 		}
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+	
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

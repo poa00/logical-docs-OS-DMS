@@ -3,13 +3,13 @@ package com.logicaldoc.gui.frontend.client.account;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.data.DevicesDS;
+import com.logicaldoc.gui.common.client.grid.DateListGridField;
+import com.logicaldoc.gui.common.client.grid.IdListGridField;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.services.SecurityService;
 import com.logicaldoc.gui.common.client.util.LD;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField;
 import com.smartgwt.client.types.Alignment;
 import com.smartgwt.client.types.HeaderControls;
 import com.smartgwt.client.types.SelectionStyle;
@@ -50,26 +50,19 @@ public class TrustedDevices extends com.smartgwt.client.widgets.Window {
 	}
 
 	private void prepareGrid() {
-		ListGridField id = new ListGridField("id", I18N.message("device"), 80);
-		id.setHidden(true);
-		id.setCanEdit(false);
+		ListGridField id = new IdListGridField();
 
 		ListGridField label = new ListGridField("label", I18N.message("label"), 150);
 		label.setCanEdit(true);
-		label.addCellSavedHandler(
-				event -> SecurityService.Instance.get().updateDeviceLabel(event.getRecord().getAttributeAsLong("id"),
-						event.getNewValue() != null ? event.getNewValue().toString() : null, new AsyncCallback<>() {
+		label.addCellSavedHandler(event -> SecurityService.Instance.get().updateDeviceLabel(
+				event.getRecord().getAttributeAsLong("id"),
+				event.getNewValue() != null ? event.getNewValue().toString() : null, new DefaultAsyncCallback<>() {
 
-							@Override
-							public void onFailure(Throwable caught) {
-								GuiLog.serverError(caught);
-							}
-
-							@Override
-							public void onSuccess(Void arg) {
-								// Nothing to do
-							}
-						}));
+					@Override
+					public void onSuccess(Void arg) {
+						// Nothing to do
+					}
+				}));
 
 		ListGridField deviceId = new ListGridField("deviceId", I18N.message("deviceid"), 150);
 		deviceId.setHidden(true);
@@ -127,12 +120,7 @@ public class TrustedDevices extends com.smartgwt.client.widgets.Window {
 		delete.setTitle(I18N.message("ddelete"));
 		delete.addClickHandler(event -> LD.ask(I18N.message("question"), I18N.message("confirmdelete"), answer -> {
 			if (Boolean.TRUE.equals(answer)) {
-				SecurityService.Instance.get().deleteTrustedDevices(ids, new AsyncCallback<>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				SecurityService.Instance.get().deleteTrustedDevices(ids, new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Void result) {
 						list.removeSelectedData();
@@ -144,5 +132,15 @@ public class TrustedDevices extends com.smartgwt.client.widgets.Window {
 
 		contextMenu.setItems(delete);
 		contextMenu.showContextMenu();
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

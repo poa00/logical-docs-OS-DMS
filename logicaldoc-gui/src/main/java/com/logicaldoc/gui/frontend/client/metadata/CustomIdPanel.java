@@ -3,12 +3,13 @@ package com.logicaldoc.gui.frontend.client.metadata;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Feature;
 import com.logicaldoc.gui.common.client.beans.GUIScheme;
-import com.logicaldoc.gui.common.client.beans.GUISequence;
+import com.logicaldoc.gui.common.client.data.SequencesDS;
+import com.logicaldoc.gui.common.client.grid.IdListGridField;
+import com.logicaldoc.gui.common.client.grid.RefreshableListGrid;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.frontend.client.administration.AdminPanel;
 import com.logicaldoc.gui.frontend.client.services.SchemeService;
@@ -33,11 +34,9 @@ import com.smartgwt.client.widgets.toolbar.ToolStripButton;
  */
 public class CustomIdPanel extends AdminPanel {
 
+	private static final String CUSTOMID = "customid-";
+
 	private static final String VALUE = "value";
-
-	private static final String FOLDER = "folder";
-
-	private static final String FREQUENCY = "frequency";
 
 	private static final String TEMPLATE_ID = "templateId";
 
@@ -49,7 +48,7 @@ public class CustomIdPanel extends AdminPanel {
 
 	private static final String TEMPLATE = "template";
 
-	private ListGrid sequences;
+	private RefreshableListGrid sequences;
 
 	private List<GUIScheme> schemesData;
 
@@ -148,18 +147,12 @@ public class CustomIdPanel extends AdminPanel {
 			GUIScheme cid = new GUIScheme();
 			ListGridRecord rec = customIds.getRecord(event.getRowNum());
 			cid.setTemplateId(Long.parseLong(rec.getAttribute(TEMPLATE_ID)));
-			cid.setEvaluateAtCheckin(rec.getAttributeAsBoolean(EVALUATE_AT_CHECKIN));
-			cid.setEvaluateAtUpdate(rec.getAttributeAsBoolean(EVALUATE_AT_UPDATE));
+			cid.setEvaluateAtCheckin(Boolean.TRUE.equals(rec.getAttributeAsBoolean(EVALUATE_AT_CHECKIN)));
+			cid.setEvaluateAtUpdate(Boolean.TRUE.equals(rec.getAttributeAsBoolean(EVALUATE_AT_UPDATE)));
 			cid.setScheme(rec.getAttributeAsString(SCHEME));
 			cid.setType(rec.getAttributeAsString("type"));
 
-			SchemeService.Instance.get().save(cid, new AsyncCallback<>() {
-
-				@Override
-				public void onFailure(Throwable caught) {
-					GuiLog.serverError(caught);
-				}
-
+			SchemeService.Instance.get().save(cid, new DefaultAsyncCallback<>() {
 				@Override
 				public void onSuccess(Void ret) {
 					// Nothing to do
@@ -183,54 +176,44 @@ public class CustomIdPanel extends AdminPanel {
 
 		ToolStripButton refresh = new ToolStripButton(I18N.message("refresh"));
 		refresh.setAutoFit(true);
-		refresh.addClickHandler(event -> refreshSequences());
+		refresh.addClickHandler(event -> sequences.refresh(new SequencesDS(CUSTOMID)));
 		toolStrip.addButton(refresh);
 
-		ListGridField id = new ListGridField("id", I18N.message("id"));
-		id.setWidth(60);
-		id.setCanEdit(false);
-		id.setHidden(true);
+		ListGridField id = new IdListGridField();
 
 		ListGridField name = new ListGridField("name", I18N.message("name"));
-		name.setWidth(150);
+		name.setWidth(200);
 		name.setCanEdit(false);
-		name.setHidden(true);
-
-		ListGridField frequency = new ListGridField(FREQUENCY, I18N.message(FREQUENCY));
-		frequency.setWidth(80);
-		frequency.setCanEdit(false);
-
-		ListGridField template = new ListGridField(TEMPLATE, I18N.message(TEMPLATE));
-		template.setWidth(200);
-		template.setCanEdit(false);
-
-		ListGridField folder = new ListGridField(FOLDER, I18N.message(FOLDER));
-		folder.setWidth(200);
-		folder.setCanEdit(false);
+		name.setRequired(true);
+		name.setCanFilter(true);
+		name.setCellFormatter((value, rec, rowNum, colNum) -> {
+			if (value.toString().startsWith(CUSTOMID))
+				return value.toString().substring(CUSTOMID.length());
+			else
+				return value.toString();
+		});
 
 		final ListGridField value = new ListGridField(VALUE, I18N.message(VALUE));
 		value.setWidth(80);
 		value.setType(ListGridFieldType.INTEGER);
 		value.setRequired(true);
+		value.setCanFilter(true);
 
-		sequences = new ListGrid();
+		sequences = new RefreshableListGrid(new SequencesDS(CUSTOMID));
 		sequences.setShowAllRecords(true);
 		sequences.setCanEdit(true);
 		sequences.setWidth100();
 		sequences.setHeight100();
 		sequences.setSelectionType(SelectionStyle.SINGLE);
 		sequences.setModalEditing(true);
-		sequences.setFields(id, name, frequency, template, folder, value);
+		sequences.setFilterOnKeypress(true);
+		sequences.setShowFilterEditor(true);
+		sequences.setFields(id, name, value);
 
 		sequences.addEditCompleteHandler(event -> {
 			ListGridRecord rec = sequences.getRecord(event.getRowNum());
-			SchemeService.Instance.get().resetSequence(Long.parseLong(rec.getAttribute("id")),
-					rec.getAttributeAsInt(VALUE), new AsyncCallback<>() {
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
-						}
-
+			SchemeService.Instance.get().resetSequence(rec.getAttributeAsLong("id"), rec.getAttributeAsInt(VALUE),
+					new DefaultAsyncCallback<>() {
 						@Override
 						public void onSuccess(Void ret) {
 							// Nothing to do
@@ -238,44 +221,16 @@ public class CustomIdPanel extends AdminPanel {
 					});
 		});
 
-		sequences.addCellContextClickHandler(event -> {
+		sequences.addCellContextClickHandler(ckick -> {
 			showSequencesContextMenu();
-			event.cancel();
+			ckick.cancel();
 		});
 
 		VLayout sequencesPanel = new VLayout();
 		sequencesPanel.setMembers(toolStrip, sequences);
 
-		refreshSequences();
+		sequences.refresh(new SequencesDS(CUSTOMID));
 		return sequencesPanel;
-	}
-
-	private void refreshSequences() {
-		SchemeService.Instance.get().loadSequences(new AsyncCallback<>() {
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
-			@Override
-			public void onSuccess(List<GUISequence> data) {
-				List<ListGridRecord> records = new ArrayList<>();
-				if (data != null)
-					for (GUISequence cid : data) {
-						ListGridRecord rec = new ListGridRecord();
-						rec.setAttribute(TEMPLATE, cid.getTemplate());
-						rec.setAttribute(FREQUENCY, I18N.message(cid.getFrequency()));
-						rec.setAttribute("year", cid.getYear());
-						rec.setAttribute("month", cid.getMonth());
-						rec.setAttribute(FOLDER, cid.getFolder());
-						rec.setAttribute("id", cid.getId());
-						rec.setAttribute("name", cid.getName());
-						rec.setAttribute(VALUE, cid.getValue());
-						records.add(rec);
-					}
-				sequences.setData(records.toArray(new ListGridRecord[0]));
-			}
-		});
 	}
 
 	private void showSchemeContextMenu(final ListGrid schemes) {
@@ -288,13 +243,7 @@ public class CustomIdPanel extends AdminPanel {
 					if (Boolean.TRUE.equals(confirm)) {
 						final ListGridRecord rec = schemes.getSelectedRecord();
 						SchemeService.Instance.get().delete(Long.parseLong(rec.getAttributeAsString(TEMPLATE_ID)),
-								rec.getAttributeAsString("type"), new AsyncCallback<>() {
-
-									@Override
-									public void onFailure(Throwable caught) {
-										GuiLog.serverError(caught);
-									}
-
+								rec.getAttributeAsString("type"), new DefaultAsyncCallback<>() {
 									@Override
 									public void onSuccess(Void ret) {
 										schemes.getSelectedRecord().setAttribute(SCHEME, (String) null);
@@ -321,12 +270,7 @@ public class CustomIdPanel extends AdminPanel {
 		delete.addClickHandler(
 				event -> LD.ask(I18N.message("question"), I18N.message("confirmdelete"), (Boolean confirm) -> {
 					if (Boolean.TRUE.equals(confirm)) {
-						SchemeService.Instance.get().deleteSequence(id, new AsyncCallback<>() {
-							@Override
-							public void onFailure(Throwable caught) {
-								GuiLog.serverError(caught);
-							}
-
+						SchemeService.Instance.get().deleteSequence(id, new DefaultAsyncCallback<>() {
 							@Override
 							public void onSuccess(Void result) {
 								sequences.removeSelectedData();
@@ -338,5 +282,15 @@ public class CustomIdPanel extends AdminPanel {
 
 		contextMenu.setItems(delete);
 		contextMenu.showContextMenu();
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

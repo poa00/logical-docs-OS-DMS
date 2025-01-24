@@ -9,7 +9,6 @@ import static org.junit.Assert.fail;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
@@ -41,7 +40,6 @@ import org.apache.chemistry.opencmis.commons.impl.dataobjects.PropertyStringImpl
 import org.apache.chemistry.opencmis.commons.impl.server.ObjectInfoImpl;
 import org.apache.chemistry.opencmis.commons.server.ObjectInfo;
 import org.apache.chemistry.opencmis.commons.spi.Holder;
-import org.java.plugin.PluginLifecycleException;
 import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -61,10 +59,11 @@ import com.logicaldoc.core.folder.FolderEvent;
 import com.logicaldoc.core.folder.FolderHistory;
 import com.logicaldoc.core.folder.FolderHistoryDAO;
 import com.logicaldoc.core.searchengine.SearchEngine;
+import com.logicaldoc.core.security.Client;
 import com.logicaldoc.core.security.Session;
 import com.logicaldoc.core.security.SessionManager;
 import com.logicaldoc.core.security.Tenant;
-import com.logicaldoc.core.store.Storer;
+import com.logicaldoc.core.store.Store;
 import com.logicaldoc.util.Context;
 import com.logicaldoc.util.io.FileUtil;
 import com.logicaldoc.util.plugin.PluginException;
@@ -85,22 +84,22 @@ public class LDRepositoryTest extends AbstractCmisTestCase {
 
 	@Before
 	@Override
-	public void setUp() throws FileNotFoundException, IOException, SQLException, PluginException {
+	public void setUp() throws IOException, SQLException, PluginException {
 		super.setUp();
 
 		engine = (SearchEngine) context.getBean("SearchEngine");
 
+		fdao = (FolderDAO) context.getBean("FolderDAO");
+
+		ddao = (DocumentDAO) context.getBean("DocumentDAO");
+		
 		try {
 			addHits();
 		} catch (Exception e) {
 			throw new IOException(e.getMessage(), e);
 		}
 
-		fdao = (FolderDAO) context.getBean("FolderDAO");
-
-		ddao = (DocumentDAO) context.getBean("DocumentDAO");
-
-		session = SessionManager.get().newSession("admin", "admin", null);
+		session = SessionManager.get().newSession("admin", "admin", (Client) null);
 
 		Folder folder = fdao.findDefaultWorkspace(Tenant.DEFAULT_ID);
 		assertNotNull(folder);
@@ -125,6 +124,7 @@ public class LDRepositoryTest extends AbstractCmisTestCase {
 		fold.setId(5);
 		fold.setName("root");
 		document.setFolder(fold);
+		ddao.initialize(document);
 		engine.addHit(document, "Questo � un documento di prova. Per fortuna che esistono i test. document");
 
 		// Adding unexisting document 111
@@ -135,6 +135,7 @@ public class LDRepositoryTest extends AbstractCmisTestCase {
 		document.setLanguage("en");
 		document.setDate(new Date());
 		document.setFolder(fold);
+		ddao.initialize(document);
 		engine.addHit(document,
 				"This is another test documents just for test insertion.Solr is an enterprise-ready, Lucene-based search server that supports faceted ... This is useful for retrieving and highlighting the documents contents for display but is not .... hl, When hl=true , highlight snippets in the query response.");
 
@@ -144,6 +145,7 @@ public class LDRepositoryTest extends AbstractCmisTestCase {
 		document.setLanguage("en");
 		document.setDate(new Date());
 		document.setFolder(fold);
+		ddao.initialize(document);
 		engine.addHit(document, "Another document");
 
 		document = new Document();
@@ -152,6 +154,7 @@ public class LDRepositoryTest extends AbstractCmisTestCase {
 		document.setLanguage("en");
 		document.setDate(new Date());
 		document.setFolder(fold);
+		ddao.initialize(document);
 		engine.addHit(document,
 				"Lorem ipsum dolor sit amet, consectetur 5568299afbX0 ZKBKCHZZ80A CH8900761016116097873 adipisicing elit");
 
@@ -167,12 +170,13 @@ public class LDRepositoryTest extends AbstractCmisTestCase {
 		document.addTag("Google");
 		document.addTag("document");
 		document.addTag("numbered");
+		ddao.initialize(document);
 		engine.addHit(document,
 				"12, 81390264001300, FLEXSPACE NO 1 LLP, T/A FLEXSPACE, UNIT 13 EVANS BUSINESS CENTRE, VINCENT CAREY ROAD, ROTHERWAS INDUSTRIAL ESTATE, HEREFORD, HR2");
 	}
 
 	@Test
-	public void testQuery() throws PluginLifecycleException, PersistenceException {
+	public void testQuery() {
 		// Search by filename
 		String query = "SELECT cmis:objectId,cmis:name,ldoc:tags FROM cmis:document WHERE cmis:name = 'test.doc'";
 
@@ -253,7 +257,7 @@ public class LDRepositoryTest extends AbstractCmisTestCase {
 	}
 
 	@Test
-	public void testGetObjectInfo() throws PersistenceException {
+	public void testGetObjectInfo() {
 		ObjectInfo oi = testSubject.getObjectInfo("doc.5", null);
 		assertNotNull(oi);
 		assertEquals("doc.5", oi.getId());
@@ -266,7 +270,7 @@ public class LDRepositoryTest extends AbstractCmisTestCase {
 	}
 
 	@Test
-	public void testUpdateProperties() throws PersistenceException {
+	public void testUpdateProperties() {
 		ObjectInfo oi = testSubject.getObjectInfo("doc.5", null);
 		assertNotNull(oi);
 		assertEquals("doc.5", oi.getId());
@@ -343,9 +347,9 @@ public class LDRepositoryTest extends AbstractCmisTestCase {
 		Folder folder = fdao.findDefaultWorkspace(Tenant.DEFAULT_ID);
 		log.info(folder.getName());
 
-		Session session = SessionManager.get().newSession("admin", "admin", null);
+		Session sess = SessionManager.get().newSession("admin", "admin", (Client) null);
 
-		LDRepository ldrep = new LDRepository(folder, session.getSid());
+		LDRepository ldrep = new LDRepository(folder, sess.getSid());
 		String id = ldrep.createDocument(null, props, "fld.4", contentStream);
 		assertNotNull(id);
 
@@ -494,7 +498,7 @@ public class LDRepositoryTest extends AbstractCmisTestCase {
 	}
 
 	@Test
-	public void testGetObjectByPath() throws IOException, PersistenceException {
+	public void testGetObjectByPath() throws PersistenceException {
 		Document doc = ddao.findById(5L);
 		Folder folder = doc.getFolder();
 		String path = fdao.computePathExtended(folder) + "/" + doc.getFileName();
@@ -638,12 +642,12 @@ public class LDRepositoryTest extends AbstractCmisTestCase {
 		props.addProperty(p);
 
 		Folder folder = fdao.findDefaultWorkspace(Tenant.DEFAULT_ID);
-		Session session = SessionManager.get().newSession("admin", "admin", null);
+		Session sess = SessionManager.get().newSession("admin", "admin", (Client) null);
 
 		List<Folder> list = fdao.findAll();
 		assertEquals(7, list.size());
 
-		LDRepository ldrep = new LDRepository(folder, session.getSid());
+		LDRepository ldrep = new LDRepository(folder, sess.getSid());
 		String id = ldrep.createFolder(null, props, "fld.4");
 		assertNotNull(id);
 
@@ -652,7 +656,7 @@ public class LDRepositoryTest extends AbstractCmisTestCase {
 		assertEquals("pippo.txt", list.get(4).getName());
 
 		ldrep = new LDRepository(folder, null);
-		id = ldrep.createFolder(new MockCallContext(null, session.getSid()), props, "fld.4");
+		id = ldrep.createFolder(new MockCallContext(null, sess.getSid()), props, "fld.4");
 		assertNotNull(id);
 
 	}
@@ -677,12 +681,12 @@ public class LDRepositoryTest extends AbstractCmisTestCase {
 		assertEquals(5, folder6.getParentId());
 
 		stringHolder = new Holder<String>("fld.6");
-		testSubject.moveObject(null, stringHolder, "fld.4", null);
-
-		folder6 = fdao.findById(6L);
-		fdao.initialize(folder6);
-		assertEquals(4, folder6.getParentId());
-
+		try {
+			testSubject.moveObject(null, stringHolder, "fld.4", null);
+			fail("cannot move a workspace");
+		} catch (Exception e) {
+			// All ok
+		}
 	}
 
 	@Test
@@ -709,8 +713,8 @@ public class LDRepositoryTest extends AbstractCmisTestCase {
 			FileUtil.delete(content);
 		}
 
-		Storer storer = (Storer) context.getBean("Storer");
-		String mergedContent = new String(storer.getBytes(5L, "1.0"));
+		Store store = (Store) context.getBean("Store");
+		String mergedContent = new String(store.getBytes(5L, "1.0"));
 		assertTrue(mergedContent.contains("content1"));
 		assertTrue(mergedContent.contains("content2"));
 
@@ -747,13 +751,13 @@ public class LDRepositoryTest extends AbstractCmisTestCase {
 		status = ddao.findById(1L).getStatus();
 		assertEquals(1, status);
 
-		Document doc = ddao.findById(1L);
+		ddao.findById(1L);
 		testSubject.deleteObjectOrCancelCheckOut(null, "doc.1");
 
 		status = ddao.findById(1L).getStatus();
 		assertEquals(0, status);
 
-		doc = ddao.findById(1L);
+		Document doc = ddao.findById(1L);
 		assertEquals(0, doc.getDeleted());
 
 		testSubject.deleteObjectOrCancelCheckOut(null, "doc.1");
@@ -769,7 +773,7 @@ public class LDRepositoryTest extends AbstractCmisTestCase {
 	}
 
 	@Test
-	public void testCreate() throws FileNotFoundException, IOException {
+	public void testCreate() throws IOException {
 		// test document
 		PropertiesImpl props = new PropertiesImpl();
 

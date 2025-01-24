@@ -27,6 +27,9 @@ import com.logicaldoc.core.metadata.Attribute;
 import com.logicaldoc.core.security.TenantDAO;
 import com.logicaldoc.core.security.user.User;
 import com.logicaldoc.core.security.user.UserDAO;
+import com.logicaldoc.core.security.user.UserEvent;
+import com.logicaldoc.core.security.user.UserHistory;
+import com.logicaldoc.core.security.user.UserHistoryDAO;
 import com.logicaldoc.util.Context;
 import com.logicaldoc.util.config.ContextProperties;
 import com.logicaldoc.util.plugin.PluginRegistry;
@@ -140,7 +143,7 @@ public abstract class Search {
 		internalSearch();
 
 		ContextProperties config = Context.get().getProperties();
-		TenantDAO tdao = (TenantDAO) Context.get().getBean(TenantDAO.class);
+		TenantDAO tdao = Context.get(TenantDAO.class);
 		String extattrs;
 		try {
 			extattrs = config.getProperty(tdao.getTenantName(searchUser.getTenantId()) + ".search.extattr");
@@ -161,7 +164,7 @@ public abstract class Search {
 			// Search for extended attributes, key is docId-name
 			final Map<String, Attribute> extAtt = new HashMap<>();
 
-			DocumentDAO ddao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+			DocumentDAO ddao = Context.get(DocumentDAO.class);
 			StringBuilder query = new StringBuilder();
 
 			if (hits.get(0).getType().startsWith("folder")) {
@@ -211,11 +214,23 @@ public abstract class Search {
 		log.info("Search completed in {} ms and found {} hits (estimated {})", execTime, hits.size(),
 				estimatedHitsNumber);
 
+		UserHistoryDAO historyDao = Context.get(UserHistoryDAO.class);
+		UserHistory transaction = options.getTransaction();
+		if (transaction == null)
+			transaction = new UserHistory();
+		transaction.setUser(searchUser);
+		transaction.setComment(StringUtils.left(options.toString(), 500));
+		transaction.setEvent(UserEvent.SEARCH.toString());
+		try {
+			historyDao.store(transaction);
+		} catch (PersistenceException e) {
+			log.info("Error trying to save search history", e);
+		}
 		return hits;
 	}
 
 	protected Collection<Long> getAccessibleFolderIds() throws SearchException {
-		FolderDAO fdao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+		FolderDAO fdao = Context.get(FolderDAO.class);
 
 		/*
 		 * We have to see what folders the user can access. But we need to
@@ -250,13 +265,12 @@ public abstract class Search {
 	 * 
 	 * @throws SearchException error in the data layer
 	 */
-	@SuppressWarnings("unchecked")
 	protected Set<Long> getDeniedDocIds(List<Hit> hits, Collection<Long> accessibleFolderIds) throws SearchException {
 		HashSet<Long> denied = new HashSet<>();
 		if (searchUser.isAdmin() || hits.isEmpty())
 			return denied;
 
-		DocumentDAO dao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO dao = Context.get(DocumentDAO.class);
 
 		// Detect those hits outside the accessible folders
 		for (Hit hit : hits)
@@ -300,16 +314,16 @@ public abstract class Search {
 	}
 
 	private void initSearchUser() throws SearchException {
-		UserDAO uDao = (UserDAO) Context.get().getBean(UserDAO.class);
+		UserDAO uDao = Context.get(UserDAO.class);
 		try {
 			searchUser = uDao.findById(options.getUserId());
+			uDao.initialize(searchUser);
 		} catch (PersistenceException e1) {
 			throw new SearchException(e1);
 		}
-		if (searchUser != null) {
-			uDao.initialize(searchUser);
+
+		if (searchUser != null && log.isInfoEnabled())
 			log.info("Search User: {}", searchUser.getUsername());
-		}
 	}
 
 	/**

@@ -3,9 +3,7 @@ package com.logicaldoc.webdav;
 import static org.junit.Assert.assertNotNull;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.rmi.ServerException;
 import java.sql.SQLException;
 import java.util.List;
 
@@ -26,7 +24,7 @@ import com.logicaldoc.util.Context;
 import com.logicaldoc.util.io.FileUtil;
 import com.logicaldoc.util.junit.AbstractTestCase;
 import com.logicaldoc.util.plugin.PluginException;
-import com.logicaldoc.web.util.MockServletSession;
+import com.logicaldoc.util.servlet.MockServletSession;
 import com.logicaldoc.webdav.session.DavSessionImpl;
 import com.logicaldoc.webdav.session.WebdavSession;
 
@@ -51,22 +49,16 @@ public abstract class AbstractWebdavTestCase extends AbstractTestCase {
 	protected MockServletSession servletSession = new MockServletSession();
 
 	@Override
-	public void setUp() throws FileNotFoundException, IOException, SQLException, PluginException {
+	public void setUp() throws IOException, SQLException, PluginException {
 		super.setUp();
 
 		prepareRepository();
-		
-		try {
-			prepareSession("admin", "admin");
-		} catch (ServerException e) {
-			throw new IOException(e);
-		}
-
+		prepareSession("admin", "admin");
 		assertNotNull(session);
 	}
 
-	protected void prepareSession(String username, String password) throws ServerException, PersistenceException {
-		UserDAO userDao = (UserDAO) Context.get().getBean(UserDAO.class);
+	protected void prepareSession(String username, String password) throws PersistenceException {
+		UserDAO userDao = Context.get(UserDAO.class);
 
 		Client client = new Client("xyz", "192.168.2.231", "ghost");
 		Device device = new Device();
@@ -93,7 +85,7 @@ public abstract class AbstractWebdavTestCase extends AbstractTestCase {
 	private void prepareRepository() throws IOException {
 		repositoryDir.mkdirs();
 		repositoryDir.mkdir();
-		
+
 		File file3 = new File(repositoryDir.getPath() + "/docs/1/doc/1.0");
 		file3.getParentFile().mkdirs();
 		FileUtil.copyResource("/pdf1.pdf", file3);

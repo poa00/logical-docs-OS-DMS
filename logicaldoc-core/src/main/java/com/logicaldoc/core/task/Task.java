@@ -82,10 +82,10 @@ public abstract class Task implements Runnable {
 	@Resource(name = "UserDAO")
 	protected UserDAO userDao = null;
 
-	@Resource(name = "LockManager")
+	@Resource(name = "lockManager")
 	protected LockManager lockManager;
 
-	@Resource(name = "SystemLoadMonitor")
+	@Resource(name = "systemLoadMonitor")
 	protected SystemLoadMonitor systemLoadMonitor;
 
 	protected boolean sendActivityReport = false;
@@ -319,7 +319,7 @@ public abstract class Task implements Runnable {
 
 	/**
 	 * Concrete implementations must insert here the code needed to save the
-	 * elaboration state in a persistent storage
+	 * elaboration state in a persistent store
 	 */
 	public void saveWork() {
 		// By default do nothing
@@ -391,7 +391,7 @@ public abstract class Task implements Runnable {
 			dictionary.put("error", (lastRunError != null ? lastRunError.getMessage() : null));
 			dictionary.put("report", prepareReport(recipient.getLocale()).replace("\\n", "<br />"));
 
-			// Send the email
+			// Send the email..eeee
 			try {
 				sender.send(email, "task.report", dictionary);
 				log.info("Report sent to: {}", recipient.getEmail());
@@ -409,7 +409,7 @@ public abstract class Task implements Runnable {
 	 * @return the report's body
 	 */
 	protected String prepareReport(Locale locale) {
-		return null;
+		return "";
 	}
 
 	/**
@@ -431,7 +431,7 @@ public abstract class Task implements Runnable {
 
 	/**
 	 * Concrete implementations must override this method declaring if the task
-	 * supports multiple instances running concurrently.
+	 * supports multiple instances running concurrently. tHIbernat
 	 * 
 	 * @return true if the task is concurrent
 	 */
@@ -477,7 +477,7 @@ public abstract class Task implements Runnable {
 
 	@PostConstruct
 	protected void init() {
-		sendActivityReport = "true".equals(config.getProperty("task.sendreport." + name));
+		sendActivityReport = config.getBoolean("task.sendreport." + name);
 		reportRecipients = config.getProperty("task.recipients." + name);
 	}
 }

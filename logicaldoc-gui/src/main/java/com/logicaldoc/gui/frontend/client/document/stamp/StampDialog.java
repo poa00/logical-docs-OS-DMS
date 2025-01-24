@@ -3,7 +3,7 @@ package com.logicaldoc.gui.frontend.client.document.stamp;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIDocument;
 import com.logicaldoc.gui.common.client.beans.GUIStamp;
 import com.logicaldoc.gui.common.client.controllers.DocumentController;
@@ -78,12 +78,12 @@ public class StampDialog extends StickyWindow {
 		long stampId = selection.getAttributeAsLong("id");
 
 		LD.contactingServer();
-		StampService.Instance.get().getStamp(stampId, new AsyncCallback<>() {
+		StampService.Instance.get().getStamp(stampId, new DefaultAsyncCallback<>() {
 
 			@Override
 			public void onFailure(Throwable caught) {
 				LD.clearPrompt();
-				GuiLog.serverError(caught);
+				super.onFailure(caught);
 			}
 
 			@Override
@@ -111,12 +111,12 @@ public class StampDialog extends StickyWindow {
 			LD.contactingServer();
 
 			StampService.Instance.get().applyStamp(documents.stream().map(d -> d.getId()).collect(Collectors.toList()),
-					stamp, new AsyncCallback<>() {
+					stamp, new DefaultAsyncCallback<>() {
 
 						@Override
 						public void onFailure(Throwable caught) {
 							LD.clearPrompt();
-							GuiLog.serverError(caught);
+							super.onFailure(caught);
 						}
 
 						@Override
@@ -124,13 +124,7 @@ public class StampDialog extends StickyWindow {
 							LD.clearPrompt();
 							GuiLog.info(I18N.message("event.stamped"), null);
 							for (GUIDocument doc : documents) {
-								DocumentService.Instance.get().getById(doc.getId(), new AsyncCallback<>() {
-
-									@Override
-									public void onFailure(Throwable caught) {
-										GuiLog.serverError(caught);
-									}
-
+								DocumentService.Instance.get().getById(doc.getId(), new DefaultAsyncCallback<>() {
 									@Override
 									public void onSuccess(GUIDocument document) {
 										DocumentController.get().modified(document);
@@ -141,5 +135,15 @@ public class StampDialog extends StickyWindow {
 						}
 					});
 		}
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

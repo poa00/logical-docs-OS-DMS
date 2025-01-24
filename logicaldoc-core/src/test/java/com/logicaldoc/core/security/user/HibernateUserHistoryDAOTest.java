@@ -1,6 +1,5 @@
 package com.logicaldoc.core.security.user;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.Collection;
@@ -28,7 +27,7 @@ public class HibernateUserHistoryDAOTest extends AbstractCoreTestCase {
 	private UserHistoryDAO dao;
 
 	@Before
-	public void setUp() throws FileNotFoundException, IOException, SQLException, PluginException {
+	public void setUp() throws IOException, SQLException, PluginException {
 		super.setUp();
 
 		// Retrieve the instance under test from spring context. Make sure that
@@ -88,7 +87,7 @@ public class HibernateUserHistoryDAOTest extends AbstractCoreTestCase {
 		Assert.assertNotNull(newUserHistory);
 
 		// Test the stored history
-		Collection<UserHistory> histories = (Collection<UserHistory>) dao.findByUserId(3);
+		Collection<UserHistory> histories = (Collection<UserHistory>) dao.findByUserId(3L);
 		Assert.assertNotNull(histories);
 		Assert.assertFalse(histories.isEmpty());
 
@@ -99,7 +98,7 @@ public class HibernateUserHistoryDAOTest extends AbstractCoreTestCase {
 				break;
 			}
 		}
-
+		
 		Assert.assertEquals(hStored, newUserHistory);
 		Assert.assertEquals(hStored.getDate().getTime(), DateBean.dateFromCompactString("20061220").getTime());
 		Assert.assertEquals(hStored.getUsername(), "sebastian");

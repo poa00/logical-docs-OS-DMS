@@ -4,8 +4,8 @@ import java.util.Arrays;
 import java.util.List;
 
 import com.google.gwt.user.client.Timer;
-import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.logicaldoc.gui.common.client.CookiesManager;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIDocument;
 import com.logicaldoc.gui.common.client.beans.GUIFolder;
@@ -14,7 +14,6 @@ import com.logicaldoc.gui.common.client.controllers.DocumentObserver;
 import com.logicaldoc.gui.common.client.controllers.FolderController;
 import com.logicaldoc.gui.common.client.controllers.FolderObserver;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.GridUtil;
 import com.logicaldoc.gui.frontend.client.document.grid.DocumentsGrid;
 import com.logicaldoc.gui.frontend.client.document.grid.DocumentsListGrid;
@@ -128,8 +127,8 @@ public class DocumentsPanel extends HLayout implements FolderObserver, DocumentO
 		setMembers(documentsMenu, body);
 
 		previewPanel.addVisibilityChangedHandler(event -> {
-			if (detailPanel instanceof DocumentDetailsPanel)
-				previewPanel.setDocument(((DocumentDetailsPanel) detailPanel).getDocument());
+			if (detailPanel instanceof DocumentDetailsPanel docDetails)
+				previewPanel.setDocument(docDetails.getDocument());
 		});
 
 		initialized = true;
@@ -142,19 +141,19 @@ public class DocumentsPanel extends HLayout implements FolderObserver, DocumentO
 		MainPanel.get().selectDocumentsTab();
 		FolderNavigator.get().openFolder(folderId, docId);
 		documentsMenu.expandSection(0);
-		if (detailPanel instanceof DocumentDetailsPanel)
-			((DocumentDetailsPanel) detailPanel).selectDefaultTab();
+		if (detailPanel instanceof DocumentDetailsPanel docDetails)
+			docDetails.selectDefaultTab();
 	}
 
 	public void openInFolder(long docId) {
-		DocumentService.Instance.get().getById(docId, new AsyncCallback<>() {
+		DocumentService.Instance.get().getById(docId, new DefaultAsyncCallback<>() {
 			@Override
 			public void onFailure(Throwable caught) {
 				/*
 				 * Sometimes we can have spurious errors using Firefox.
 				 */
 				if (Session.get().isDevel())
-					GuiLog.serverError(caught);
+					super.onFailure(caught);
 			}
 
 			@Override
@@ -177,14 +176,14 @@ public class DocumentsPanel extends HLayout implements FolderObserver, DocumentO
 	 *        list
 	 */
 	public void selectDocument(long docId, final boolean clearSelection) {
-		DocumentService.Instance.get().getById(docId, new AsyncCallback<>() {
+		DocumentService.Instance.get().getById(docId, new DefaultAsyncCallback<>() {
 			@Override
 			public void onFailure(Throwable caught) {
 				/*
 				 * Sometimes we can have spurious errors using Firefox.
 				 */
 				if (Session.get().isDevel())
-					GuiLog.serverError(caught);
+					super.onFailure(caught);
 			}
 
 			@Override
@@ -197,8 +196,8 @@ public class DocumentsPanel extends HLayout implements FolderObserver, DocumentO
 				}
 
 				DocumentToolbar.get().update(result, null);
-				if (detailPanel instanceof DocumentDetailsPanel) {
-					((DocumentDetailsPanel) detailPanel).setDocument(result);
+				if (detailPanel instanceof DocumentDetailsPanel docDetailsPanel) {
+					docDetailsPanel.setDocument(result);
 					details.redraw();
 				}
 
@@ -224,9 +223,9 @@ public class DocumentsPanel extends HLayout implements FolderObserver, DocumentO
 	}
 
 	public void changePageSize() {
-		if (listingPanel instanceof DocumentsListPanel
-				&& ((DocumentsListPanel) listingPanel).getVisualizationMode() == visualizationMode) {
-			((DocumentsListPanel) listingPanel).updateData(folder);
+		if (listingPanel instanceof DocumentsListPanel docListPanel
+				&& docListPanel.getVisualizationMode() == visualizationMode) {
+			docListPanel.updateData(folder);
 		} else {
 			if (listingPanel != null) {
 				listing.removeMember(listingPanel);
@@ -255,9 +254,9 @@ public class DocumentsPanel extends HLayout implements FolderObserver, DocumentO
 	}
 
 	private void updateListingPanel(GUIFolder folder) {
-		if (listingPanel instanceof DocumentsListPanel
-				&& ((DocumentsListPanel) listingPanel).getVisualizationMode() == visualizationMode) {
-			((DocumentsListPanel) listingPanel).updateData(folder);
+		if (listingPanel instanceof DocumentsListPanel docListPanel
+				&& docListPanel.getVisualizationMode() == visualizationMode) {
+			docListPanel.updateData(folder);
 		} else {
 			if (listingPanel != null) {
 				listing.removeMember(listingPanel);
@@ -284,26 +283,26 @@ public class DocumentsPanel extends HLayout implements FolderObserver, DocumentO
 	}
 
 	public void toggleFilters() {
-		if (listingPanel instanceof DocumentsListPanel) {
-			((DocumentsListPanel) listingPanel).toggleFilters();
+		if (listingPanel instanceof DocumentsListPanel docListPanel) {
+			docListPanel.toggleFilters();
 		}
 	}
 
 	public void printPreview() {
-		if (listingPanel instanceof DocumentsListPanel) {
-			GridUtil.print((DocumentsListGrid) ((DocumentsListPanel) listingPanel).getGrid());
+		if (listingPanel instanceof DocumentsListPanel docListPanel) {
+			GridUtil.print((DocumentsListGrid) docListPanel.getGrid());
 		}
 	}
 
 	public void export() {
-		if (listingPanel instanceof DocumentsListPanel
-				&& ((DocumentsListPanel) listingPanel).getGrid() instanceof DocumentsListGrid)
-			GridUtil.exportCSV((DocumentsListGrid) ((DocumentsListPanel) listingPanel).getGrid(), false);
+		if (listingPanel instanceof DocumentsListPanel docListPanel
+				&& (docListPanel.getGrid() instanceof DocumentsListGrid docListGrid))
+			GridUtil.exportCSV(docListGrid, false);
 	}
 
 	public GUIDocument getSelectedDocument() {
-		if (listingPanel instanceof DocumentsListPanel)
-			return ((DocumentsListPanel) listingPanel).getGrid().getSelectedDocument();
+		if (listingPanel instanceof DocumentsListPanel docListPanel)
+			return docListPanel.getGrid().getSelectedDocument();
 		else
 			return null;
 	}
@@ -381,8 +380,8 @@ public class DocumentsPanel extends HLayout implements FolderObserver, DocumentO
 		}
 
 		DocumentToolbar.get().update(document, null);
-		if (detailPanel instanceof DocumentDetailsPanel) {
-			((DocumentDetailsPanel) detailPanel).setDocument(document);
+		if (detailPanel instanceof DocumentDetailsPanel docDetails) {
+			docDetails.setDocument(document);
 			details.redraw();
 		}
 
@@ -465,8 +464,8 @@ public class DocumentsPanel extends HLayout implements FolderObserver, DocumentO
 	public void onFolderSelected(GUIFolder folder) {
 		this.folder = folder;
 		// Reset the cursor to the first page
-		if (listingPanel instanceof DocumentsListPanel)
-			((DocumentsListPanel) listingPanel).getGrid().getGridCursor().setCurrentPage(1);
+		if (listingPanel instanceof DocumentsListPanel docsPanel)
+			docsPanel.getGrid().getGridCursor().setCurrentPage(1);
 		refresh();
 	}
 
@@ -478,11 +477,8 @@ public class DocumentsPanel extends HLayout implements FolderObserver, DocumentO
 
 	@Override
 	public void onFolderCancelEditing(GUIFolder folder) {
-		if (detailPanel instanceof FolderDetailsPanel) {
-			FolderDetailsPanel fPanel = (FolderDetailsPanel) detailPanel;
-			if (fPanel.getFolder().getId() == folder.getId())
-				enableAll();
-		}
+		if (detailPanel instanceof FolderDetailsPanel fPanel && fPanel.getFolder().getId() == folder.getId())
+			enableAll();
 	}
 
 	@Override
@@ -504,13 +500,22 @@ public class DocumentsPanel extends HLayout implements FolderObserver, DocumentO
 	}
 
 	public String getDocsGridViewState() {
-		if (listingPanel instanceof DocumentsListPanel) {
-			DocumentsListPanel docsListingPanel = (DocumentsListPanel) listingPanel;
-			if (docsListingPanel.getGrid() instanceof NavigatorDocumentsGrid)
-				return ((NavigatorDocumentsGrid) docsListingPanel.getGrid()).getGridLayout();
+		if (listingPanel instanceof DocumentsListPanel docsListingPanel) {
+			if (docsListingPanel.getGrid() instanceof NavigatorDocumentsGrid navigator)
+				return navigator.getGridLayout();
 			else
 				return null;
 		} else
 			return null;
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

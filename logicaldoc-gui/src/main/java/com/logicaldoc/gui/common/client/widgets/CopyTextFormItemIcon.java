@@ -21,9 +21,7 @@ public class CopyTextFormItemIcon extends FormItemIcon {
 	public CopyTextFormItemIcon(String text, String tooltip) {
 		setName("copy");
 		setPrompt(I18N.message(tooltip));
-		setSrc("[SKIN]/page_white_paste.png");
-		setWidth(16);
-		setHeight(16);
+		setSrc("[SKIN]/paste.svg");
 		addFormItemClickHandler(event -> {
 			if (text != null)
 				Util.copyText(text);

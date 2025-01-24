@@ -1,12 +1,5 @@
 package com.logicaldoc.core.searchengine.saved;
 
-import java.beans.XMLDecoder;
-import java.beans.XMLEncoder;
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
 import java.io.Serializable;
 import java.util.Date;
 
@@ -15,7 +8,7 @@ import com.logicaldoc.core.PersistentObject;
 import com.logicaldoc.core.searchengine.SearchOptions;
 import com.logicaldoc.core.security.TenantDAO;
 import com.logicaldoc.util.Context;
-import com.logicaldoc.util.io.FileUtil;
+import com.logicaldoc.util.io.IOUtil;
 
 /**
  * A search saved in the database
@@ -52,51 +45,28 @@ public class SavedSearch extends PersistentObject implements Serializable, Compa
 		this.options = source.options;
 	}
 
-	public void saveOptions(SearchOptions opt) throws IOException, PersistenceException {
+	public void saveOptions(SearchOptions opt) throws PersistenceException {
 		this.setType(opt.getType());
 
-		TenantDAO tenantDao = (TenantDAO) Context.get().getBean(TenantDAO.class);
+		TenantDAO tenantDao = Context.get(TenantDAO.class);
 		String tenantName = tenantDao.getTenantName(getTenantId());
 		String charset = Context.get().getProperties().getProperty(tenantName + ".charset", "UTF-8");
 
-		File tmpFile = FileUtil.createTempFile("ser", ".txt");
-		try (OutputStream out = new FileOutputStream(tmpFile);
-				XMLEncoder encoder = new XMLEncoder(out, charset, false, 0)) {
-			encoder.writeObject(opt);
-		} catch (IOException ioe) {
-			FileUtil.delete(tmpFile);
-			throw ioe;
-		}
-
-		try {
-			setOptions(FileUtil.readFile(tmpFile).trim());
-		} finally {
-			FileUtil.delete(tmpFile);
-		}
+		setOptions(IOUtil.serialize(opt, charset));
 	}
 
 	public SearchOptions readOptions() {
-		try (XMLDecoder decoder = new XMLDecoder(new ByteArrayInputStream(getOptions().getBytes()))) {
-			SearchOptions searchOptions = (SearchOptions) decoder.readObject();
-			searchOptions.setName(getName());
-			searchOptions.setDescription(getDescription());
-			return searchOptions;
-		}
+		SearchOptions searchOptions = (SearchOptions) IOUtil.deserialize(getOptions());
+		searchOptions.setName(getName());
+		searchOptions.setDescription(getDescription());
+		return searchOptions;
 	}
 
 	@Override
 	public int compareTo(SavedSearch other) {
 		return this.getOptions().compareTo(other.getOptions());
 	}
-
-	@Override
-	public boolean equals(Object obj) {
-		if (!(obj instanceof SavedSearch))
-			return false;
-		SavedSearch other = (SavedSearch) obj;
-		return getOptions().equals(other.getOptions());
-	}
-
+	
 	public long getUserId() {
 		return userId;
 	}
@@ -143,5 +113,31 @@ public class SavedSearch extends PersistentObject implements Serializable, Compa
 
 	public void setType(int type) {
 		this.type = type;
+	}
+	
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = super.hashCode();
+		result = prime * result + ((name == null) ? 0 : name.hashCode());
+		result = prime * result + (int) (userId ^ (userId >>> 32));
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (!super.equals(obj))
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		SavedSearch other = (SavedSearch) obj;
+		if (name == null) {
+			if (other.name != null)
+				return false;
+		} else if (!name.equals(other.name))
+			return false;
+		return userId == other.userId;
 	}
 }

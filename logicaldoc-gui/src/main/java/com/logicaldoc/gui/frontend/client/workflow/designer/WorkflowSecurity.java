@@ -3,16 +3,15 @@ package com.logicaldoc.gui.frontend.client.workflow.designer;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIAccessControlEntry;
 import com.logicaldoc.gui.common.client.beans.GUIWorkflow;
 import com.logicaldoc.gui.common.client.data.WorkflowAclDS;
+import com.logicaldoc.gui.common.client.grid.UserListGridField;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.GridUtil;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.LD;
-import com.logicaldoc.gui.common.client.widgets.grid.UserListGridField;
 import com.logicaldoc.gui.frontend.client.services.WorkflowService;
 import com.smartgwt.client.types.HeaderControls;
 import com.smartgwt.client.types.ListGridFieldType;
@@ -241,8 +240,8 @@ public class WorkflowSecurity extends Window {
 				GUIAccessControlEntry right = new GUIAccessControlEntry();
 				right.setName(rec.getAttributeAsString(ENTITY));
 				right.setEntityId(Long.parseLong(rec.getAttribute(ENTITY_ID)));
-				right.setWrite("true".equals(rec.getAttributeAsString(WRITE)));
-				right.setRead("true".equals(rec.getAttributeAsString("read")));
+				right.setWrite(Boolean.TRUE.equals(rec.getAttributeAsBoolean(WRITE)));
+				right.setRead(Boolean.TRUE.equals(rec.getAttributeAsBoolean("read")));
 				acl.add(right);
 			}
 
@@ -285,16 +284,21 @@ public class WorkflowSecurity extends Window {
 
 	public void onSave() {
 		workflow.setAccessControlList(getACL());
-		WorkflowService.Instance.get().saveACL(workflow, new AsyncCallback<Void>() {
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
+		WorkflowService.Instance.get().saveACL(workflow, new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(Void arg0) {
 				destroy();
 			}
 		});
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

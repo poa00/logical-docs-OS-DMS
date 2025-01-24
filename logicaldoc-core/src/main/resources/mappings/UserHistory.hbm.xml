@@ -16,6 +16,8 @@
 		<property name="creation" type="timestamp" column="ld_creation" not-null="true" />
 		<property name="deleted" type="int" column="ld_deleted" not-null="true" />
 		<property name="tenantId" type="long" column="ld_tenantid" not-null="true" />
+		<property name="docId" type="long" column="ld_docid"/>
+		<property name="folderId" type="long" column="ld_folderid" />
 		<property name="userId" type="long" column="ld_userid" />
 		<property name="date" type="timestamp" column="ld_date" />
 		<property name="username" type="string" column="ld_username" length="255" />
@@ -25,6 +27,7 @@
 		<property name="reason" type="string" column="ld_reason" length="4000" />
 		<property name="notified" type="int" column="ld_notified" not-null="true" />
 		<property name="sessionId" type="string" column="ld_sessionid" length="255" />
+		<property name="keyLabel" type="string" column="ld_keylabel" length="255" />
 		<property name="isNew" type="int" column="ld_new" />
 		<property name="filename" type="string" column="ld_filename" length="255" />
 		<property name="fileSize" type="long" column="ld_filesize"/>
@@ -32,5 +35,6 @@
 		<property name="author" type="string" column="ld_author" length="255" />
 		<property name="geolocation" type="string" column="ld_geolocation" length="255" />
         <property name="device" type="string" column="ld_device" length="255" />
+        <property name="path" type="string" column="ld_path" length="4000" />
 	</class>
 </hibernate-mapping>

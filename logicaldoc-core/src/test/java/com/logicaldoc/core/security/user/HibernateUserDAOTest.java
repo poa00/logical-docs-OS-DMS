@@ -1,6 +1,5 @@
 package com.logicaldoc.core.security.user;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
 import java.sql.SQLException;
@@ -36,7 +35,7 @@ public class HibernateUserDAOTest extends AbstractCoreTestCase {
 	private GroupDAO groupDao;
 
 	@Before
-	public void setUp() throws FileNotFoundException, IOException, SQLException, PluginException {
+	public void setUp() throws IOException, SQLException, PluginException {
 		super.setUp();
 
 		// Retrieve the instance under test from spring context. Make sure that
@@ -283,7 +282,7 @@ public class HibernateUserDAOTest extends AbstractCoreTestCase {
 
 		user = dao.findById(1L);
 
-		PasswordHistoryDAO pDao = (PasswordHistoryDAO) Context.get().getBean(PasswordHistoryDAO.class);
+		PasswordHistoryDAO pDao = (PasswordHistoryDAO) Context.get(PasswordHistoryDAO.class);
 		Assert.assertEquals(6, pDao.findByUserId(user.getId(), null).size());
 	}
 

@@ -3,16 +3,14 @@ package com.logicaldoc.gui.frontend.client.dropbox;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.controllers.FolderController;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.frontend.client.document.DocumentsPanel;
 import com.logicaldoc.gui.frontend.client.folder.FolderNavigator;
 import com.logicaldoc.gui.frontend.client.panels.MainPanel;
 import com.logicaldoc.gui.frontend.client.search.SearchPanel;
-import com.logicaldoc.gui.frontend.client.services.DropboxService;
 import com.smartgwt.client.data.Record;
 import com.smartgwt.client.types.HeaderControls;
 import com.smartgwt.client.util.SC;
@@ -95,13 +93,7 @@ public class DropboxDialog extends Dialog {
 
 						LD.contactingServer();
 						DropboxService.Instance.get().exportDocuments(targetPath, folderIds, docIds,
-								new AsyncCallback<>() {
-									@Override
-									public void onFailure(Throwable caught) {
-										LD.clearPrompt();
-										GuiLog.serverError(caught);
-									}
-
+								new DefaultAsyncCallback<>() {
 									@Override
 									public void onSuccess(Boolean result) {
 										LD.clearPrompt();
@@ -130,13 +122,7 @@ public class DropboxDialog extends Dialog {
 				DropboxDialog.this.destroy();
 				LD.contactingServer();
 				DropboxService.Instance.get().importDocuments(FolderController.get().getCurrentFolder().getId(), paths,
-						new AsyncCallback<>() {
-							@Override
-							public void onFailure(Throwable caught) {
-								LD.clearPrompt();
-								GuiLog.serverError(caught);
-							}
-
+						new DefaultAsyncCallback<>() {
 							@Override
 							public void onSuccess(Integer count) {
 								LD.clearPrompt();
@@ -146,5 +132,15 @@ public class DropboxDialog extends Dialog {
 						});
 			}
 		});
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

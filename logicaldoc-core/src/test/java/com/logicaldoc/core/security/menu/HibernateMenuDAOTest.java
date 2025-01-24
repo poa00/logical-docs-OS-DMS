@@ -3,7 +3,6 @@ package com.logicaldoc.core.security.menu;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.Collection;
@@ -33,7 +32,8 @@ public class HibernateMenuDAOTest extends AbstractCoreTestCase {
 	// Instance under test
 	private MenuDAO dao;
 
-	@Before	public void setUp() throws FileNotFoundException, IOException, SQLException, PluginException {
+	@Before
+	public void setUp() throws IOException, SQLException, PluginException {
 		super.setUp();
 
 		// Retrieve the instance under test from spring context. Make sure that
@@ -74,7 +74,6 @@ public class HibernateMenuDAOTest extends AbstractCoreTestCase {
 		menu.setName("pippo2");
 		dao.store(menu);
 		Assert.assertNotNull(menu);
-		menu = dao.findById(102);
 
 		menu = dao.findById(102);
 		dao.store(menu);
@@ -164,14 +163,14 @@ public class HibernateMenuDAOTest extends AbstractCoreTestCase {
 
 		menus = dao.findByUserId(4);
 		Assert.assertNotNull(menus);
-		Assert.assertEquals(25, menus.size());
+		Assert.assertEquals(27, menus.size());
 	}
 
 	@Test
 	public void testFindByParentId() {
 		List<Menu> menus = dao.findByParentId(2, false);
 		Assert.assertNotNull(menus);
-		Assert.assertEquals(35, menus.size());
+		Assert.assertEquals(36, menus.size());
 
 		// Try with unexisting parent
 		menus = dao.findByParentId(999, false);
@@ -201,7 +200,7 @@ public class HibernateMenuDAOTest extends AbstractCoreTestCase {
 	public void testFindMenuIdByUserId() {
 		Collection<Long> ids = dao.findMenuIdByUserId(4, true);
 		Assert.assertNotNull(ids);
-		Assert.assertEquals(25, ids.size());
+		Assert.assertEquals(27, ids.size());
 		Assert.assertTrue(ids.contains(-104L));
 		Assert.assertTrue(ids.contains(1200L));
 

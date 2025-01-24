@@ -217,7 +217,7 @@ public class LoginPanel extends VLayout {
 		formItems.add(password);
 		formItems.add(spacerItem12);
 
-		if ("true".equals(info.getConfig("gui.login.lang"))) {
+		if (Boolean.parseBoolean(info.getConfig("gui.login.lang"))) {
 			formItems.add(language);
 			formItems.add(spacerItem12);
 		}
@@ -312,7 +312,7 @@ public class LoginPanel extends VLayout {
 			username.setValue(credentials[0]);
 			password.setValue(credentials[1]);
 		}
-		
+
 		CookiesManager.removeSid();
 	}
 
@@ -401,7 +401,7 @@ public class LoginPanel extends VLayout {
 	}
 
 	protected void initGUI() {
-		boolean saveLoginEnabled = "true".equals(info.getConfig("gui.savelogin"));
+		boolean saveLoginEnabled = Boolean.parseBoolean(info.getConfig("gui.savelogin"));
 		initGUI(saveLoginEnabled);
 	}
 
@@ -496,11 +496,11 @@ public class LoginPanel extends VLayout {
 			return;
 		}
 
-		if (Feature.enabled(Feature.TWO_FACTORS_AUTHENTICATION) && "true".equals(info.getConfig("2fa.enabled"))
+		if (Feature.enabled(Feature.TWO_FACTORS_AUTHENTICATION) && Boolean.parseBoolean(info.getConfig("2fa.enabled"))
 				&& credentialsPanel.isVisible()) {
 			String login = username.getValueAsString();
 			LoginService.Instance.get().isSecretKeyRequired(login, CookiesManager.getSavedDevice(),
-					new AsyncCallback<Boolean>() {
+					new AsyncCallback<>() {
 
 						@Override
 						public void onFailure(Throwable caught) {
@@ -659,12 +659,12 @@ public class LoginPanel extends VLayout {
 
 	protected void onAuthenticationSuccess(GUISession session) {
 		SC.clearPrompt();
-		boolean saveLoginEnabled = "true".equals(info.getConfig("gui.savelogin"));
+		boolean saveLoginEnabled = Boolean.parseBoolean(info.getConfig("gui.savelogin"));
 		CookiesManager.saveLogin(saveLoginEnabled, rememberMe.getValueAsBoolean(), username.getValueAsString(),
 				password.getValueAsString());
 
-		if (!"true".contentEquals(session.getInfo().getConfig("2fa.enabled"))
-				|| !"true".contentEquals(session.getInfo().getConfig("2fa.allowtrusted"))) {
+		if (!Boolean.parseBoolean(session.getInfo().getConfig("2fa.enabled"))
+				|| !Boolean.parseBoolean(session.getInfo().getConfig("2fa.allowtrusted"))) {
 			Util.redirectToSuccessUrl(language.getValueAsString());
 		} else {
 			SecurityService.Instance.get().isTrustedDevice(CookiesManager.getSavedDevice(),
@@ -748,5 +748,15 @@ public class LoginPanel extends VLayout {
 	public void onPasswordChanged() {
 		if (!credentialsPanel.isVisible())
 			toggleInputForm();
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

@@ -17,6 +17,8 @@ import com.logicaldoc.util.Context;
 import com.logicaldoc.util.sql.SqlUtil;
 
 /**
+ * Hibernate implementation of {@link GroupDAO}
+ * 
  * @author Alessandro Gasparini - LogicalDOC
  * @since 3.0
  */
@@ -123,9 +125,9 @@ public class HibernateGroupDAO extends HibernatePersistentObjectDAO<Group> imple
 		log.debug("Replicate all ACLs from group {}", parentGroupId);
 		jdbcUpdate(sql);
 
-		sql = "insert into ld_folder_acl(ld_folderid, ld_groupid, ld_read, ld_preview, ld_write, ld_add, ld_security, ld_immutable, ld_delete, ld_rename, ld_import, ld_export, ld_sign, ld_archive, ld_workflow, ld_download, ld_calendar, ld_subscription, ld_print, ld_password, ld_move, ld_email, ld_automation, ld_storage, ld_readingreq, ld_customid) "
+		sql = "insert into ld_folder_acl(ld_folderid, ld_groupid, ld_read, ld_preview, ld_write, ld_add, ld_security, ld_immutable, ld_delete, ld_rename, ld_import, ld_export, ld_sign, ld_archive, ld_workflow, ld_download, ld_calendar, ld_subscription, ld_print, ld_password, ld_move, ld_email, ld_automation, ld_store, ld_readingreq, ld_customid) "
 				+ "select B.ld_folderid," + groupId
-				+ ", B.ld_read, B.ld_preview, B.ld_write, B.ld_add, B.ld_security, B.ld_immutable, B.ld_delete, B.ld_rename, B.ld_import, B.ld_export, B.ld_sign, B.ld_archive, B.ld_workflow, B.ld_download, B.ld_calendar, B.ld_subscription, B.ld_print, B.ld_password, B.ld_move, B.ld_email, B.ld_automation, B.ld_storage, B.ld_readingreq, B.ld_customid from ld_folder_acl B "
+				+ ", B.ld_read, B.ld_preview, B.ld_write, B.ld_add, B.ld_security, B.ld_immutable, B.ld_delete, B.ld_rename, B.ld_import, B.ld_export, B.ld_sign, B.ld_archive, B.ld_workflow, B.ld_download, B.ld_calendar, B.ld_subscription, B.ld_print, B.ld_password, B.ld_move, B.ld_email, B.ld_automation, B.ld_store, B.ld_readingreq, B.ld_customid from ld_folder_acl B "
 				+ "where B.ld_groupid= " + parentGroupId;
 		jdbcUpdate(sql);
 
@@ -161,7 +163,7 @@ public class HibernateGroupDAO extends HibernatePersistentObjectDAO<Group> imple
 		if (group.getDeleted() == 0)
 			refresh(group);
 
-		UserDAO uDao = (UserDAO) Context.get().getBean(UserDAO.class);
+		UserDAO uDao = Context.get(UserDAO.class);
 		try {
 			group.setUsers(uDao.findByGroup(group.getId()));
 		} catch (PersistenceException e) {
@@ -187,7 +189,7 @@ public class HibernateGroupDAO extends HibernatePersistentObjectDAO<Group> imple
 			return;
 		boolean guest = group.isGuest();
 		if (!guest && group.isUserGroup()) {
-			UserDAO userDao = (UserDAO) Context.get().getBean(UserDAO.class);
+			UserDAO userDao = Context.get(UserDAO.class);
 			User user = userDao
 					.findById(Long.parseLong(group.getName().substring(group.getName().lastIndexOf('_') + 1)));
 			guest = user.isReadonly();
@@ -196,7 +198,7 @@ public class HibernateGroupDAO extends HibernatePersistentObjectDAO<Group> imple
 		if (guest) {
 			// Remove not admitted permissions in folders
 			String sql = "update ld_folder_acl set ld_write=0, ld_add=0, ld_security=0, ld_immutable=0, ld_delete=0, ld_rename=0, ld_import=0, ld_export=0,"
-					+ " ld_sign=0, ld_archive=0, ld_workflow=0, ld_calendar=0, ld_password=0, ld_move=0, ld_automation=0 , ld_storage=0 "
+					+ " ld_sign=0, ld_archive=0, ld_workflow=0, ld_calendar=0, ld_password=0, ld_move=0, ld_automation=0 , ld_store=0 "
 					+ " where ld_groupid=" + group.getId();
 			jdbcUpdate(sql);
 			

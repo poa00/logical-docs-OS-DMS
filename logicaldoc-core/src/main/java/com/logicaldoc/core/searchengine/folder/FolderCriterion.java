@@ -1,11 +1,14 @@
 package com.logicaldoc.core.searchengine.folder;
 
 import java.io.Serializable;
+import java.lang.reflect.Field;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
+import org.apache.commons.lang3.builder.ToStringStyle;
 
 import com.logicaldoc.core.metadata.Attribute;
 
@@ -181,12 +184,12 @@ public class FolderCriterion implements Serializable {
 				setLongValue((Long) value);
 			break;
 		case Attribute.TYPE_DOUBLE:
-			if (value instanceof Double doubleVal)
-				setDoubleValue(doubleVal);
-			else if (value instanceof Long longVal)
-				setDoubleValue(longVal.doubleValue());
-			else
-				setDoubleValue(((Float) value).doubleValue());
+			switch (value) {
+			case Double doubleVal -> setDoubleValue(doubleVal);
+			case Long longVal -> setDoubleValue(longVal.doubleValue());
+			case Float floatVal -> setDoubleValue(floatVal.doubleValue());
+			default -> setDoubleValue(null);
+			}
 			break;
 		case Attribute.TYPE_DATE:
 			setDateValue((Date) value);
@@ -270,5 +273,21 @@ public class FolderCriterion implements Serializable {
 
 	public void setExtendedAttribute(boolean extendedAttribute) {
 		this.extendedAttribute = extendedAttribute;
+	}
+
+	@Override
+	public String toString() {
+		return new ReflectionToStringBuilder(this, ToStringStyle.NO_CLASS_NAME_STYLE) {
+			@Override
+			protected boolean accept(Field field) {
+				try {
+					Object value = field.get(getObject());
+					return super.accept(field) && value != null && StringUtils.isNotEmpty(value.toString())
+							&& !field.getName().equals("field");
+				} catch (IllegalAccessException | IllegalArgumentException | SecurityException e) {
+					return false;
+				}
+			}
+		}.toString();
 	}
 }

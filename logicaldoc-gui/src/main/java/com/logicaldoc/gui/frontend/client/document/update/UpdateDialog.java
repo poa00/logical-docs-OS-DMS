@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.ServerValidationException;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIAccessControlEntry;
@@ -88,26 +89,16 @@ public class UpdateDialog extends StickyWindow {
 	protected void onDraw() {
 		super.onDraw();
 
-		if (ids==null || ids.isEmpty()) {
+		if (ids == null || ids.isEmpty()) {
 			FolderService.Instance.get().getFolder(metadata.getFolder().getId(), false, false, false,
-					new AsyncCallback<GUIFolder>() {
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
-						}
-
+					new DefaultAsyncCallback<>() {
 						@Override
 						public void onSuccess(GUIFolder folder) {
 							onDraw(folder.getAllowedPermissions());
 						}
 					});
 		} else {
-			DocumentService.Instance.get().getAllowedPermissions(ids, new AsyncCallback<>() {
-				@Override
-				public void onFailure(Throwable caught) {
-					GuiLog.serverError(caught);
-				}
-
+			DocumentService.Instance.get().getAllowedPermissions(ids, new DefaultAsyncCallback<>() {
 				@Override
 				public void onSuccess(GUIAccessControlEntry permissions) {
 					onDraw(permissions);
@@ -123,14 +114,14 @@ public class UpdateDialog extends StickyWindow {
 			if (!bulkPanel.validate())
 				return;
 
-			DocumentService.Instance.get().validate(metadata, new AsyncCallback<>() {
+			DocumentService.Instance.get().validate(metadata, new DefaultAsyncCallback<>() {
 
 				@Override
 				public void onFailure(Throwable caught) {
-					if (caught instanceof ServerValidationException)
-						bulkPanel.extendedPropertiesPanel.handleErrors((ServerValidationException) caught);
+					if (caught instanceof ServerValidationException validationException)
+						bulkPanel.extendedPropertiesPanel.handleErrors(validationException);
 					else
-						GuiLog.serverError(caught);
+						super.onFailure(caught);
 				}
 
 				@Override
@@ -180,7 +171,7 @@ public class UpdateDialog extends StickyWindow {
 				bulkPanel.getDocument().setComment(saveForm.getValueAsString(VERSIONCOMMENT));
 				LD.contactingServer();
 				DocumentService.Instance.get().bulkUpdate(ids, bulkPanel.getDocument(),
-						"true".equals(saveForm.getValueAsString(IGNOREEMPTYFIELDS)), new AsyncCallback<>() {
+						Boolean.valueOf(saveForm.getValueAsString(IGNOREEMPTYFIELDS)), new AsyncCallback<>() {
 							@Override
 							public void onFailure(Throwable error) {
 								LD.clearPrompt();
@@ -246,9 +237,9 @@ public class UpdateDialog extends StickyWindow {
 			metadata.setStatus(0);
 		}
 
-		if(metadata!=null)
+		if (metadata != null)
 			metadata.setAllowedPermissions(permissions);
-		
+
 		bulkPanel = new UpdatePanel(metadata, CONTEXT_UPLOAD.equals(context) || CHECKIN.equals(context),
 				permissions.isSecurity());
 		bulkPanel.setWidth100();
@@ -299,5 +290,15 @@ public class UpdateDialog extends StickyWindow {
 		content.setMembers(bulkPanel, savePanel);
 
 		addItem(content);
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

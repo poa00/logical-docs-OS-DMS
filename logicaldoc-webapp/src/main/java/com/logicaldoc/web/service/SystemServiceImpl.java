@@ -4,10 +4,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.net.URLClassLoader;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -36,12 +32,12 @@ import org.springframework.jdbc.core.RowMapper;
 
 import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.RunLevel;
-import com.logicaldoc.core.SystemInfo;
 import com.logicaldoc.core.dbinit.PluginDbInit;
 import com.logicaldoc.core.document.DocumentHistoryDAO;
 import com.logicaldoc.core.folder.FolderDAO;
 import com.logicaldoc.core.generic.Generic;
 import com.logicaldoc.core.generic.GenericDAO;
+import com.logicaldoc.core.history.History;
 import com.logicaldoc.core.job.JobManager;
 import com.logicaldoc.core.security.Session;
 import com.logicaldoc.core.security.SessionManager;
@@ -71,7 +67,6 @@ import com.logicaldoc.util.Context;
 import com.logicaldoc.util.config.ContextProperties;
 import com.logicaldoc.util.config.LogConfigurator;
 import com.logicaldoc.util.config.PluginDescriptorConfigurator;
-import com.logicaldoc.util.exec.Exec;
 import com.logicaldoc.util.io.FileUtil;
 import com.logicaldoc.util.io.ZipUtil;
 import com.logicaldoc.util.plugin.LogicalDOCPlugin;
@@ -118,7 +113,7 @@ public class SystemServiceImpl extends AbstractRemoteService implements SystemSe
 			task.getScheduling().save();
 			return true;
 		} catch (IOException | ParseException e) {
-			return (Boolean) throwServerException(session, log, e);
+			return throwServerException(session, log, e);
 		}
 	}
 
@@ -141,17 +136,16 @@ public class SystemServiceImpl extends AbstractRemoteService implements SystemSe
 
 			return true;
 		} catch (IOException | ParseException e) {
-			return (Boolean) throwServerException(session, log, e);
+			return throwServerException(session, log, e);
 		}
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public List<List<GUIParameter>> getStatistics(String locale) throws ServerException {
 		Session session = validateSession();
 
 		try {
-			GenericDAO genDao = (GenericDAO) Context.get().getBean(GenericDAO.class);
+			GenericDAO genDao = Context.get(GenericDAO.class);
 
 			List<List<GUIParameter>> parameters = new ArrayList<>();
 
@@ -313,12 +307,12 @@ public class SystemServiceImpl extends AbstractRemoteService implements SystemSe
 
 			return parameters;
 		} catch (PersistenceException e) {
-			return (List<List<GUIParameter>>) throwServerException(session, log, e);
+			return throwServerException(session, log, e);
 		}
 	}
 
 	private void setLongValue(Generic generic, GUIParameter parameter) {
-		if (generic != null)
+		if (generic != null && generic.getInteger1() != null)
 			parameter.setValue(Long.toString(generic.getInteger1()));
 		else
 			parameter.setValue("0");
@@ -352,7 +346,7 @@ public class SystemServiceImpl extends AbstractRemoteService implements SystemSe
 	}
 
 	private Task getTask(String taskName) {
-		TaskManager manager = (TaskManager) Context.get().getBean(TaskManager.class);
+		TaskManager manager = Context.get(TaskManager.class);
 		Task tsk = null;
 		for (Task t : manager.getTasks()) {
 			if (t.getName().equals(taskName)) {
@@ -383,7 +377,7 @@ public class SystemServiceImpl extends AbstractRemoteService implements SystemSe
 	}
 
 	private void addReportRecipients(GUITask guiTask, Task task) {
-		UserDAO dao = (UserDAO) Context.get().getBean(UserDAO.class);
+		UserDAO dao = Context.get(UserDAO.class);
 		if (StringUtils.isNotEmpty(task.getReportRecipients())) {
 			StringTokenizer st = new StringTokenizer(task.getReportRecipients(), ",", false);
 			while (st.hasMoreTokens()) {
@@ -408,7 +402,7 @@ public class SystemServiceImpl extends AbstractRemoteService implements SystemSe
 	public List<GUITask> loadTasks(String locale) throws ServerException {
 		validateSession();
 
-		TaskManager manager = (TaskManager) Context.get().getBean(TaskManager.class);
+		TaskManager manager = Context.get(TaskManager.class);
 		List<GUITask> tasks = new ArrayList<>();
 
 		for (Task t : manager.getTasks()) {
@@ -454,7 +448,7 @@ public class SystemServiceImpl extends AbstractRemoteService implements SystemSe
 	public GUITask saveTask(GUITask guiTask, String locale) throws ServerException {
 		validateSession();
 
-		TaskManager manager = (TaskManager) Context.get().getBean(TaskManager.class);
+		TaskManager manager = Context.get(TaskManager.class);
 		Task task = null;
 		for (Task t : manager.getTasks()) {
 			if (t.getName().equals(guiTask.getName())) {
@@ -504,7 +498,7 @@ public class SystemServiceImpl extends AbstractRemoteService implements SystemSe
 
 	@Override
 	public void startTask(String taskName) {
-		TaskManager manager = (TaskManager) Context.get().getBean(TaskManager.class);
+		TaskManager manager = Context.get(TaskManager.class);
 
 		for (Task task : manager.getTasks()) {
 			if (task.getName().equals(taskName)) {
@@ -517,7 +511,7 @@ public class SystemServiceImpl extends AbstractRemoteService implements SystemSe
 
 	@Override
 	public void stopTask(String taskName) {
-		TaskManager manager = (TaskManager) Context.get().getBean(TaskManager.class);
+		TaskManager manager = Context.get(TaskManager.class);
 		for (Task task : manager.getTasks()) {
 			if (task.getName().equals(taskName)) {
 				task.interrupt();
@@ -590,80 +584,26 @@ public class SystemServiceImpl extends AbstractRemoteService implements SystemSe
 		}
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public List<GUIHistory> search(Long userId, Date from, Date till, int maxResult, String historySid,
 			List<String> events, Long rootFolderId) throws ServerException {
 		Session session = validateSession();
 
-		// Search in the document/folder history
-		StringBuilder query = new StringBuilder(
-				"select A.ld_username, A.ld_event, A.ld_date, A.ld_filename, A.ld_folderid, A.ld_path, A.ld_sessionid, A.ld_docid, A.ld_userid, A.ld_ip as ip, A.ld_userlogin, A.ld_comment, A.ld_reason, A.ld_device, A.ld_geolocation from ld_history A where A.ld_tenantid = "
-						+ session.getTenantId());
-		appendUserCondition("A", userId, query);
-		appendSessionCondition("A", historySid, query);
-		appendDatesCondition("A", from, till, query);
-		appendFolderCondition("A", rootFolderId, query);
-		appendEventsCondition("A", events, query);
+		int i = 0;
+		StringBuilder query = new StringBuilder();
+		for (String table : History.eventTables()) {
+			String tableAlias = "A" + (i++);
 
-		// Search in the folder history
-		query.append(
-				" union select B.ld_username, B.ld_event, B.ld_date, B.ld_filename, B.ld_folderid, B.ld_path, B.ld_sessionid, B.ld_docid, B.ld_userid, B.ld_ip as ip, B.ld_userlogin, B.ld_comment, B.ld_reason, B.ld_device, B.ld_geolocation from ld_folder_history B where B.ld_tenantid = "
-						+ session.getTenantId());
-		appendUserCondition("B", userId, query);
-		appendSessionCondition("B", historySid, query);
-		appendDatesCondition("B", from, till, query);
-		appendFolderCondition("B", rootFolderId, query);
-		appendEventsCondition("B", events, query);
-
-		// Search in the user history
-		if (rootFolderId == null) {
+			if (!query.isEmpty())
+				query.append(" union ");
 			query.append(
-					" union select C.ld_username, C.ld_event, C.ld_date, null, null, null, C.ld_sessionid, null, C.ld_userid, C.ld_ip as ip, C.ld_userlogin, C.ld_comment, C.ld_reason, C.ld_device, C.ld_geolocation from ld_user_history C where C.ld_tenantid = "
-							+ session.getTenantId());
-			appendUserCondition("C", userId, query);
-			appendSessionCondition("C", historySid, query);
-			appendDatesCondition("C", from, till, query);
-			appendEventsCondition("C", events, query);
-		}
-
-		if (SystemInfo.get().getFeatures().contains("Feature_19")) {
-
-			// Search in the workflow history
-			query.append(
-					" union select D.ld_username, D.ld_event, D.ld_date, null, null, null, D.ld_sessionid, D.ld_docid, D.ld_userid, '' as ip, D.ld_userlogin, D.ld_comment, D.ld_reason, D.ld_device, D.ld_geolocation from ld_workflowhistory D where D.ld_tenantid = "
-							+ session.getTenantId());
-			appendUserCondition("D", userId, query);
-			appendSessionCondition("D", historySid, query);
-			appendDatesCondition("D", from, till, query);
-			appendFolderCondition("D", rootFolderId, query);
-			appendEventsCondition("D", events, query);
-		}
-
-		if (SystemInfo.get().getFeatures().contains("Feature_1")) {
-			// Search in the workflow history
-			query.append(
-					" union select E.ld_username, E.ld_event, E.ld_date, E.ld_filename, E.ld_folderid, E.ld_path, null, E.ld_docid, E.ld_userid, null as ip, E.ld_userlogin, E.ld_comment, null, null, null  from ld_importfolder_history E where E.ld_tenantid = "
-							+ session.getTenantId());
-			appendUserCondition("E", userId, query);
-			if (StringUtils.isNotEmpty(historySid))
-				query.append(" and 1 = 2 ");
-			appendDatesCondition("E", from, till, query);
-			appendFolderCondition("E", rootFolderId, query);
-			appendEventsCondition("E", events, query);
-		}
-
-		if (SystemInfo.get().getFeatures().contains("Feature_3")) {
-			// Search in the OCR history
-			query.append(
-					" union select F.ld_username, F.ld_event, F.ld_date, F.ld_filename, F.ld_folderid, F.ld_path, null, F.ld_docid, F.ld_userid, null as ip, F.ld_userlogin, F.ld_comment, null, null, null  from ld_ocr_history F where F.ld_tenantid = "
-							+ session.getTenantId());
-			appendUserCondition("F", userId, query);
-			if (StringUtils.isNotEmpty(historySid))
-				query.append(" and 1 = 2 ");
-			appendDatesCondition("F", from, till, query);
-			appendFolderCondition("F", rootFolderId, query);
-			appendEventsCondition("F", events, query);
+					"select A.ld_username, A.ld_event, A.ld_date, A.ld_filename, A.ld_folderid, A.ld_path, A.ld_sessionid, A.ld_docid, A.ld_userid, A.ld_ip as ip, A.ld_userlogin, A.ld_comment, A.ld_reason, A.ld_device, A.ld_geolocation, A.ld_keylabel from TABLE A where A.ld_tenantid = "
+							.replace("TABLE", table).replace("A", tableAlias) + session.getTenantId());
+			appendUserCondition(tableAlias, userId, query);
+			appendSessionCondition(tableAlias, historySid, query);
+			appendDatesCondition(tableAlias, from, till, query);
+			appendFolderCondition(tableAlias, rootFolderId, query);
+			appendEventsCondition(tableAlias, events, query);
 		}
 
 		query.append(" order by 3 desc ");
@@ -671,7 +611,7 @@ public class SystemServiceImpl extends AbstractRemoteService implements SystemSe
 		try {
 			return executeQuery(query.toString(), maxResult, session);
 		} catch (PersistenceException e) {
-			return (List<GUIHistory>) throwServerException(session, log, e);
+			return throwServerException(session, log, e);
 		}
 	}
 
@@ -703,13 +643,12 @@ public class SystemServiceImpl extends AbstractRemoteService implements SystemSe
 			query.append(AND + tableAlias + ".ld_userid = " + userId);
 	}
 
-	@SuppressWarnings("unchecked")
 	private List<GUIHistory> executeQuery(String query, int maxResult, Session session) throws PersistenceException {
-		DocumentHistoryDAO dao = (DocumentHistoryDAO) Context.get().getBean(DocumentHistoryDAO.class);
-		return dao.query(query, new RowMapper<>() {
+		DocumentHistoryDAO dao = Context.get(DocumentHistoryDAO.class);
+		return dao.query(query, new RowMapper<GUIHistory>() {
 
 			@Override
-			public GUIHistory mapRow(ResultSet rs, int arg1) throws SQLException {
+			public GUIHistory mapRow(ResultSet rs, int row) throws SQLException {
 				GUIHistory history = new GUIHistory();
 				history.setTenant(session.getTenantName());
 				history.setTenantId(session.getTenantId());
@@ -728,6 +667,7 @@ public class SystemServiceImpl extends AbstractRemoteService implements SystemSe
 				history.setReason(rs.getString(13));
 				history.setDevice(rs.getString(14));
 				history.setGeolocation(rs.getString(15));
+				history.setKeyLabel(rs.getString(16));
 
 				if (history.getFileName() != null && history.getDocId() != 0L)
 					history.setIcon(IconSelector.selectIcon(history.getFileName()));
@@ -744,7 +684,7 @@ public class SystemServiceImpl extends AbstractRemoteService implements SystemSe
 			return;
 
 		StringBuilder folderPredicate = new StringBuilder();
-		FolderDAO fDao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+		FolderDAO fDao = Context.get(FolderDAO.class);
 		Collection<Long> tree = fDao.findFolderIdInTree(rootFolderId, false);
 		if (fDao.isOracle()) {
 			/*
@@ -764,21 +704,20 @@ public class SystemServiceImpl extends AbstractRemoteService implements SystemSe
 		query.append(folderPredicate.toString());
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public List<GUIHistory> searchApiCalls(Long userId, Date from, Date till, String callSid, String protocol,
 			String uri, int maxResult) throws ServerException {
 		Session session = validateSession();
 
 		try {
-			TenantDAO dao = (TenantDAO) Context.get().getBean(TenantDAO.class);
+			TenantDAO dao = Context.get(TenantDAO.class);
 			Map<Long, String> tenants = dao.findAll().stream()
 					.collect(Collectors.toMap(Tenant::getId, Tenant::getName));
 			tenants.put(Tenant.SYSTEM_ID, "system");
 
 			// Search in the document/folder history
 			StringBuilder query = new StringBuilder(
-					"select ld_username, ld_date, ld_path, ld_sessionid, ld_userid, ld_ip as ip, ld_userlogin, ld_comment, ld_device, ld_geolocation, ld_protocol, ld_tenantId from ld_webservicecall where 1 = 1 ");
+					"select ld_username, ld_date, ld_path, ld_sessionid, ld_userid, ld_ip as ip, ld_userlogin, ld_comment, ld_device, ld_geolocation, ld_protocol, ld_tenantId, ld_keylabel from ld_webservicecall where 1 = 1 ");
 			if (userId != null)
 				query.append(" and ld_userid = " + userId);
 			if (callSid != null && StringUtils.isNotEmpty(callSid))
@@ -816,20 +755,21 @@ public class SystemServiceImpl extends AbstractRemoteService implements SystemSe
 					history.setProtocol(rs.getString(11));
 					history.setTenantId(rs.getLong(12));
 					history.setTenant(tenants.get(history.getTenantId()));
+					history.setKeyLabel(rs.getString(13));
 
 					return history;
 				}
 
 			}, maxResult);
 		} catch (PersistenceException e) {
-			return (List<GUIHistory>) throwServerException(session, log, e);
+			return throwServerException(session, log, e);
 		}
 	}
 
 	@Override
 	public void unscheduleJobs(List<GUIValue> jobs) throws ServerException {
 		Session session = validateSession();
-		JobManager jobManager = (JobManager) Context.get().getBean(JobManager.class);
+		JobManager jobManager = Context.get(JobManager.class);
 		for (GUIValue trigger : jobs)
 			try {
 				jobManager.unscheduleTrigger(trigger.getCode(), trigger.getValue());
@@ -875,17 +815,6 @@ public class SystemServiceImpl extends AbstractRemoteService implements SystemSe
 				// Nothing to do
 			}
 
-		try {
-			if (pluginJarFile.exists()) {
-				if (new Exec().isWindows())
-					Runtime.getRuntime().exec("cmd.exe /c \"del /F /Q \"" + pluginJarFile.getAbsolutePath() + "\"\"");
-				else
-					new Exec().exec("rm -rf \"" + pluginJarFile.getAbsolutePath() + "\"", null, null);
-			}
-		} catch (IOException e) {
-			throwServerException(session, log, e);
-		}
-
 		if (pluginJarFile.exists())
 			throw new ServerException("Cannot remove plugin file " + pluginJarFile.getAbsolutePath()
 					+ ". Please stop the application and delete that file manually.");
@@ -929,8 +858,7 @@ public class SystemServiceImpl extends AbstractRemoteService implements SystemSe
 				throw new ServerException("Database Connection failure.");
 			}
 		} catch (InstantiationException | IllegalAccessException | IllegalArgumentException | InvocationTargetException
-				| NoSuchMethodException | SecurityException | ClassNotFoundException | PluginException | ServerException
-				| SQLException e) {
+				| NoSuchMethodException | ClassNotFoundException | PluginException | ServerException | SQLException e) {
 			throwServerException(session, log, e);
 		}
 	}
@@ -942,7 +870,7 @@ public class SystemServiceImpl extends AbstractRemoteService implements SystemSe
 		if (!session.getUser().isMemberOf(Group.GROUP_ADMIN) || session.getTenantId() != Tenant.DEFAULT_ID)
 			throw new AccessDeniedException();
 
-		Map<String, File> uploadedFilesMap = UploadServlet.getReceivedFiles(session.getSid());
+		Map<String, File> uploadedFilesMap = UploadServlet.getUploads(session.getSid());
 		if (uploadedFilesMap == null || uploadedFilesMap.size() < 1)
 			throw new ServerException("Cannot find a plugin package to install");
 
@@ -995,21 +923,6 @@ public class SystemServiceImpl extends AbstractRemoteService implements SystemSe
 				log.info("Deleted existing plugin home {}", pluginHome.getAbsolutePath());
 			}
 
-			File libFolder = new File(new File(rootFolder, "WEB-INF"), "lib");
-			File pluginJarFile = new File(libFolder, pluginJar);
-
-			/*
-			 * Append the plugin jar in the classpath
-			 */
-			appendPluginJarInClasspath(pluginJarFile);
-
-			/*
-			 * Initialize the plugin
-			 */
-			PluginRegistry pluginRegistry = PluginRegistry.getInstance();
-			pluginRegistry.init(libFolder.getAbsolutePath());
-			initializePlugin(pluginId);
-
 			/*
 			 * Copy the plugin archive as .installed so it will be maintained
 			 * over the updates
@@ -1018,27 +931,11 @@ public class SystemServiceImpl extends AbstractRemoteService implements SystemSe
 			File targetFile = new File(pluginsDir, pluginId + "-" + pluginVersion + "-plugin.zip.installed");
 			log.info("Copying plugin package {} into {}", pluginPackage.getName(), targetFile.getAbsolutePath());
 			FileUtil.copyFile(pluginPackage, targetFile);
-
-			if (pluginRegistry.isRestartRequired())
-				ApplicationListener.restartRequired();
-		} catch (ServerException | IOException | NoSuchMethodException | SecurityException | IllegalArgumentException
-				| InvocationTargetException | PluginException e) {
+			ApplicationListener.restartRequired();
+		} catch (ServerException | IOException | IllegalArgumentException e) {
 			throwServerException(session, log, e);
 		} finally {
-			UploadServlet.cleanReceivedFiles(session.getSid());
-		}
-	}
-
-	private void appendPluginJarInClasspath(File pluginJarFile)
-			throws NoSuchMethodException, InvocationTargetException, MalformedURLException {
-		final ClassLoader sysloader = this.getClass().getClassLoader();
-		final Class<URLClassLoader> sysclass = URLClassLoader.class;
-		final Method method = sysclass.getDeclaredMethod("addURL", URL.class);
-
-		try {
-			method.invoke(sysloader, pluginJarFile.toURI().toURL());
-		} catch (IllegalAccessException iae) {
-			log.warn(iae.getMessage(), iae);
+			UploadServlet.cleanUploads(session.getSid());
 		}
 	}
 

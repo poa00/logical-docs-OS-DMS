@@ -3,17 +3,17 @@ package com.logicaldoc.gui.frontend.client.folder;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.logicaldoc.gui.common.client.Feature;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIAccessControlEntry;
 import com.logicaldoc.gui.common.client.beans.GUIFolder;
 import com.logicaldoc.gui.common.client.data.AccessControlListDS;
+import com.logicaldoc.gui.common.client.grid.UserListGridField;
 import com.logicaldoc.gui.common.client.i18n.I18N;
 import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.GridUtil;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.LD;
-import com.logicaldoc.gui.common.client.widgets.grid.UserListGridField;
 import com.logicaldoc.gui.frontend.client.services.FolderService;
 import com.smartgwt.client.data.Record;
 import com.smartgwt.client.types.Alignment;
@@ -60,7 +60,7 @@ public class FolderSecurityPanel extends FolderDetailTab {
 
 	private static final String AUTOMATION = "automation";
 
-	private static final String STORAGE = "storage";
+	private static final String STORE = "store";
 
 	private static final String READINGREQ = "readingreq";
 
@@ -236,7 +236,7 @@ public class FolderSecurityPanel extends FolderDetailTab {
 		addCalendar(fields);
 		addSubscription(fields);
 		addAutomation(fields);
-		addStorage(fields);
+		addStore(fields);
 		addReadingReq(fields);
 
 		list.setFields(fields.toArray(new ListGridField[0]));
@@ -250,13 +250,7 @@ public class FolderSecurityPanel extends FolderDetailTab {
 
 	private void displayInheritingPanel(GUIFolder folder) {
 		FolderService.Instance.get().getFolder(folder.getSecurityRef().getId(), true, false, false,
-				new AsyncCallback<>() {
-
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(final GUIFolder refFolder) {
 						inheritInfoPanel = new HLayout();
@@ -302,13 +296,13 @@ public class FolderSecurityPanel extends FolderDetailTab {
 		}
 	}
 
-	private void addStorage(List<ListGridField> fields) {
-		if (Feature.enabled(Feature.MULTI_STORAGE)) {
-			ListGridField storage = new ListGridField(STORAGE, prepareHeaderLabel(STORAGE));
-			storage.setType(ListGridFieldType.BOOLEAN);
-			storage.setCanEdit(true);
-			storage.setAutoFitWidth(true);
-			fields.add(storage);
+	private void addStore(List<ListGridField> fields) {
+		if (Feature.enabled(Feature.MULTI_STORE)) {
+			ListGridField store = new ListGridField(STORE, prepareHeaderLabel(STORE));
+			store.setType(ListGridFieldType.BOOLEAN);
+			store.setCanEdit(true);
+			store.setAutoFitWidth(true);
+			fields.add(store);
 		}
 	}
 
@@ -391,13 +385,7 @@ public class FolderSecurityPanel extends FolderDetailTab {
 		inheritFromParent.setAutoFit(true);
 		buttons.addMember(inheritFromParent);
 		inheritFromParent.addClickHandler((ClickEvent event) -> FolderService.Instance.get()
-				.getFolder(folder.getParentId(), false, false, false, new AsyncCallback<>() {
-
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				.getFolder(folder.getParentId(), false, false, false, new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(GUIFolder parent) {
 						LD.ask(I18N.message("inheritrights"),
@@ -405,13 +393,7 @@ public class FolderSecurityPanel extends FolderDetailTab {
 								(Boolean interitConfirmed) -> {
 									if (Boolean.TRUE.equals(interitConfirmed)) {
 										FolderService.Instance.get().inheritACL(folder.getId(), folder.getParentId(),
-												new AsyncCallback<>() {
-
-													@Override
-													public void onFailure(Throwable caught) {
-														GuiLog.serverError(caught);
-													}
-
+												new DefaultAsyncCallback<>() {
 													@Override
 													public void onSuccess(GUIFolder arg) {
 														FolderSecurityPanel.this.refresh(arg);
@@ -543,30 +525,30 @@ public class FolderSecurityPanel extends FolderDetailTab {
 			GUIAccessControlEntry ace = new GUIAccessControlEntry();
 			ace.setName(rec.getAttributeAsString(ENTITY));
 			ace.setEntityId(Long.parseLong(rec.getAttribute(ENTITY_ID)));
-			ace.setRead(rec.getAttributeAsBoolean("read"));
-			ace.setPreview(rec.getAttributeAsBoolean(PREVIEW));
-			ace.setPrint(rec.getAttributeAsBoolean(PRINT));
-			ace.setWrite(rec.getAttributeAsBoolean(WRITE));
-			ace.setCustomid(rec.getAttributeAsBoolean(CUSTOMID));
-			ace.setDelete(rec.getAttributeAsBoolean(DELETE));
-			ace.setAdd(rec.getAttributeAsBoolean("add"));
-			ace.setWorkflow(rec.getAttributeAsBoolean(WORKFLOW));
-			ace.setSign(rec.getAttributeAsBoolean("sign"));
-			ace.setImport(rec.getAttributeAsBoolean(IMPORT));
-			ace.setExport(rec.getAttributeAsBoolean(EXPORT));
-			ace.setImmutable(rec.getAttributeAsBoolean(IMMUTABLE));
-			ace.setRename(rec.getAttributeAsBoolean(RENAME));
-			ace.setSecurity(rec.getAttributeAsBoolean(SECURITY));
-			ace.setArchive(rec.getAttributeAsBoolean(ARCHIVE));
-			ace.setDownload(rec.getAttributeAsBoolean(DOWNLOAD));
-			ace.setCalendar(rec.getAttributeAsBoolean(CALENDAR));
-			ace.setSubscription(rec.getAttributeAsBoolean(SUBSCRIPTION));
-			ace.setPassword(rec.getAttributeAsBoolean(PASSWORD));
-			ace.setMove(rec.getAttributeAsBoolean("move"));
-			ace.setEmail(rec.getAttributeAsBoolean(EMAIL));
-			ace.setAutomation(rec.getAttributeAsBoolean(AUTOMATION));
-			ace.setStorage(rec.getAttributeAsBoolean(STORAGE));
-			ace.setReadingreq(rec.getAttributeAsBoolean(READINGREQ));
+			ace.setRead(Boolean.TRUE.equals(rec.getAttributeAsBoolean("read")));
+			ace.setPreview(Boolean.TRUE.equals(rec.getAttributeAsBoolean(PREVIEW)));
+			ace.setPrint(Boolean.TRUE.equals(rec.getAttributeAsBoolean(PRINT)));
+			ace.setWrite(Boolean.TRUE.equals(rec.getAttributeAsBoolean(WRITE)));
+			ace.setCustomid(Boolean.TRUE.equals(rec.getAttributeAsBoolean(CUSTOMID)));
+			ace.setDelete(Boolean.TRUE.equals(rec.getAttributeAsBoolean(DELETE)));
+			ace.setAdd(Boolean.TRUE.equals(rec.getAttributeAsBoolean("add")));
+			ace.setWorkflow(Boolean.TRUE.equals(rec.getAttributeAsBoolean(WORKFLOW)));
+			ace.setSign(Boolean.TRUE.equals(rec.getAttributeAsBoolean("sign")));
+			ace.setImport(Boolean.TRUE.equals(rec.getAttributeAsBoolean(IMPORT)));
+			ace.setExport(Boolean.TRUE.equals(rec.getAttributeAsBoolean(EXPORT)));
+			ace.setImmutable(Boolean.TRUE.equals(rec.getAttributeAsBoolean(IMMUTABLE)));
+			ace.setRename(Boolean.TRUE.equals(rec.getAttributeAsBoolean(RENAME)));
+			ace.setSecurity(Boolean.TRUE.equals(rec.getAttributeAsBoolean(SECURITY)));
+			ace.setArchive(Boolean.TRUE.equals(rec.getAttributeAsBoolean(ARCHIVE)));
+			ace.setDownload(Boolean.TRUE.equals(rec.getAttributeAsBoolean(DOWNLOAD)));
+			ace.setCalendar(Boolean.TRUE.equals(rec.getAttributeAsBoolean(CALENDAR)));
+			ace.setSubscription(Boolean.TRUE.equals(rec.getAttributeAsBoolean(SUBSCRIPTION)));
+			ace.setPassword(Boolean.TRUE.equals(rec.getAttributeAsBoolean(PASSWORD)));
+			ace.setMove(Boolean.TRUE.equals(rec.getAttributeAsBoolean("move")));
+			ace.setEmail(Boolean.TRUE.equals(rec.getAttributeAsBoolean(EMAIL)));
+			ace.setAutomation(Boolean.TRUE.equals(rec.getAttributeAsBoolean(AUTOMATION)));
+			ace.setStore(Boolean.TRUE.equals(rec.getAttributeAsBoolean(STORE)));
+			ace.setReadingreq(Boolean.TRUE.equals(rec.getAttributeAsBoolean(READINGREQ)));
 
 			acl.add(ace);
 		}
@@ -611,13 +593,7 @@ public class FolderSecurityPanel extends FolderDetailTab {
 		// Apply all rights
 		folder.setAccessControlList(this.getACL());
 
-		FolderService.Instance.get().saveACL(folder, recursive, new AsyncCallback<>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
+		FolderService.Instance.get().saveACL(folder, recursive, new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(Void result) {
 				if (!recursive)
@@ -628,5 +604,15 @@ public class FolderSecurityPanel extends FolderDetailTab {
 				refresh(folder);
 			}
 		});
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

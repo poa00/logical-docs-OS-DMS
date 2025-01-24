@@ -1,8 +1,6 @@
 package com.logicaldoc.gui.frontend.client.settings;
 
-import java.util.Map;
-
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIEmailAccount;
 import com.logicaldoc.gui.common.client.beans.GUIVIASettings;
 import com.logicaldoc.gui.common.client.i18n.I18N;
@@ -20,10 +18,10 @@ import com.smartgwt.client.widgets.form.ValuesManager;
 import com.smartgwt.client.widgets.form.fields.ButtonItem;
 import com.smartgwt.client.widgets.form.fields.IntegerItem;
 import com.smartgwt.client.widgets.form.fields.PasswordItem;
-import com.smartgwt.client.widgets.form.fields.RadioGroupItem;
 import com.smartgwt.client.widgets.form.fields.SelectItem;
 import com.smartgwt.client.widgets.form.fields.SpinnerItem;
 import com.smartgwt.client.widgets.form.fields.TextItem;
+import com.smartgwt.client.widgets.form.fields.ToggleItem;
 import com.smartgwt.client.widgets.layout.HLayout;
 import com.smartgwt.client.widgets.layout.VLayout;
 
@@ -62,13 +60,7 @@ public class VIASettingsPanel extends AdminPanel {
 		setHeight100();
 		setMembersMargin(20);
 
-		VIAService.Instance.get().get(new AsyncCallback<>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
+		VIAService.Instance.get().get(new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(GUIVIASettings settings) {
 				VIASettingsPanel.this.settings = settings;
@@ -101,9 +93,8 @@ public class VIASettingsPanel extends AdminPanel {
 		settingsForm.setNumCols(1);
 		settingsForm.setWidth(1);
 
-		RadioGroupItem enabled = ItemFactory.newBooleanSelector("eenabled", "enabled");
+		ToggleItem enabled = ItemFactory.newToggleItem("eenabled", "enabled", settings.isEnabled());
 		enabled.setRequired(true);
-		enabled.setValue(settings.isEnabled() ? "yes" : "no");
 
 		SpinnerItem maxAttachments = ItemFactory.newSpinnerItem("maxattachments", settings.getMaxAttachments());
 		maxAttachments.setMin(0);
@@ -151,8 +142,7 @@ public class VIASettingsPanel extends AdminPanel {
 		IntegerItem port = ItemFactory.newIntegerItem("port", "port", account.getPort());
 		port.setWidth(80);
 
-		RadioGroupItem ssl = ItemFactory.newBooleanSelector("ssl", "ssl");
-		ssl.setValue(account.isSsl() ? "yes" : "no");
+		ToggleItem ssl = ItemFactory.newToggleItem("ssl", "ssl", account.isSsl());
 
 		SelectItem protocol = ItemFactory.newEmailProtocolSelector();
 		protocol.setValue(account.getProvider());
@@ -194,28 +184,24 @@ public class VIASettingsPanel extends AdminPanel {
 
 	private IButton prepareSaveButton() {
 		IButton save = new IButton(I18N.message("save"));
-		save.addClickHandler(event -> onSave());
+		save.addClickHandler(click -> onSave());
 		return save;
 	}
 
 	private ButtonItem prepareResetCacheButton() {
 		ButtonItem resetCache = new ButtonItem("resetcache", I18N.message("resetcache"));
-		resetCache.addClickHandler(event -> LD.ask(I18N.message("question"), I18N.message("confirmresetcache"), yes -> {
-			if (Boolean.TRUE.equals(yes)) {
-				EmailAccountService.Instance.get().resetCache(settings.getEmailAccount().getId(),
-						new AsyncCallback<>() {
-							@Override
-							public void onFailure(Throwable caught) {
-								GuiLog.serverError(caught);
-							}
-
-							@Override
-							public void onSuccess(Void result) {
-								GuiLog.info(I18N.message("cachedeleted"), null);
-							}
-						});
-			}
-		}));
+		resetCache
+				.addClickHandler(click01 -> LD.ask(I18N.message("question"), I18N.message("confirmresetcache"), yes -> {
+					if (Boolean.TRUE.equals(yes)) {
+						EmailAccountService.Instance.get().resetCache(settings.getEmailAccount().getId(),
+								new DefaultAsyncCallback<>() {
+									@Override
+									public void onSuccess(Void result) {
+										GuiLog.info(I18N.message("cachedeleted"), null);
+									}
+								});
+					}
+				}));
 		return resetCache;
 	}
 
@@ -223,23 +209,13 @@ public class VIASettingsPanel extends AdminPanel {
 		ButtonItem testEmail = new ButtonItem("testconnection", I18N.message("testconnection"));
 		testEmail.addClickHandler(event -> {
 			if (validate()) {
-				VIAService.Instance.get().save(settings, new AsyncCallback<>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				VIAService.Instance.get().save(settings, new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(GUIVIASettings settings) {
 						GuiLog.info(I18N.message("settingssaved"), null);
 						VIASettingsPanel.this.settings = settings;
 						EmailAccountService.Instance.get().test(settings.getEmailAccount().getId(),
-								new AsyncCallback<Boolean>() {
-									@Override
-									public void onFailure(Throwable caught) {
-										GuiLog.serverError(caught);
-									}
-
+								new DefaultAsyncCallback<>() {
 									@Override
 									public void onSuccess(Boolean result) {
 										if (result.booleanValue())
@@ -257,12 +233,7 @@ public class VIASettingsPanel extends AdminPanel {
 
 	private void onSave() {
 		if (validate()) {
-			VIAService.Instance.get().save(settings, new AsyncCallback<>() {
-				@Override
-				public void onFailure(Throwable caught) {
-					GuiLog.serverError(caught);
-				}
-
+			VIAService.Instance.get().save(settings, new DefaultAsyncCallback<>() {
 				@Override
 				public void onSuccess(GUIVIASettings settings) {
 					GuiLog.info(I18N.message("settingssaved"), null);
@@ -273,14 +244,12 @@ public class VIASettingsPanel extends AdminPanel {
 		}
 	}
 
-	@SuppressWarnings("unchecked")
 	boolean validate() {
 		vm.validate();
 		if (Boolean.FALSE.equals(vm.hasErrors())) {
-			Map<String, Object> values = vm.getValues();
-			settings.setEnabled("yes".equals(values.get("eenabled").toString()));
-			settings.setMaxAttachments(Integer.parseInt(values.get("maxattachments").toString()));
-			settings.setMaxAttachmentSize(Long.parseLong(values.get(MAXATTACHMENTSIZE).toString()) * 1024L);
+			settings.setEnabled(Boolean.valueOf(vm.getValueAsString("eenabled")));
+			settings.setMaxAttachments(Integer.parseInt(vm.getValueAsString("maxattachments")));
+			settings.setMaxAttachmentSize(Long.parseLong(vm.getValueAsString(MAXATTACHMENTSIZE)) * 1024L);
 
 			GUIEmailAccount account = settings.getEmailAccount();
 			if (account == null) {
@@ -288,17 +257,14 @@ public class VIASettingsPanel extends AdminPanel {
 				settings.setEmailAccount(account);
 			}
 
-			account.setMailAddress((String) values.get("mailaddress"));
-			account.setHost((String) values.get("server"));
-			account.setUsername((String) values.get(USERNAME));
-			account.setPassword((String) values.get(PASSWORD));
-			account.setProvider((String) values.get("protocol"));
-			if (values.get("port") instanceof Integer)
-				account.setPort((Integer) values.get("port"));
-			else
-				account.setPort(Integer.parseInt((String) values.get("port")));
-			account.setSsl("yes".equals(values.get("ssl")));
-			account.setMailFolder((String) values.get("mailfolder"));
+			account.setMailAddress(vm.getValueAsString("mailaddress"));
+			account.setHost(vm.getValueAsString("server"));
+			account.setUsername(vm.getValueAsString(USERNAME));
+			account.setPassword(vm.getValueAsString(PASSWORD));
+			account.setProvider(vm.getValueAsString("protocol"));
+			account.setPort(Integer.parseInt(vm.getValueAsString("port")));
+			account.setSsl(Boolean.valueOf(vm.getValueAsString("ssl")));
+			account.setMailFolder(vm.getValueAsString("mailfolder"));
 
 			if (account.getMailAddress() == null || account.getMailAddress().trim().isEmpty())
 				account.setEnabled(0);
@@ -306,5 +272,15 @@ public class VIASettingsPanel extends AdminPanel {
 				account.setEnabled(1);
 		}
 		return !vm.hasErrors();
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

@@ -56,7 +56,7 @@ public class UsersDataServlet extends AbstractDataServlet {
 		/*
 		 * Iterate over records composing the response XML document
 		 */
-		UserDAO userDao = (UserDAO) Context.get().getBean(UserDAO.class);
+		UserDAO userDao = Context.get(UserDAO.class);
 		for (User user : users) {
 			if (user.getType() == User.TYPE_SYSTEM || (skipdisabled && user.getEnabled() != 1))
 				continue;
@@ -75,8 +75,7 @@ public class UsersDataServlet extends AbstractDataServlet {
 		writer.print("<user>");
 		writer.print("<id>" + user.getId() + "</id>");
 		writer.print("<username><![CDATA[" + user.getUsername() + "]]></username>");
-		writer.print("<enabledIcon>" + (user.getEnabled() == 1 ? "0" : "2") + "</enabledIcon>");
-		writer.print("<eenabled>" + (user.getEnabled() == 1 ? "true" : "false") + "</eenabled>");
+		writer.print("<eenabled>" + Boolean.toString(user.getEnabled() == 1) + "</eenabled>");
 		writer.print("<guest>" + user.isReadonly() + "</guest>");
 		writer.print("<name><![CDATA[" + StringUtils.defaultString(user.getName()) + "]]></name>");
 		writer.print("<firstName><![CDATA[" + StringUtils.defaultString(user.getFirstName()) + "]]></firstName>");
@@ -113,8 +112,8 @@ public class UsersDataServlet extends AbstractDataServlet {
 	private List<User> findUsers(Session session, String groupIdOrName) throws PersistenceException {
 		List<User> users = new ArrayList<>();
 
-		UserDAO userDao = (UserDAO) Context.get().getBean(UserDAO.class);
-		GroupDAO groupDao = (GroupDAO) Context.get().getBean(GroupDAO.class);
+		UserDAO userDao = Context.get(UserDAO.class);
+		GroupDAO groupDao = Context.get(GroupDAO.class);
 
 		if (groupIdOrName != null && !groupIdOrName.trim().isEmpty()) {
 			Group group = null;

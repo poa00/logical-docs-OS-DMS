@@ -1,6 +1,5 @@
 package com.logicaldoc.util.junit;
 
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 
 import java.io.File;
@@ -14,8 +13,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 import javax.sql.DataSource;
 
@@ -31,9 +28,12 @@ import org.springframework.context.support.AbstractApplicationContext;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
 import org.springframework.util.CollectionUtils;
 
+import com.logicaldoc.util.Context;
+import com.logicaldoc.util.config.ContextProperties;
 import com.logicaldoc.util.io.FileUtil;
 import com.logicaldoc.util.plugin.PluginException;
 import com.logicaldoc.util.plugin.PluginRegistry;
+import com.logicaldoc.util.time.Pause;
 
 /**
  * Abstract test case that of database and context initialization.
@@ -51,7 +51,7 @@ public abstract class AbstractTestCase {
 
 	protected File tempDir = new File("target/tmp");
 
-	private String userHome = System.getProperty(USER_HOME);
+	protected final String originalUserHome = System.getProperty(USER_HOME);
 
 	@Before
 	public void setUp() throws IOException, SQLException, PluginException {
@@ -72,6 +72,10 @@ public abstract class AbstractTestCase {
 	public void tearDown() throws SQLException {
 		try {
 			destroyDatabase();
+
+			File pluginsDir = new File(
+					Context.get().getProperties().getProperty("conf.plugindir", "target/tests-plugins"));
+			FileUtil.delete(pluginsDir);
 
 			if (context != null)
 				((AbstractApplicationContext) context).close();
@@ -116,7 +120,8 @@ public abstract class AbstractTestCase {
 		if (CollectionUtils.isEmpty(pluginArchives))
 			return;
 
-		File pluginsDir = new File("target/tests-plugins");
+		File pluginsDir = new File(new ContextProperties().getProperty("conf.plugindir", "target/tests-plugins"));
+		FileUtil.delete(pluginsDir);
 		pluginsDir.mkdir();
 
 		for (String pluginArchive : pluginArchives) {
@@ -181,7 +186,7 @@ public abstract class AbstractTestCase {
 	 */
 	private void loadDevelSettings() throws IOException {
 		Properties devSettings = new Properties();
-		try (FileReader reader = new FileReader(new File(userHome + "/logicaldoc-dev.properties"))) {
+		try (FileReader reader = new FileReader(new File(originalUserHome + "/logicaldoc-dev.properties"))) {
 			devSettings.load(reader);
 			for (Map.Entry<Object, Object> entry : devSettings.entrySet())
 				System.setProperty(entry.getKey().toString(), entry.getValue().toString());
@@ -195,7 +200,7 @@ public abstract class AbstractTestCase {
 
 	private void restoreUserHome() {
 		// Restore user home system property
-		System.setProperty(USER_HOME, userHome);
+		System.setProperty(USER_HOME, originalUserHome);
 	}
 
 	/**
@@ -213,13 +218,10 @@ public abstract class AbstractTestCase {
 	}
 
 	protected Connection getConnection() throws SQLException {
-		DataSource ds = (DataSource) context.getBean("DataSource");
-		return ds.getConnection();
+		return context.getBean(DataSource.class).getConnection();
 	}
 
 	protected void waiting() throws InterruptedException {
-		final int secondsToWait = 5;
-		CountDownLatch latch = new CountDownLatch(1);
-		assertFalse(latch.await(secondsToWait, TimeUnit.SECONDS));
+		Pause.doPause(5000L);
 	}
 }

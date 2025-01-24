@@ -1,23 +1,23 @@
 package com.logicaldoc.gui.frontend.client.tenant;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.logicaldoc.gui.common.client.Constants;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUITenant;
 import com.logicaldoc.gui.common.client.data.TenantsDS;
+import com.logicaldoc.gui.common.client.grid.EnabledDateListGridField;
+import com.logicaldoc.gui.common.client.grid.EnabledListGridField;
+import com.logicaldoc.gui.common.client.grid.IdListGridField;
+import com.logicaldoc.gui.common.client.grid.formatters.EnabledCellFormatter;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.LD;
-import com.logicaldoc.gui.common.client.util.Util;
 import com.logicaldoc.gui.common.client.widgets.HTMLPanel;
 import com.logicaldoc.gui.common.client.widgets.InfoPanel;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField;
 import com.logicaldoc.gui.frontend.client.administration.AdminPanel;
 import com.logicaldoc.gui.frontend.client.services.TenantService;
 import com.smartgwt.client.data.AdvancedCriteria;
 import com.smartgwt.client.data.Record;
 import com.smartgwt.client.types.Alignment;
-import com.smartgwt.client.types.ListGridFieldType;
 import com.smartgwt.client.types.OperatorId;
 import com.smartgwt.client.types.SelectionStyle;
 import com.smartgwt.client.widgets.Canvas;
@@ -39,7 +39,7 @@ import com.smartgwt.client.widgets.toolbar.ToolStripButton;
  */
 public class TenantsPanel extends AdminPanel {
 
-	private static final String ENABLED_ICON = "enabledIcon";
+	private static final String ENABLED = "eenabled";
 
 	private static final String ADDRESS = "address";
 
@@ -69,40 +69,40 @@ public class TenantsPanel extends AdminPanel {
 		listing.setHeight("50%");
 		listing.setShowResizeBar(true);
 
-		ListGridField id = new ListGridField("id", 50);
-		id.setHidden(true);
+		ListGridField id = new IdListGridField();
+		id.setCellFormatter(new EnabledCellFormatter());
 
 		ListGridField name = new ListGridField("name", I18N.message("name"), 100);
 		name.setCanFilter(true);
+		name.setCellFormatter(new EnabledCellFormatter());
 
 		ListGridField displayName = new ListGridField("displayName", I18N.message("displayname"), 150);
 		displayName.setCanFilter(true);
+		displayName.setCellFormatter(new EnabledCellFormatter());
 
 		ListGridField telephone = new ListGridField("telephone", I18N.message("phone"), 90);
 		telephone.setCanFilter(true);
+		telephone.setCellFormatter(new EnabledCellFormatter());
 
 		ListGridField country = new ListGridField(COUNTRY, I18N.message(COUNTRY), 90);
 		country.setCanFilter(true);
+		country.setCellFormatter(new EnabledCellFormatter());
 
 		ListGridField city = new ListGridField("city", I18N.message("city"), 90);
 		city.setCanFilter(true);
+		city.setCellFormatter(new EnabledCellFormatter());
 
 		ListGridField email = new ListGridField(EMAIL, I18N.message(EMAIL), 200);
 		email.setCanFilter(true);
+		email.setCellFormatter(new EnabledCellFormatter());
 
 		ListGridField address = new ListGridField(ADDRESS, I18N.message(ADDRESS), 150);
 		address.setCanFilter(true);
+		address.setCellFormatter(new EnabledCellFormatter());
 
-		ListGridField enabled = new ListGridField(ENABLED_ICON, " ", 30);
-		enabled.setType(ListGridFieldType.IMAGE);
-		enabled.setCanSort(false);
-		enabled.setAlign(Alignment.CENTER);
-		enabled.setShowDefaultContextMenu(false);
-		enabled.setImageURLPrefix(Util.imagePrefix());
-		enabled.setImageURLSuffix(".png");
-		enabled.setCanFilter(false);
+		ListGridField enabled = new EnabledListGridField();
 
-		ListGridField expire = new DateListGridField("expire", "expireson");
+		ListGridField expire = new EnabledDateListGridField("expire", "expireson");
 
 		list = new ListGrid();
 		list.setEmptyMessage(I18N.message("notitemstoshow"));
@@ -155,13 +155,7 @@ public class TenantsPanel extends AdminPanel {
 	}
 
 	public void loadTenant(long tenantId) {
-		TenantService.Instance.get().load(tenantId, new AsyncCallback<>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
+		TenantService.Instance.get().load(tenantId, new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(GUITenant tenant) {
 				showTenantDetails(tenant);
@@ -194,14 +188,7 @@ public class TenantsPanel extends AdminPanel {
 		rec.setAttribute("postalCode", tenant.getPostalCode());
 		rec.setAttribute("state", tenant.getState());
 		rec.setAttribute("expire", tenant.getExpire());
-
-		if (tenant.isEnabled()) {
-			rec.setAttribute(ENABLED_ICON, "bullet_green");
-			rec.setAttribute("eenabled", false);
-		} else {
-			rec.setAttribute(ENABLED_ICON, "bullet_red");
-			rec.setAttribute("eenabled", false);
-		}
+		rec.setAttribute(ENABLED, tenant.isEnabled());
 
 		list.refreshRow(list.getRecordIndex(rec));
 	}
@@ -223,25 +210,58 @@ public class TenantsPanel extends AdminPanel {
 
 		MenuItem delete = new MenuItem();
 		delete.setTitle(I18N.message("ddelete"));
-		delete.addClickHandler(event -> 
-			LD.ask(I18N.message("question"), I18N.message("confirmdelete"), answer -> {
-				if (Boolean.TRUE.equals(answer)) {
-					TenantService.Instance.get().delete(id, new AsyncCallback<>() {
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
-						}
+		delete.addClickHandler(event -> LD.ask(I18N.message("question"), I18N.message("confirmdelete"), answer -> {
+			if (Boolean.TRUE.equals(answer)) {
+				TenantService.Instance.get().delete(id, new DefaultAsyncCallback<>() {
+					@Override
+					public void onSuccess(Void result) {
+						super.onSuccess(result);
+						list.removeSelectedData();
+						list.deselectAllRecords();
+						details = SELECT_TENANT;
+						detailsContainer.setMembers(details);
+					}
+				});
+			}
+		}));
 
-						@Override
-						public void onSuccess(Void result) {
-							list.removeSelectedData();
-							list.deselectAllRecords();
-							details = SELECT_TENANT;
-							detailsContainer.setMembers(details);
-						}
-					});
-				}
-			}));
+		MenuItem enable = new MenuItem();
+		enable.setTitle(I18N.message("enable"));
+		enable.setEnabled(Boolean.FALSE.equals(rec.getAttributeAsBoolean(ENABLED)));
+		enable.addClickHandler(event -> TenantService.Instance.get().load(id, new DefaultAsyncCallback<>() {
+			@Override
+			public void onSuccess(GUITenant tenant) {
+				tenant.setEnabled(true);
+				TenantService.Instance.get().save(tenant, new DefaultAsyncCallback<>() {
+
+					@Override
+					public void onSuccess(GUITenant v) {
+						super.onSuccess(v);
+						updateRecord(v);
+						showTenantDetails(v);
+					}
+				});
+			}
+		}));
+
+		MenuItem disable = new MenuItem();
+		disable.setTitle(I18N.message("disable"));
+		disable.setEnabled(Boolean.TRUE.equals(rec.getAttributeAsBoolean(ENABLED)));
+		disable.addClickHandler(event -> TenantService.Instance.get().load(id, new DefaultAsyncCallback<>() {
+			@Override
+			public void onSuccess(GUITenant tenant) {
+				tenant.setEnabled(false);
+				TenantService.Instance.get().save(tenant, new DefaultAsyncCallback<>() {
+
+					@Override
+					public void onSuccess(GUITenant v) {
+						super.onSuccess(v);
+						updateRecord(v);
+						showTenantDetails(v);
+					}
+				});
+			}
+		}));
 
 		MenuItem password = new MenuItem();
 		password.setTitle(I18N.message("changepassword"));
@@ -251,9 +271,21 @@ public class TenantsPanel extends AdminPanel {
 		if (id == Constants.TENANT_DEFAULTID) {
 			delete.setEnabled(false);
 			password.setEnabled(false);
+			enable.setEnabled(false);
+			disable.setEnabled(false);
 		}
 
-		contextMenu.setItems(password, delete);
+		contextMenu.setItems(password, enable, disable, delete);
 		contextMenu.showContextMenu();
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

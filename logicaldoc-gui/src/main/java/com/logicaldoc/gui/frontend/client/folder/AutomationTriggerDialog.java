@@ -1,10 +1,10 @@
 package com.logicaldoc.gui.frontend.client.folder;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIAutomationRoutine;
 import com.logicaldoc.gui.common.client.beans.GUIAutomationTrigger;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
+import com.logicaldoc.gui.common.client.util.EventSelectorOptions;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.frontend.client.services.AutomationService;
 import com.smartgwt.client.types.HeaderControls;
@@ -106,8 +106,8 @@ public class AutomationTriggerDialog extends Window {
 		form1.setNumCols(1);
 		form1.setValuesManager(vm);
 
-		SelectItem events = ItemFactory.newEventsSelector(EVENTS, I18N.message("triggeron"), null, true, true, true,
-				true, true);
+		SelectItem events = ItemFactory.newEventsSelector(EVENTS, I18N.message("triggeron"), null,
+				new EventSelectorOptions(true, true, true, true, true, true, false));
 		events.setHeight(210);
 		events.setHeight(250);
 		events.setEndRow(true);
@@ -149,12 +149,7 @@ public class AutomationTriggerDialog extends Window {
 
 			trigger.setEvents(eventsStr);
 
-			AutomationService.Instance.get().saveTrigger(trigger, new AsyncCallback<>() {
-				@Override
-				public void onFailure(Throwable caught) {
-					GuiLog.serverError(caught);
-				}
-
+			AutomationService.Instance.get().saveTrigger(trigger, new DefaultAsyncCallback<>() {
 				@Override
 				public void onSuccess(GUIAutomationTrigger trg) {
 					automationPanel.updateRecord(trg);
@@ -162,5 +157,15 @@ public class AutomationTriggerDialog extends Window {
 				}
 			});
 		}
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

@@ -40,7 +40,7 @@ import com.logicaldoc.core.security.SessionManager;
 import com.logicaldoc.core.security.user.Group;
 import com.logicaldoc.core.security.user.User;
 import com.logicaldoc.core.security.user.UserDAO;
-import com.logicaldoc.core.store.Storer;
+import com.logicaldoc.core.store.Store;
 import com.logicaldoc.util.Context;
 import com.logicaldoc.webdav.context.ImportContext;
 import com.logicaldoc.webdav.resource.model.Resource;
@@ -48,11 +48,11 @@ import com.logicaldoc.webdav.resource.model.ResourceImpl;
 import com.logicaldoc.webdav.session.WebdavSession;
 
 /**
- * Base implementation of a ResourceService
+ * Base implementation of a {@link ResourceService}
  * 
  * @author Sebastian Wenzky
  */
-@Component("ResourceService")
+@Component("resourceService")
 public class ResourceServiceImpl implements ResourceService {
 
 	private static final long serialVersionUID = 1L;
@@ -68,11 +68,11 @@ public class ResourceServiceImpl implements ResourceService {
 	@javax.annotation.Resource(name = "FolderDAO")
 	private transient FolderDAO folderDAO;
 
-	@javax.annotation.Resource(name = "DocumentManager")
+	@javax.annotation.Resource(name = "documentManager")
 	private transient DocumentManager documentManager;
 
-	@javax.annotation.Resource(name = "Storer")
-	private transient Storer storer;
+	@javax.annotation.Resource(name = "Store")
+	private transient Store store;
 
 	@javax.annotation.Resource(name = "UserDAO")
 	private transient UserDAO userDAO;
@@ -97,8 +97,8 @@ public class ResourceServiceImpl implements ResourceService {
 		this.folderDAO = folderDAO;
 	}
 
-	public void setStorer(Storer storer) {
-		this.storer = storer;
+	public void setStore(Store store) {
+		this.store = store;
 	}
 
 	private Resource marshallFolder(Folder folder, WebdavSession session) {
@@ -279,10 +279,11 @@ public class ResourceServiceImpl implements ResourceService {
 		User user;
 		try {
 			user = userDAO.findById(userId);
+			userDAO.initialize(user);
 		} catch (PersistenceException e) {
 			throw new DavException(HttpServletResponse.SC_FORBIDDEN, e);
 		}
-		userDAO.initialize(user);
+		
 		checkPublished(user, document);
 
 		return marshallDocument(document, session);
@@ -830,11 +831,11 @@ public class ResourceServiceImpl implements ResourceService {
 		InputStream is = null;
 		try {
 			if (version == null || version.equals("")) {
-				String res = storer.getResourceName(document, null, null);
-				is = storer.getStream(document.getId(), res);
+				String res = store.getResourceName(document, null, null);
+				is = store.getStream(document.getId(), res);
 			} else {
-				String res = storer.getResourceName(document, resource.getVersionLabel(), null);
-				is = storer.getStream(document.getId(), res);
+				String res = store.getResourceName(document, resource.getVersionLabel(), null);
+				is = store.getStream(document.getId(), res);
 			}
 		} catch (IOException e) {
 			throw new DavException(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, e);
@@ -849,10 +850,10 @@ public class ResourceServiceImpl implements ResourceService {
 		User user = null;
 		try {
 			user = userDAO.findById(resource.getRequestedPerson());
+			userDAO.initialize(user);
 		} catch (PersistenceException e1) {
 			throw new DavException(HttpServletResponse.SC_FORBIDDEN, e1);
 		}
-		userDAO.initialize(user);
 
 		try {
 			checkPublished(user, Long.parseLong(resource.getID()));
@@ -941,7 +942,7 @@ public class ResourceServiceImpl implements ResourceService {
 		try {
 			User user = userDAO.findById(resource.getRequestedPerson());
 
-			BookmarkDAO bdao = (BookmarkDAO) Context.get().getBean(BookmarkDAO.class);
+			BookmarkDAO bdao = Context.get(BookmarkDAO.class);
 
 			Bookmark bmark = new Bookmark();
 			if (resource.isFolder()) {
@@ -972,7 +973,7 @@ public class ResourceServiceImpl implements ResourceService {
 		try {
 			User user = userDAO.findById(resource.getRequestedPerson());
 
-			BookmarkDAO bdao = (BookmarkDAO) Context.get().getBean(BookmarkDAO.class);
+			BookmarkDAO bdao = Context.get(BookmarkDAO.class);
 
 			Bookmark bkm = null;
 			if (resource.isFolder()) {

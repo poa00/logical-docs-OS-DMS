@@ -17,7 +17,7 @@ import com.logicaldoc.webservice.doc.WSDoc;
 @WebService(name = "Auth", serviceName = "Auth", targetNamespace = "http://ws.logicaldoc.com")
 public interface AuthService {
 	/**
-	 * Starts a new session.
+	 *  Starts a new session.
 	 * 
 	 * @param username The username
 	 * @param password The password
@@ -27,15 +27,29 @@ public interface AuthService {
 	 * @throws AuthenticationException the user was not authenticated
 	 */
 	@WebMethod(action = "login")
-	@WSDoc(description = "starts a new session; returns the session identifier(SID)")
+	@WSDoc(description = "deprecated, use loginApiKey instead.")
 	public String login(@WebParam(name = "username")
 	String username, @WebParam(name = "password")
 	String password) throws AuthenticationException;
 
 	/**
+	 * Starts a new session.
+	 * 
+	 * @param apiKey The API Key
+	 * 
+	 * @return The newly created session identifier(sid)
+	 * 
+	 * @throws AuthenticationException the user was not authenticated
+	 */
+	@WebMethod(action = "loginApiKey")
+	@WSDoc(description = "starts a new session; returns the session identifier(SID)")
+	public String loginApiKey(@WebParam(name = "apiKey")
+	String apiKey) throws AuthenticationException;
+
+	/**
 	 * Closes a session.
 	 * 
-	 * @param sid The session identifier
+	 * @param sid identifier of the session or an API Key
 	 */
 	@WebMethod(action = "logout")
 	@WSDoc(description = "closes a session")
@@ -46,7 +60,7 @@ public interface AuthService {
 	/**
 	 * Checks if a SID is valid
 	 * 
-	 * @param sid identifier of the session
+	 * @param sid identifier of the session or an API Key
 	 * 
 	 * @return if the session is valid
 	 */
@@ -59,7 +73,7 @@ public interface AuthService {
 	/**
 	 * Renews a session
 	 * 
-	 * @param sid identifier of the session
+	 * @param sid identifier of the session or an API Key
 	 */
 	@WebMethod(action = "renew")
 	@WSDoc(description = "renews an existing session")

@@ -88,7 +88,7 @@
 <!ELEMENT value (#PCDATA)>
 ]>
 
-<plugin id="logicaldoc-core" version="8.9.3" class="com.logicaldoc.core.CorePlugin">
+<plugin id="logicaldoc-core" version="9.1.1" class="com.logicaldoc.core.CorePlugin">
   <extension-point id="DbInit">
     <parameter-def id="sqlFile" />
     <parameter-def id="position" />
@@ -148,7 +148,7 @@
   	<parameter-def id="name" />
     <parameter-def id="factory" />
   </extension-point>  
-  <extension-point id="Storer">
+  <extension-point id="Store">
     <parameter-def id="type" />
     <parameter-def id="class" />
   </extension-point>  
@@ -160,6 +160,10 @@
   <extension plugin-id="logicaldoc-core" point-id="Authentication" id="DefaultAuthentication">
     <parameter id="authenticatorId" value="DefaultAuthenticator" />
     <parameter id="position" value="100" />
+  </extension>
+  <extension plugin-id="logicaldoc-core" point-id="Authentication" id="ApiKeyAuthentication">
+    <parameter id="authenticatorId" value="ApiKeyAuthenticator" />
+    <parameter id="position" value="110" />
   </extension>
 
   <extension plugin-id="logicaldoc-core" point-id="Language" id="standardLanguage">
@@ -451,7 +455,10 @@
   </extension>
   <extension plugin-id="logicaldoc-core" point-id="Aspect" id="aspWriteCheck">
     <parameter id="code" value="writeCheck" />
-  </extension>  
+  </extension> 
+    <extension plugin-id="logicaldoc-core" point-id="Aspect" id="aspSendingMessages">
+    <parameter id="code" value="sendingMessages" />
+  </extension> 
 
   <extension plugin-id="logicaldoc-core" point-id="FormatConverter" id="imageConv">
 		<parameter id="in" value="png,gif,jpg,jpeg,jfif,tif,tiff,bmp,psd,webp,heic"/>
@@ -507,7 +514,12 @@
 		<parameter id="in" value="pst"/>
 		<parameter id="out" value="txt,pdf"/>
 		<parameter id="class" value="com.logicaldoc.core.conversion.PstConverter"/>
-  </extension>  
+  </extension>
+  <extension plugin-id="logicaldoc-core" point-id="FormatConverter" id="mdConv">
+		<parameter id="in" value="md,mkd,mdwn,mdown,mdtxt,mdtext,markdown"/>
+		<parameter id="out" value="html,pdf"/>
+		<parameter id="class" value="com.logicaldoc.core.conversion.MarkdownConverter"/>
+  </extension>    
 
 
   <extension plugin-id="logicaldoc-core" point-id="DocumentListener" id="documentInitializationListener">

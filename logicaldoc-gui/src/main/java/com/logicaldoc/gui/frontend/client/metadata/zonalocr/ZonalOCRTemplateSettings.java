@@ -1,10 +1,10 @@
 package com.logicaldoc.gui.frontend.client.metadata.zonalocr;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
+import com.logicaldoc.gui.common.client.IgnoreAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIOCRTemplate;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.widgets.Upload;
 import com.logicaldoc.gui.frontend.client.services.DocumentService;
@@ -16,11 +16,11 @@ import com.smartgwt.client.widgets.IButton;
 import com.smartgwt.client.widgets.Window;
 import com.smartgwt.client.widgets.form.DynamicForm;
 import com.smartgwt.client.widgets.form.ValuesManager;
-import com.smartgwt.client.widgets.form.fields.RadioGroupItem;
 import com.smartgwt.client.widgets.form.fields.SpinnerItem;
 import com.smartgwt.client.widgets.form.fields.StaticTextItem;
 import com.smartgwt.client.widgets.form.fields.TextAreaItem;
 import com.smartgwt.client.widgets.form.fields.TextItem;
+import com.smartgwt.client.widgets.form.fields.ToggleItem;
 import com.smartgwt.client.widgets.layout.VLayout;
 
 /**
@@ -68,13 +68,7 @@ public class ZonalOCRTemplateSettings extends Window {
 		layout.addMember(save);
 
 		// Clean the upload folder if the window is closed
-		addCloseClickHandler(event -> DocumentService.Instance.get().cleanUploadedFileFolder(new AsyncCallback<>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
+		addCloseClickHandler(event -> DocumentService.Instance.get().cleanUploadedFileFolder(new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(Void result) {
 				destroy();
@@ -84,18 +78,7 @@ public class ZonalOCRTemplateSettings extends Window {
 		addItem(layout);
 
 		// Just to clean the upload folder
-		DocumentService.Instance.get().cleanUploadedFileFolder(new AsyncCallback<>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				// Nothing to do
-			}
-
-			@Override
-			public void onSuccess(Void result) {
-				// Nothing to do
-			}
-		});
+		DocumentService.Instance.get().cleanUploadedFileFolder(new IgnoreAsyncCallback<>());
 	}
 
 	private void prepareForm() {
@@ -117,9 +100,9 @@ public class ZonalOCRTemplateSettings extends Window {
 		StaticTextItem id = ItemFactory.newStaticTextItem("id", "" + ocrPanel.getSelectedOcrTemplate().getId());
 		id.setVisible(ocrPanel.getSelectedOcrTemplate().getId() != 0L);
 
-		RadioGroupItem saveChangeEvent = ItemFactory.newBooleanSelector("savechangeevent");
+		ToggleItem saveChangeEvent = ItemFactory.newToggleItem("savechangeevent",
+				ocrPanel.getSelectedOcrTemplate().isSaveChangeEvent());
 		saveChangeEvent.setWrapTitle(false);
-		saveChangeEvent.setValue(ocrPanel.getSelectedOcrTemplate().isSaveChangeEvent() ? "yes" : "no");
 
 		SpinnerItem batch = ItemFactory.newSpinnerItem("batch", Session.get().getConfigAsInt("zonalocr.batch"));
 		batch.setStep(50);
@@ -145,7 +128,7 @@ public class ZonalOCRTemplateSettings extends Window {
 
 		ocrPanel.getSelectedOcrTemplate().setName(vm.getValueAsString("name"));
 		ocrPanel.getSelectedOcrTemplate().setDescription(vm.getValueAsString("description"));
-		ocrPanel.getSelectedOcrTemplate().setSaveChangeEvent("yes".equals(vm.getValue("savechangeevent")));
+		ocrPanel.getSelectedOcrTemplate().setSaveChangeEvent(Boolean.valueOf(vm.getValueAsString("savechangeevent")));
 
 		if (Session.get().isDefaultTenant()) {
 			int batch = Integer.parseInt(vm.getValueAsString("batch"));
@@ -153,17 +136,22 @@ public class ZonalOCRTemplateSettings extends Window {
 			ocrPanel.getSelectedOcrTemplate().setBatch(batch);
 		}
 
-		ZonalOCRService.Instance.get().save(ocrPanel.getSelectedOcrTemplate(), new AsyncCallback<>() {
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
+		ZonalOCRService.Instance.get().save(ocrPanel.getSelectedOcrTemplate(), new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(GUIOCRTemplate template) {
 				ocrPanel.setSelectedOcrTemplate(template);
 				destroy();
 			}
 		});
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

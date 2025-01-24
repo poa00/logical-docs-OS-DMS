@@ -1,22 +1,22 @@
 package com.logicaldoc.gui.frontend.client.reports;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIFolder;
 import com.logicaldoc.gui.common.client.data.DeletedDocsDS;
+import com.logicaldoc.gui.common.client.grid.ColoredListGridField;
+import com.logicaldoc.gui.common.client.grid.DateListGridField;
+import com.logicaldoc.gui.common.client.grid.FileNameListGridField;
+import com.logicaldoc.gui.common.client.grid.FileSizeListGridField;
+import com.logicaldoc.gui.common.client.grid.IdListGridField;
+import com.logicaldoc.gui.common.client.grid.UserListGridField;
+import com.logicaldoc.gui.common.client.grid.VersionListGridField;
+import com.logicaldoc.gui.common.client.grid.DateListGridField.DateCellFormatter;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.GridUtil;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.common.client.widgets.FolderChangeListener;
 import com.logicaldoc.gui.common.client.widgets.FolderSelector;
-import com.logicaldoc.gui.common.client.widgets.grid.ColoredListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField.DateCellFormatter;
-import com.logicaldoc.gui.common.client.widgets.grid.FileNameListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.FileSizeListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.UserListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.VersionListGridField;
 import com.logicaldoc.gui.frontend.client.folder.RestoreDialog;
 import com.logicaldoc.gui.frontend.client.services.DocumentService;
 import com.smartgwt.client.types.Alignment;
@@ -50,9 +50,7 @@ public class DeletedDocsReport extends ReportPanel implements FolderChangeListen
 
 	@Override
 	protected void prepareListGrid() {
-		ListGridField id = new ListGridField("id", 100);
-		id.setHidden(true);
-		id.setCanGroupBy(false);
+		ListGridField id = new IdListGridField();
 
 		ListGridField size = new FileSizeListGridField("size", I18N.message("size"), 70);
 		size.setCanFilter(false);
@@ -147,27 +145,28 @@ public class DeletedDocsReport extends ReportPanel implements FolderChangeListen
 
 		MenuItem delete = new MenuItem();
 		delete.setTitle(I18N.message("permanentlydelete"));
-		delete.addClickHandler(click -> LD.ask(I18N.message("permanentlydelete"), I18N.message("permanentlydeletehint"), choice -> {
-			if (Boolean.TRUE.equals(choice)) {
-				LD.contactingServer();
-				DocumentService.Instance.get().destroyDocuments(GridUtil.getIds(selection), new AsyncCallback<Void>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						LD.clearPrompt();
-						GuiLog.serverError(caught);
-						refresh();
-					}
+		delete.addClickHandler(
+				click -> LD.ask(I18N.message("permanentlydelete"), I18N.message("permanentlydeletehint"), choice -> {
+					if (Boolean.TRUE.equals(choice)) {
+						LD.contactingServer();
+						DocumentService.Instance.get().destroyDocuments(GridUtil.getIds(selection),
+								new DefaultAsyncCallback<Void>() {
+									@Override
+									public void onFailure(Throwable caught) {
+										super.onFailure(caught);
+										refresh();
+									}
 
-					@Override
-					public void onSuccess(Void arg0) {
-						LD.clearPrompt();
-						refresh();
+									@Override
+									public void onSuccess(Void arg0) {
+										LD.clearPrompt();
+										refresh();
+									}
+								});
 					}
-				});
-			}
-		}));
-		delete.setEnabled(com.logicaldoc.gui.common.client.Menu
-				.enabled(com.logicaldoc.gui.common.client.Menu.DESTROY_DOCUMENTS));
+				}));
+		delete.setEnabled(
+				com.logicaldoc.gui.common.client.Menu.enabled(com.logicaldoc.gui.common.client.Menu.DESTROY_DOCUMENTS));
 
 		contextMenu.setItems(restore, delete);
 		contextMenu.showContextMenu();
@@ -176,5 +175,15 @@ public class DeletedDocsReport extends ReportPanel implements FolderChangeListen
 	@Override
 	public void onChanged(GUIFolder folder) {
 		refresh();
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

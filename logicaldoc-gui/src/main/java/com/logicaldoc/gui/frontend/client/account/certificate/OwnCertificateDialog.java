@@ -1,11 +1,11 @@
 package com.logicaldoc.gui.frontend.client.account.certificate;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
+import com.logicaldoc.gui.common.client.IgnoreAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIUser;
 import com.logicaldoc.gui.common.client.controllers.UserController;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.services.SecurityService;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.LD;
@@ -63,18 +63,14 @@ public class OwnCertificateDialog extends Window {
 		layout.addMember(submitButton);
 
 		// Clean the upload folder if the window is closed
-		addCloseClickHandler(event -> DocumentService.Instance.get().cleanUploadedFileFolder(new AsyncCallback<>() {
+		addCloseClickHandler(
+				event -> DocumentService.Instance.get().cleanUploadedFileFolder(new DefaultAsyncCallback<>() {
 
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
-			@Override
-			public void onSuccess(Void result) {
-				destroy();
-			}
-		}));
+					@Override
+					public void onSuccess(Void result) {
+						destroy();
+					}
+				}));
 
 		addItem(layout);
 
@@ -83,18 +79,7 @@ public class OwnCertificateDialog extends Window {
 
 	private void cleanUploadFolder() {
 		// Just to clean the upload folder
-		DocumentService.Instance.get().cleanUploadedFileFolder(new AsyncCallback<>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				// Nothing to do
-			}
-
-			@Override
-			public void onSuccess(Void result) {
-				// Nothing to do
-			}
-		});
+		DocumentService.Instance.get().cleanUploadedFileFolder(new IgnoreAsyncCallback<>());
 	}
 
 	private void prepareForm() {
@@ -123,37 +108,37 @@ public class OwnCertificateDialog extends Window {
 	}
 
 	public void onSubmit() {
-		if (Boolean.FALSE.equals(form.validate()))
+		if (!form.validate())
 			return;
 
 		LD.contactingServer();
 		SignService.Instance.get().importCertificate(form.getValueAsString(CERTIFICATE + ".crt"),
-				form.getValueAsString(PRIVATEKEY), new AsyncCallback<>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						LD.clearPrompt();
-						GuiLog.serverError(caught);
-					}
-
+				form.getValueAsString(PRIVATEKEY), new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Void arg0) {
 						LD.clearPrompt();
 						cleanUploadFolder();
-						SecurityService.Instance.get().getUser(Session.get().getUser().getId(), new AsyncCallback<>() {
+						SecurityService.Instance.get().getUser(Session.get().getUser().getId(),
+								new DefaultAsyncCallback<>() {
 
-							@Override
-							public void onFailure(Throwable caught) {
-								GuiLog.serverError(caught);
-							}
-
-							@Override
-							public void onSuccess(GUIUser user) {
-								Session.get().setUser(user);
-								UserController.get().changed(user);
-								destroy();
-							}
-						});
+									@Override
+									public void onSuccess(GUIUser user) {
+										Session.get().setUser(user);
+										UserController.get().changed(user);
+										destroy();
+									}
+								});
 					}
 				});
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

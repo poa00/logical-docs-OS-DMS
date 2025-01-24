@@ -110,6 +110,7 @@ public class FulltextSearch extends Search {
 			hit.setLanguage(rs.getString(36));
 			hit.setPages(rs.getInt(37));
 			hit.setColor(rs.getString(38));
+			hit.setLastNote(rs.getString(39));
 
 			return hit;
 		}
@@ -121,7 +122,7 @@ public class FulltextSearch extends Search {
 	@Override
 	public void internalSearch() throws SearchException {
 		FulltextSearchOptions opt = (FulltextSearchOptions) options;
-		SearchEngine engine = (SearchEngine) Context.get().getBean(SearchEngine.class);
+		SearchEngine engine = Context.get(SearchEngine.class);
 
 		setDefaultFields(opt);
 
@@ -148,11 +149,12 @@ public class FulltextSearch extends Search {
 		/*
 		 * Launch the search
 		 */
-		log.debug("Full-text seach: {}", query);
+		log.debug("Full-text seach: {}   filters: {}", query, filters);
 		Hits results = engine.search(query.toString(), filters, opt.getExpressionLanguage(), null);
 		log.debug("End of Full-text search");
 		log.debug("Fulltext hits count: {}", (results != null ? results.getCount() : 0));
-
+		
+		
 		// Save here the binding between ID and Hit
 		Map<Long, Hit> hitsMap = buildHitsMap(opt, results);
 
@@ -167,7 +169,7 @@ public class FulltextSearch extends Search {
 		StringBuilder hitsIdsCondition = new StringBuilder();
 		if (!hitsIds.isEmpty()) {
 			hitsIdsCondition.append(" and (");
-			FolderDAO fdao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+			FolderDAO fdao = Context.get(FolderDAO.class);
 			if (fdao.isOracle()) {
 				/*
 				 * In Oracle The limit of 1000 elements applies to sets of
@@ -196,7 +198,7 @@ public class FulltextSearch extends Search {
 		richQuery.append(
 				" FOLD.ld_name, A.ld_folderid, A.ld_tgs tags, A.ld_templateid, C.ld_name, A.ld_tenantid, A.ld_docreftype, ");
 		richQuery.append(
-				" A.ld_stamped, A.ld_password, A.ld_workflowstatusdisp, A.ld_language, A.ld_pages, A.ld_color ");
+				" A.ld_stamped, A.ld_password, A.ld_workflowstatusdisp, A.ld_language, A.ld_pages, A.ld_color, A.ld_lastnote ");
 		richQuery.append(" from ld_document A ");
 		richQuery.append(" join ld_folder FOLD on A.ld_folderid=FOLD.ld_id ");
 		richQuery.append(" left outer join ld_template C on A.ld_templateid=C.ld_id ");
@@ -226,7 +228,7 @@ public class FulltextSearch extends Search {
 			richQuery.append(
 					" FOLD.ld_name, A.ld_folderid, A.ld_tgs tags, REF.ld_templateid, C.ld_name, A.ld_tenantid, A.ld_docreftype, ");
 			richQuery.append(
-					" REF.ld_stamped, REF.ld_password, REF.ld_workflowstatusdisp, REF.ld_language, REF.ld_pages, A.ld_color ");
+					" REF.ld_stamped, REF.ld_password, REF.ld_workflowstatusdisp, REF.ld_language, REF.ld_pages, A.ld_color, A.ld_lastnote ");
 			richQuery.append(" from ld_document A  ");
 			richQuery.append(" join ld_folder FOLD on A.ld_folderid=FOLD.ld_id ");
 			richQuery.append(" join ld_document REF on A.ld_docref=REF.ld_id ");
@@ -248,7 +250,7 @@ public class FulltextSearch extends Search {
 
 		log.debug("Execute query {}", richQuery);
 
-		DocumentDAO dao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO dao = Context.get(DocumentDAO.class);
 		try {
 			dao.query(richQuery.toString(), new HitMapper(hitsMap), null);
 		} catch (PersistenceException e) {
@@ -267,7 +269,6 @@ public class FulltextSearch extends Search {
 		Map<Long, Hit> hitsMap = new HashMap<>();
 		while (results != null && results.hasNext()) {
 			Hit hit = results.next();
-
 			// Skip a document if not in the filter set
 			if (opt.getFilterIds() != null && !opt.getFilterIds().isEmpty()
 					&& !opt.getFilterIds().contains(hit.getId()))
@@ -300,7 +301,7 @@ public class FulltextSearch extends Search {
 
 	private void setQueryFilters(FulltextSearchOptions opt, Set<String> filters, long tenantId,
 			Collection<Long> accessibleFolderIds) throws SearchException, PersistenceException {
-		TenantDAO tdao = (TenantDAO) Context.get().getBean(TenantDAO.class);
+		TenantDAO tdao = Context.get(TenantDAO.class);
 		if (searchUser != null && tdao.count() > 1)
 			filters.add(HitField.TENANT_ID + ":" + (tenantId < 0 ? "\\" : "") + tenantId);
 
@@ -334,7 +335,7 @@ public class FulltextSearch extends Search {
 
 	private void appendFolderQueryFilter(FulltextSearchOptions opt, Set<String> filters,
 			Collection<Long> accessibleFolderIds) throws SearchException {
-		FolderDAO fdao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+		FolderDAO fdao = Context.get(FolderDAO.class);
 		try {
 			if (opt.getFolderId() != null && !accessibleFolderIds.contains(opt.getFolderId())
 					&& fdao.isReadAllowed(opt.getFolderId().longValue(), opt.getUserId()))

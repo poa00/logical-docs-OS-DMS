@@ -34,12 +34,15 @@ import com.logicaldoc.util.io.FileUtil;
  * Each document has one or more Versions. The most recent version is the one
  * used as default when we refer to a Document, but all previous versions are
  * accessible from the history even if the are not indexed.
+ * </p>
+ * 
  * <p>
  * Each Version carries out two main informations, the version code itself that
  * is called simply 'version', and the file version, called 'fileVersion'. The
  * first identified the Version itself while the second refers to the file
  * content. In general not all updates to a document involves the upload of a
  * new file.
+ * </p>
  * 
  * A Document is written in a single language, this language defines the
  * full-text index in which the document's content will be stored.
@@ -109,6 +112,11 @@ public abstract class AbstractDocument extends SecurableExtensibleObject impleme
 	public static final int NATURE_DOC = 0;
 
 	private String comment;
+
+	/**
+	 * The text of the last note put on the document
+	 */
+	private String lastNote;
 
 	private long fileSize = 0;
 
@@ -488,23 +496,23 @@ public abstract class AbstractDocument extends SecurableExtensibleObject impleme
 	 * @return name of the icon file
 	 */
 	public String getIcon() {
-		String icon = IconSelector.selectIcon("", docRef != null && docRef.longValue() != 0L);
+		String icon = IconSelector.selectIcon("");
 		try {
 			String extension = fileName.substring(fileName.lastIndexOf(".") + 1);
-			icon = IconSelector.selectIcon(extension, docRef != null && docRef.longValue() != 0L);
-			if ((getFileName().toLowerCase().endsWith(".eml") || getFileName().toLowerCase().endsWith(".msg"))
+			icon = IconSelector.selectIcon(extension);
+			if (docRef != null && docRef.longValue() != 0L && "pdf".equals(getDocRefType())) {
+				icon = IconSelector.selectIcon("pdf");
+			} else if ((getFileName().toLowerCase().endsWith(".eml") || getFileName().toLowerCase().endsWith(".msg"))
 					&& getPages() > 1) {
-				if (docRef != null && docRef.longValue() != 0L) {
-					icon = "email_attach-sc.png";
-				} else {
-					icon = "email_attach.png";
-				}
+				icon += "-clip";
 			}
-			if (docRef != null && docRef.longValue() != 0L && "pdf".equals(getDocRefType()))
-				icon = IconSelector.selectIcon("pdf", true);
 		} catch (Exception e) {
 			// Nothing to do
 		}
+
+		if (docRef != null && docRef.longValue() != 0L)
+			icon += "-shortcut";
+
 		return icon;
 	}
 
@@ -884,7 +892,7 @@ public abstract class AbstractDocument extends SecurableExtensibleObject impleme
 	 * 
 	 * @param pwd The password in readable format
 	 * 
-	 * @throws NoSuchAlgorithmException Cripting error 
+	 * @throws NoSuchAlgorithmException Cripting error
 	 */
 	public void setDecodedPassword(String pwd) throws NoSuchAlgorithmException {
 		if (org.apache.commons.lang.StringUtils.isNotEmpty(pwd)) {
@@ -921,37 +929,9 @@ public abstract class AbstractDocument extends SecurableExtensibleObject impleme
 
 		try {
 			String test = CryptUtil.encryptSHA256(myPassword);
-			if (test.equals(getPassword()))
-				return true;
-
-			// The test with current algorithm failed so we try with the legacy
-			// one
-			String testLegacy = CryptUtil.encryptSHA(myPassword);
-			if (testLegacy.equals(getPassword())) {
-				// There is match with the old scheme, so update the database
-				// with the new one
-				setPassword(test);
-				fixEncryptedPassword(test);
-				return true;
-			}
-
-			return false;
+			return test.equals(getPassword());
 		} catch (Exception t) {
 			return false;
-		}
-	}
-
-	/**
-	 * Saves the password encrypted with current algorithm into the database
-	 * 
-	 * @param encryptedPassword The encrypted password to write
-	 */
-	private void fixEncryptedPassword(String encryptedPassword) {
-		try {
-			DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
-			docDao.jdbcUpdate("update ld_document set ld_password='" + encryptedPassword + "' where ld_id=" + getId());
-		} catch (PersistenceException e) {
-			log.warn(e.getMessage());
 		}
 	}
 
@@ -1055,7 +1035,7 @@ public abstract class AbstractDocument extends SecurableExtensibleObject impleme
 			log.debug("Got error when trying to copy collections from document {}", docVO, ex);
 
 			// load again the provided doc
-			DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+			DocumentDAO docDao = Context.get(DocumentDAO.class);
 			try {
 				Document testDocVO = docDao.findById(docVO.getId());
 				if (testDocVO != null) {
@@ -1077,5 +1057,50 @@ public abstract class AbstractDocument extends SecurableExtensibleObject impleme
 
 	public void setDocAttrs(int docAttrs) {
 		this.docAttrs = docAttrs;
+	}
+
+	public String getLastNote() {
+		return lastNote;
+	}
+
+	public void setLastNote(String lastNote) {
+		this.lastNote = lastNote;
+	}
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = super.hashCode();
+		result = prime * result + ((customId == null) ? 0 : customId.hashCode());
+		result = prime * result + ((fileVersion == null) ? 0 : fileVersion.hashCode());
+		result = prime * result + ((version == null) ? 0 : version.hashCode());
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (!super.equals(obj))
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		AbstractDocument other = (AbstractDocument) obj;
+		if (customId == null) {
+			if (other.customId != null)
+				return false;
+		} else if (!customId.equals(other.customId))
+			return false;
+		if (fileVersion == null) {
+			if (other.fileVersion != null)
+				return false;
+		} else if (!fileVersion.equals(other.fileVersion))
+			return false;
+		if (version == null) {
+			if (other.version != null)
+				return false;
+		} else if (!version.equals(other.version))
+			return false;
+		return true;
 	}
 }

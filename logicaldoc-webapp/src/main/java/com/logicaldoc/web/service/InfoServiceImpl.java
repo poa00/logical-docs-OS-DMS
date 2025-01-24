@@ -123,16 +123,17 @@ public class InfoServiceImpl extends AbstractRemoteService implements InfoServic
 
 	private static String loadChangelog() {
 		try (InputStream is = IOUtil.getLimitedStream(InfoServiceImpl.class.getResourceAsStream("/CHANGELOG.txt"),
-				4096)) {
-			return IOUtil.readStream(is);
+				5000)) {
+			String changelog = IOUtil.readStream(is);
+			return changelog.replace("logicaldoc", "").replace("LogicalDOC", "");
 		} catch (Exception e) {
 			return "";
 		}
 	}
 
 	private void setAttributes(GUIInfo info, String tenantName) {
-		TenantDAO tDAO = (TenantDAO) Context.get().getBean(TenantDAO.class);
-		AttributeSetDAO aDAO = (AttributeSetDAO) Context.get().getBean(AttributeSetDAO.class);
+		TenantDAO tDAO = Context.get(TenantDAO.class);
+		AttributeSetDAO aDAO = Context.get(AttributeSetDAO.class);
 		try {
 			Tenant tenant = tDAO.findByName(tenantName);
 			if (tenant == null) {
@@ -174,7 +175,7 @@ public class InfoServiceImpl extends AbstractRemoteService implements InfoServic
 			alerts.add(restartReminder);
 		} else {
 			// Check if the database is connected
-			UserDAO dao = (UserDAO) Context.get().getBean(UserDAO.class);
+			UserDAO dao = Context.get(UserDAO.class);
 			int test = -1;
 			try {
 				test = dao.queryForInt("select count(*) from ld_user");
@@ -300,7 +301,7 @@ public class InfoServiceImpl extends AbstractRemoteService implements InfoServic
 
 	private static void loadGUISettingsFromDB(GUITenant tenant, List<GUIValue> values) {
 		try {
-			GenericDAO dao = (GenericDAO) Context.get().getBean(GenericDAO.class);
+			GenericDAO dao = Context.get(GenericDAO.class);
 			List<Generic> dbSettings = dao.findByTypeAndSubtype("guisetting", null, 0L, tenant.getId());
 			for (Generic generic : dbSettings)
 				values.add(new GUIValue(generic.getSubtype(), generic.getString1()));
@@ -373,7 +374,7 @@ public class InfoServiceImpl extends AbstractRemoteService implements InfoServic
 		log.debug("Requested info for session {}", session.getSid());
 
 		try {
-			SystemMessageDAO messageDao = (SystemMessageDAO) Context.get().getBean(SystemMessageDAO.class);
+			SystemMessageDAO messageDao = Context.get(SystemMessageDAO.class);
 			List<GUIParameter> parameters = new ArrayList<>();
 
 			GUIParameter messages = new GUIParameter("messages",
@@ -411,7 +412,7 @@ public class InfoServiceImpl extends AbstractRemoteService implements InfoServic
 			CronDescriptor descriptor = CronDescriptor.instance(LocaleUtil.toLocale(locale));
 			return descriptor.describe(parser.parse(expression));
 		} catch (Exception e) {
-			return (String) throwServerException(session, log, e);
+			return throwServerException(session, log, e);
 		}
 	}
 }

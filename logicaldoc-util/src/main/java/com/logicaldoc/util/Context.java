@@ -41,18 +41,30 @@ public class Context implements ApplicationContextAware, ApplicationListener<App
 	private static Map<SystemEventStatus, LinkedList<SystemEventListener>> systemEvents = new EnumMap<>(
 			SystemEventStatus.class);
 
-	// Singleton instance
-	private static Context instance;
-
 	// The Spring's application context
 	private ApplicationContext applicationContext;
 
+	private static Context instance;
+
 	private Context() {
-		instance = this;
+		// Do nothing
 	}
 
 	public static Context get() {
+		if (instance == null) {
+			synchronized (Context.class) {
+				instance = new Context();
+			}
+		}
 		return instance;
+	}
+
+	public static <R> R get(Class<R> requiredType) {
+		return get().getBean(requiredType);
+	}
+
+	public static Object get(String id) {
+		return get().getBean(id);
 	}
 
 	/**
@@ -61,7 +73,7 @@ public class Context implements ApplicationContextAware, ApplicationListener<App
 	 * @return the instance of ContextProperties in the application context
 	 */
 	public ContextProperties getProperties() {
-		return (ContextProperties) getBean(ContextProperties.class);
+		return getBean(ContextProperties.class);
 	}
 
 	@Override
@@ -77,7 +89,22 @@ public class Context implements ApplicationContextAware, ApplicationListener<App
 	 * @return The bean instance
 	 */
 	public Object getBean(String id) {
-		return applicationContext.getBean(id);
+		// If not found with give ID try to lowercase the first char
+		return applicationContext.containsBean(id) ? applicationContext.getBean(id)
+				: applicationContext.getBean(Character.toLowerCase(id.charAt(0)) + id.substring(1));
+	}
+
+	/**
+	 * Says if a bean is or not available
+	 * 
+	 * @param id identifier of the bean
+	 * 
+	 * @return true if the bean is available
+	 */
+	public boolean containsBean(String id) {
+		// If not found with give ID try to lowercase the first char
+		return applicationContext.containsBean(id)
+				|| applicationContext.containsBean(Character.toLowerCase(id.charAt(0)) + id.substring(1));
 	}
 
 	/**
@@ -93,16 +120,14 @@ public class Context implements ApplicationContextAware, ApplicationListener<App
 	/**
 	 * Retrieves the list of bean of the same type
 	 * 
-	 * @param clazz class to use as filter
+	 * @param requiredType class to use as filter
 	 * 
 	 * @return the collection of bean instances
 	 */
-	public List<Object> getBeansOfType(@SuppressWarnings("rawtypes")
-	Class clazz) {
-		List<Object> beans = new ArrayList<>();
-		for (String name : applicationContext.getBeanNamesForType(clazz)) {
-			beans.add(getBean(name));
-		}
+	public <R> List<R> getBeansOfType(Class<R> requiredType) {
+		List<R> beans = new ArrayList<>();
+		for (String name : applicationContext.getBeanNamesForType(requiredType))
+			beans.add(requiredType.cast(getBean(name)));
 		return beans;
 	}
 
@@ -111,18 +136,15 @@ public class Context implements ApplicationContextAware, ApplicationListener<App
 	 * first the fully qualified class name is checked, then if nothing was
 	 * found the simple class name is used as bean id.
 	 * 
-	 * @param clazz The bean identifier as class name
+	 * @param requiredType The bean identifier as class name
 	 * 
 	 * @return The bean instance
 	 */
-	public Object getBean(@SuppressWarnings("rawtypes")
-	Class clazz) {
-		String id = clazz.getName();
-
-		if (!applicationContext.containsBean(id))
-			id = id.substring(id.lastIndexOf('.') + 1);
-
-		return getBean(id);
+	public <R> R getBean(Class<R> requiredType) {
+		if (containsBean(requiredType.getSimpleName()))
+			return requiredType.cast(getBean(requiredType.getSimpleName()));
+		else
+			return applicationContext.getBean(requiredType);
 	}
 
 	/**
@@ -150,10 +172,8 @@ public class Context implements ApplicationContextAware, ApplicationListener<App
 	private static void closeCaches() {
 		CacheManager cm1 = CacheManager.getInstance();
 		cm1.shutdown();
-
-		for (Object cm : Context.get().getBeansOfType(CacheManager.class)) {
-			((CacheManager) cm).shutdown();
-		}
+		for (CacheManager cm : Context.get().getBeansOfType(CacheManager.class))
+			cm.shutdown();
 	}
 
 	/**
@@ -251,7 +271,7 @@ public class Context implements ApplicationContextAware, ApplicationListener<App
 	 * Closes this context
 	 */
 	public void close() {
-		if ((applicationContext instanceof org.springframework.context.ConfigurableApplicationContext configurableContext))
+		if (applicationContext instanceof org.springframework.context.ConfigurableApplicationContext configurableContext)
 			configurableContext.close();
 	}
 }

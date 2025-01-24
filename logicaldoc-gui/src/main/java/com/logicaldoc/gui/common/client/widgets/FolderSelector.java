@@ -27,8 +27,6 @@ public class FolderSelector extends TextItem {
 
 	private Long folderId;
 
-	private Menu menu = new Menu();
-
 	private Collection<FolderChangeListener> listeners = new ArrayList<>();
 
 	public FolderSelector(String name, List<FormItemIcon> additionalIcons) {
@@ -45,6 +43,7 @@ public class FolderSelector extends TextItem {
 			setWidth(180);
 
 		Date date = new Date();
+		Menu menu = new Menu();
 		menu.setDataSource(new FoldersDS("folderselector" + date.getTime(), true, 100L));
 		menu.setWidth(130);
 		menu.setCanSelectParentItems(true);
@@ -54,32 +53,34 @@ public class FolderSelector extends TextItem {
 			setFolder(Long.parseLong(item.getAttributeAsString("folderId")), item.getAttributeAsString("name"));
 		});
 
-		PickerIcon search = new PickerIcon(PickerIcon.SEARCH,
-				event -> new FolderSearchDialog(FolderSelector.this).show());
+		FormItemIcon search = new FormItemIcon();
 		search.setPrompt(I18N.message("search"));
+		search.setSrc("[SKIN]/magnifying-glass.svg");
 		search.setWidth(12);
 		search.setHeight(12);
+		search.addFormItemClickHandler(click -> new FolderSearchDialog(FolderSelector.this).show());
 
 		PickerIcon pick = new PickerIcon(PickerIcon.COMBO_BOX, event -> menu.showContextMenu());
 
 		FormItemIcon open = new FormItemIcon();
-		open.setName("open");
+		open.setPrompt(I18N.message("openfolder"));
+		open.setSrc("[SKIN]/folder.svg");
 		open.setWidth(12);
 		open.setHeight(12);
-		open.setSrc("[SKIN]/folder.png");
-		open.setPrompt(I18N.message("openfolder"));
 		open.addFormItemClickHandler(click -> {
 			if (getFolderId() != null)
 				DocumentsPanel.get().openInFolder(getFolderId(), null);
 		});
 
-		PickerIcon clear = new PickerIcon(PickerIcon.CLEAR, event -> {
+		FormItemIcon clear = new FormItemIcon();
+		clear.setPrompt(I18N.message("clear"));
+		clear.setSrc("[SKIN]/trash.svg");
+		clear.setWidth(12);
+		clear.setHeight(12);
+		clear.addFormItemClickHandler(click -> {
 			clearValue();
 			setFolder(null, null);
 		});
-		clear.setPrompt(I18N.message("clear"));
-		clear.setWidth(12);
-		clear.setHeight(12);
 
 		List<FormItemIcon> icons = new ArrayList<>();
 		icons.add(pick);
@@ -146,5 +147,15 @@ public class FolderSelector extends TextItem {
 
 	public void addFolderChangeListener(FolderChangeListener listener) {
 		listeners.add(listener);
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

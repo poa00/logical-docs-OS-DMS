@@ -127,7 +127,6 @@ body {
 
 <link href="./fontawesome/css/all.min.css" rel="stylesheet">
 
-<link REL="STYLESHEET" HREF="<%=MODULE%>/sc/skins/<%=SKIN%>/style.css" TYPE="text/css" />
 <link id="favicon" rel="shortcut icon" type="image/png" href='' />
 <script type="text/javascript">		
 	// Determine what skin file to load
@@ -145,20 +144,19 @@ body {
        
         let windowContent = '<!DOCTYPE html> ';
         windowContent += '<html> ';
-        windowContent += '<head><title>' + title + '</title> ';
+    
+		    windowContent += '<head><title>' + title + '</title> ';
         windowContent += '\u003Cstyle> ';
         windowContent += '.cell, .cellDarkAltCol, .cellDark{white-space: nowrap;} ';
         windowContent += '.printHeader{white-space: nowrap; font-weight: bold; border:0px solid white;} ';
         windowContent += '\u003C/style> ';
-        
-        windowContent += "<link REL='STYLESHEET' HREF='<%=MODULE%>/sc/skins/<%=SKIN%>/style.css' TYPE='text/css' /> ";
 
         windowContent += "\u003Cscript type='text/javascript'> ";
         windowContent += "  function printPage(){document.getElementById('printPanel').style.display='none'; window.print(); window.close();} ";
         windowContent += "\u003C/script> ";
         
         windowContent += '</head> ';
-        
+    
         windowContent += '<body> ';
         
         windowContent += "<div id='printPanel' class='printPanel default'><ul><li><a href='javascript:printPage();' id='printButton'> ";
@@ -175,6 +173,31 @@ body {
         printWin.document.write(windowContent);
     });
   }
+</script>
+
+<script type="text/javascript">
+function copy(text) {
+            var textarea = document.createElement("textarea");
+            textarea.textContent = text;
+            textarea.style.position = "fixed";
+            textarea.style.width = '2em';
+            textarea.style.height = '2em';
+            textarea.style.padding = 0;
+            textarea.style.border = 'none';
+            textarea.style.outline = 'none';
+            textarea.style.boxShadow = 'none';
+            textarea.style.background = 'transparent';
+            document.body.appendChild(textarea);
+            textarea.focus();
+            textarea.select();
+            try {
+                document.execCommand("copy");
+                document.body.removeChild(textarea);
+                resolve();
+            } catch (e) {
+
+            }
+}
 </script>
 
 <script src="./fontawesome/js/all.min.js"></script>

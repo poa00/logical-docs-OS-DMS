@@ -39,4 +39,14 @@ public class InfoPanel extends HLayout {
 	public void setAlignLeft(boolean alignLeft) {
 		this.alignLeft = alignLeft;
 	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+	
+	@Override
+	public int hashCode() {
+		return super.hashCode();
+	}
 }

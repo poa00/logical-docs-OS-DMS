@@ -4,16 +4,17 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.google.gwt.user.client.Timer;
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
+import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIUser;
 import com.logicaldoc.gui.common.client.controllers.UserController;
 import com.logicaldoc.gui.common.client.controllers.UserObserver;
 import com.logicaldoc.gui.common.client.data.OnlineUsersDS;
+import com.logicaldoc.gui.common.client.grid.RefreshableListGrid;
+import com.logicaldoc.gui.common.client.grid.UserListGridField;
 import com.logicaldoc.gui.common.client.i18n.I18N;
 import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.LD;
-import com.logicaldoc.gui.common.client.widgets.grid.RefreshableListGrid;
-import com.logicaldoc.gui.common.client.widgets.grid.UserListGridField;
 import com.logicaldoc.gui.frontend.client.services.ChatService;
 import com.smartgwt.client.data.AdvancedCriteria;
 import com.smartgwt.client.data.Record;
@@ -45,16 +46,20 @@ public class OnlineUsersPanel extends VLayout implements UserObserver {
 
 	@Override
 	public void onDraw() {
-		ListGridField username = new ListGridField(USERNAME, I18N.message("onlineusers"), 150);
-		username.setCanFilter(true);
-		username.setWidth("100%");
+		ListGridField user = new UserListGridField("user", "id", "user",
+				Session.get().getConfigAsBoolean("gui.avatar.showingrids"));
+		user.setShowTitle(false);
+		user.setWidth("100%");
 
-		UserListGridField avatar = new UserListGridField();
+		ListGridField username = new ListGridField(USERNAME, I18N.message(USERNAME));
+		username.setShowTitle(false);
+		username.setWidth(80);
+		username.setHidden(true);
 
 		onlineUsers = new RefreshableListGrid(new OnlineUsersDS());
 		onlineUsers.setEmptyMessage(I18N.message("nousers"));
 		onlineUsers.setAutoFetchData(true);
-		onlineUsers.setFields(avatar, username);
+		onlineUsers.setFields(user, username);
 		onlineUsers.setSortField(USERNAME);
 
 		onlineUsers.addVisibilityChangedHandler(event -> {
@@ -175,12 +180,7 @@ public class OnlineUsersPanel extends VLayout implements UserObserver {
 					for (int i = 0; i < selection.length; i++)
 						users.add(selection[i].getAttributeAsString(USERNAME));
 
-					ChatService.Instance.get().invite(users, answer, new AsyncCallback<>() {
-
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
-						}
+					ChatService.Instance.get().invite(users, answer, new DefaultAsyncCallback<>() {
 
 						@Override
 						public void onSuccess(Void arg) {
@@ -191,5 +191,15 @@ public class OnlineUsersPanel extends VLayout implements UserObserver {
 
 		contextMenu.setItems(inviteToChat);
 		return contextMenu;
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+	
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

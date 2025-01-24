@@ -3,20 +3,19 @@ package com.logicaldoc.gui.frontend.client.security;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIAccessControlEntry;
 import com.logicaldoc.gui.common.client.beans.GUIMenu;
 import com.logicaldoc.gui.common.client.data.AccessControlListDS;
+import com.logicaldoc.gui.common.client.grid.UserListGridField;
 import com.logicaldoc.gui.common.client.i18n.I18N;
 import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.services.SecurityService;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.LD;
-import com.logicaldoc.gui.common.client.widgets.grid.UserListGridField;
 import com.smartgwt.client.types.ListGridEditEvent;
 import com.smartgwt.client.types.SelectionStyle;
 import com.smartgwt.client.widgets.Button;
-import com.smartgwt.client.widgets.events.ClickEvent;
 import com.smartgwt.client.widgets.form.DynamicForm;
 import com.smartgwt.client.widgets.form.fields.SelectItem;
 import com.smartgwt.client.widgets.form.fields.events.ChangedEvent;
@@ -102,7 +101,7 @@ public class MenuSecurityPanel extends VLayout {
 
 		Button save = new Button(I18N.message("applyrights"));
 		save.setAutoFit(true);
-		save.addClickHandler((ClickEvent event) -> onSave());
+		save.addClickHandler(click -> onSave());
 		if (withSaveButton)
 			buttons.addMember(save);
 
@@ -153,7 +152,7 @@ public class MenuSecurityPanel extends VLayout {
 		groupForm.setItems(group);
 		buttons.addMember(groupForm);
 
-		group.addChangedHandler((ChangedEvent event) -> {
+		group.addChangedHandler(changed -> {
 			ListGridRecord selectedRecord = group.getSelectedRecord();
 			if (selectedRecord == null)
 				return;
@@ -173,7 +172,7 @@ public class MenuSecurityPanel extends VLayout {
 			rec.setAttribute(ENTITY_ID, selectedRecord.getAttribute("id"));
 			rec.setAttribute(ENTITY, selectedRecord.getAttribute("name"));
 			rec.setAttribute(AVATAR, "group");
-			rec.setAttribute(READ, selectedRecord.getAttribute(READ));
+			rec.setAttribute(READ, true);
 			aclGrid.addData(rec);
 			group.clearValue();
 		});
@@ -191,7 +190,7 @@ public class MenuSecurityPanel extends VLayout {
 			GUIAccessControlEntry ace = new GUIAccessControlEntry();
 			ace.setName(rec.getAttributeAsString(ENTITY));
 			ace.setEntityId(Long.parseLong(rec.getAttribute(ENTITY_ID)));
-			ace.setRead(rec.getAttributeAsBoolean(READ));
+			ace.setRead(Boolean.TRUE.equals(rec.getAttributeAsBoolean(READ)));
 			acl.add(ace);
 		}
 		return acl;
@@ -212,8 +211,8 @@ public class MenuSecurityPanel extends VLayout {
 			if (selection == null || selection.length == 0)
 				return;
 
-			LD.ask(I18N.message("question"), I18N.message("confirmdelete"), (Boolean value) -> {
-				if (Boolean.TRUE.equals(value)) {
+			LD.ask(I18N.message("question"), I18N.message("confirmdelete"), choice -> {
+				if (Boolean.TRUE.equals(choice)) {
 					aclGrid.removeSelectedData();
 					if (!withSaveButton)
 						onSave();
@@ -229,13 +228,7 @@ public class MenuSecurityPanel extends VLayout {
 		// Apply the ACL
 		menu.setAccessControlList(getACL());
 
-		SecurityService.Instance.get().saveACL(menu, new AsyncCallback<>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
+		SecurityService.Instance.get().saveACL(menu, new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(Void result) {
 				GuiLog.info(I18N.message("appliedrightsmenu"), null);

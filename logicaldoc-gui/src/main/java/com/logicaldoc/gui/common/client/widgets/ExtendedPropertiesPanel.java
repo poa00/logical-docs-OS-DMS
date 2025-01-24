@@ -6,8 +6,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.logicaldoc.gui.common.client.Constants;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Feature;
 import com.logicaldoc.gui.common.client.InputValues;
 import com.logicaldoc.gui.common.client.ServerValidationError;
@@ -17,7 +17,6 @@ import com.logicaldoc.gui.common.client.beans.GUIExtensibleObject;
 import com.logicaldoc.gui.common.client.beans.GUIFolder;
 import com.logicaldoc.gui.common.client.beans.GUIUser;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.frontend.client.services.TemplateService;
 import com.smartgwt.client.data.Criteria;
@@ -57,7 +56,7 @@ public class ExtendedPropertiesPanel extends HLayout {
 	protected boolean checkMandatory = false;
 
 	protected boolean allowTemplateSelection = true;
-	
+
 	protected boolean customidEnabled = true;
 
 	protected DynamicForm templateForm = new DynamicForm();
@@ -233,11 +232,7 @@ public class ExtendedPropertiesPanel extends HLayout {
 			return;
 		}
 
-		TemplateService.Instance.get().getAttributes(templateId, extensibleObject, new AsyncCallback<>() {
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
+		TemplateService.Instance.get().getAttributes(templateId, extensibleObject, new DefaultAsyncCallback<>() {
 
 			@Override
 			public void onSuccess(List<GUIAttribute> templateAttributes) {
@@ -808,14 +803,12 @@ public class ExtendedPropertiesPanel extends HLayout {
 			String dependsOn = att.getDependsOn();
 			if (dependsOn != null && !dependsOn.isEmpty()) {
 				FormItem item = vm.getItem(ItemFactory.itemNameForAttribute(att.getName()));
-				if (item instanceof SelectItem) {
-					SelectItem select = (SelectItem) item;
+				if (item instanceof SelectItem select) {
 					select.setPickListFilterCriteriaFunction(itemContext -> {
 						String category = vm.getValueAsString(ItemFactory.itemNameForAttribute(dependsOn));
 						return new Criteria("category", category);
 					});
-				} else if (item instanceof ComboBoxItem) {
-					ComboBoxItem combo = (ComboBoxItem) item;
+				} else if (item instanceof ComboBoxItem combo) {
 					combo.setPickListFilterCriteriaFunction(itemContext -> {
 						String category = vm.getValueAsString(ItemFactory.itemNameForAttribute(dependsOn));
 						return new Criteria("category", category);
@@ -854,5 +847,15 @@ public class ExtendedPropertiesPanel extends HLayout {
 				}
 			}
 		}
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+	
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

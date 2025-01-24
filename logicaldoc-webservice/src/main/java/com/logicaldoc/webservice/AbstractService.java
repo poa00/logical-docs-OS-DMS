@@ -57,7 +57,25 @@ public class AbstractService {
 	@Autowired
 	protected Message currentMessage;
 
+	
 	/**
+	 * Interprets the given parameter as session ID or an API Key and gives the real session id
+	 * 
+	 * @param sidOrApikey The SID or an API Key
+	 * 
+	 * @return the SID of the session
+	 */
+	protected String sessionId(String sidOrApikey) {
+		if(!sidOrApikey.startsWith("ld-")) {
+			return sidOrApikey;
+		} else {
+			// It is an API Key so go with Client ID (that also contains the API Key)
+			return SessionManager.get().getSessionId(getCurrentRequest());
+		}
+	}
+	
+	/**
+	 * 
 	 * Utility method that validates the session and retrieve the associated
 	 * user
 	 * 
@@ -70,14 +88,14 @@ public class AbstractService {
 	 */
 	protected User validateSession(String sid)
 			throws WebserviceException, PersistenceException, AuthenticationException {
-		UserDAO userDao = (UserDAO) Context.get().getBean(UserDAO.class);
+		UserDAO userDao = Context.get(UserDAO.class);
 		if (!validateSession) {
 			User user = new User();
 			user.setId(1L);
 			user.setTenantId(1L);
 			user.setName("admin");
 			Set<Group> groups = new HashSet<>();
-			GroupDAO grpDao = (GroupDAO) Context.get().getBean(GroupDAO.class);
+			GroupDAO grpDao = Context.get(GroupDAO.class);
 			groups.add(grpDao.findById(1));
 			user.setGroups(groups);
 			return user;
@@ -131,7 +149,7 @@ public class AbstractService {
 	protected void checkMenu(String sid, long menuId)
 			throws WebserviceException, PersistenceException, PermissionException {
 		User user = validateSession(sid);
-		MenuDAO dao = (MenuDAO) Context.get().getBean(MenuDAO.class);
+		MenuDAO dao = Context.get(MenuDAO.class);
 		if (!dao.isReadEnable(menuId, user.getId())) {
 			String message = String.format("User %s cannot access menu %s", user.getUsername(), menuId);
 			log.error(message);
@@ -141,7 +159,7 @@ public class AbstractService {
 
 	protected void checkFolderPermission(Permission permission, User user, long folderId)
 			throws PersistenceException, PermissionException {
-		FolderDAO dao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+		FolderDAO dao = Context.get(FolderDAO.class);
 		if (!dao.isPermissionAllowed(permission, folderId, user.getId())) {
 			String message = String.format("User %s doesn't have permission %s on folder %s", user.getUsername(),
 					permission.getName(), folderId);
@@ -152,7 +170,7 @@ public class AbstractService {
 
 	protected void checkDocumentPermission(Permission permission, User user, long docId)
 			throws PersistenceException, PermissionException {
-		DocumentDAO dao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO dao = Context.get(DocumentDAO.class);
 		if (!dao.isPermissionAllowed(permission, docId, user.getId())) {
 			String message = String.format("User %s doesn't have permission %s on document %s", user.getUsername(),
 					permission.getName(), docId);
@@ -162,7 +180,7 @@ public class AbstractService {
 	}
 
 	protected void checkMenu(User user, long menuId) throws PermissionException {
-		MenuDAO dao = (MenuDAO) Context.get().getBean(MenuDAO.class);
+		MenuDAO dao = Context.get(MenuDAO.class);
 		if (!dao.isReadEnable(menuId, user.getId())) {
 			String message = String.format("User %s doesn't have read permission on menu %s", user.getUsername(),
 					menuId);
@@ -194,6 +212,7 @@ public class AbstractService {
 	 * <li>Request header sid</li>
 	 * <li>Request cookie ldoc-sid</li>
 	 * <li>SecurityContextHolder</li>
+	 * <li>Client ID</li>
 	 * </ol>
 	 * 
 	 * @return The current Session ID

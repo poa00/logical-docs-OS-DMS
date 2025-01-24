@@ -31,6 +31,7 @@ import com.logicaldoc.core.searchengine.saved.SearchDAO;
 import com.logicaldoc.core.security.Session;
 import com.logicaldoc.core.security.user.User;
 import com.logicaldoc.core.security.user.UserDAO;
+import com.logicaldoc.core.security.user.UserHistory;
 import com.logicaldoc.gui.common.client.ServerException;
 import com.logicaldoc.gui.common.client.beans.GUIAttribute;
 import com.logicaldoc.gui.common.client.beans.GUICriterion;
@@ -63,10 +64,10 @@ public class SearchServiceImpl extends AbstractRemoteService implements SearchSe
 		try {
 			List<Hit> hits = doSearch(options, session, result);
 
-			BookmarkDAO bDao = (BookmarkDAO) Context.get().getBean(BookmarkDAO.class);
+			BookmarkDAO bDao = Context.get(BookmarkDAO.class);
 			List<Long> bookmarks = bDao.findBookmarkedDocs(session.getUserId());
 
-			DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+			DocumentDAO docDao = Context.get(DocumentDAO.class);
 			List<GUIDocument> guiResults = new ArrayList<>();
 			DocumentServiceImpl documentServiceImpl = new DocumentServiceImpl();
 			for (Hit hit : hits) {
@@ -76,7 +77,13 @@ public class SearchServiceImpl extends AbstractRemoteService implements SearchSe
 					guiHit.setIcon(hit.getType());
 				} else {
 					Document doc = docDao.findById(hit.getId());
+					docDao.initialize(doc);
 					if (doc != null) {
+						/*
+						 * Apply the extended attributes. The template object in
+						 * search hits may have not been fully compiled so the
+						 * DocumentServiceImpl.fromDocument doesn't do the job
+						 */
 						guiHit = documentServiceImpl.fromDocument(doc, null, null);
 					} else {
 						log.debug("Unexisting document {}", hit.getId());
@@ -92,7 +99,7 @@ public class SearchServiceImpl extends AbstractRemoteService implements SearchSe
 
 			return result;
 		} catch (Exception t) {
-			return (GUIResult) throwServerException(session, log, t);
+			return throwServerException(session, log, t);
 		}
 	}
 
@@ -110,9 +117,8 @@ public class SearchServiceImpl extends AbstractRemoteService implements SearchSe
 			guiHit.setIcon(FileUtil.getBaseName(hit.getIcon()));
 
 		/*
-		 * Apply the extended attributes. The template object in search hits may
-		 * have not been fully compiled so the DocumentServiceImpl.fromDocument
-		 * doesn't do the job
+		 * If any extended attribute was retrieved from the fulltext index,
+		 * apply them
 		 */
 		List<GUIAttribute> extList = new ArrayList<>();
 		for (String name : hit.getAttributeNames()) {
@@ -163,6 +169,7 @@ public class SearchServiceImpl extends AbstractRemoteService implements SearchSe
 	private SearchOptions prepareSearchOptions(GUISearchOptions options, Session session) {
 		SearchOptions searchOptions = toSearchOptions(options);
 		searchOptions.setTenantId(session.getTenantId());
+		searchOptions.setTransaction(new UserHistory(session));
 
 		if (searchOptions instanceof FulltextSearchOptions fulltextOptions) {
 			Locale exprLoc = LocaleUtil.toLocale(options.getExpressionLanguage());
@@ -193,20 +200,20 @@ public class SearchServiceImpl extends AbstractRemoteService implements SearchSe
 			search.setDescription(options.getDescription());
 			search.saveOptions(opt);
 
-			SearchDAO dao = (SearchDAO) Context.get().getBean(SearchDAO.class);
+			SearchDAO dao = Context.get(SearchDAO.class);
 			dao.store(search);
 
 			log.debug("Saved search {}", opt.getName());
 			return true;
 		} catch (Exception t) {
-			return (Boolean) throwServerException(session, log, t);
+			return throwServerException(session, log, t);
 		}
 	}
 
 	@Override
 	public void delete(List<String> names) throws ServerException {
 		Session session = validateSession();
-		SearchDAO dao = (SearchDAO) Context.get().getBean(SearchDAO.class);
+		SearchDAO dao = Context.get(SearchDAO.class);
 
 		try {
 			for (String name : names) {
@@ -223,14 +230,14 @@ public class SearchServiceImpl extends AbstractRemoteService implements SearchSe
 	@Override
 	public GUISearchOptions load(String name) throws ServerException {
 		Session session = validateSession();
-		SearchDAO dao = (SearchDAO) Context.get().getBean(SearchDAO.class);
+		SearchDAO dao = Context.get(SearchDAO.class);
 
 		try {
 			com.logicaldoc.core.searchengine.saved.SavedSearch search = dao.findByUserIdAndName(session.getUserId(),
 					name);
 			return toGUIOptions(search.readOptions());
 		} catch (Exception t) {
-			return (GUISearchOptions) throwServerException(session, log, t);
+			return throwServerException(session, log, t);
 		}
 	}
 
@@ -245,7 +252,7 @@ public class SearchServiceImpl extends AbstractRemoteService implements SearchSe
 	 * @throws PersistenceException A problem at db level
 	 */
 	public static List<SearchOptions> getSearches(Session session) throws PersistenceException {
-		SearchDAO dao = (SearchDAO) Context.get().getBean(SearchDAO.class);
+		SearchDAO dao = Context.get(SearchDAO.class);
 
 		Map<String, SearchOptions> map = new HashMap<>();
 		List<com.logicaldoc.core.searchengine.saved.SavedSearch> searches = dao.findByUserId(session.getUserId());
@@ -323,9 +330,11 @@ public class SearchServiceImpl extends AbstractRemoteService implements SearchSe
 			if (search == null)
 				return;
 
-			addUsersFromGroups(groupIds, userIds);
+			List<Long> allUsers = new ArrayList<>();
+			allUsers.addAll(userIds);
+			addUsersFromGroups(groupIds, allUsers);
 
-			for (Long userId : userIds)
+			for (Long userId : allUsers)
 				store(search, userId);
 		} catch (Exception t) {
 			throwServerException(session, log, t);
@@ -334,7 +343,7 @@ public class SearchServiceImpl extends AbstractRemoteService implements SearchSe
 
 	private void store(com.logicaldoc.core.searchengine.saved.SavedSearch search, Long userId) {
 		try {
-			SearchDAO dao = (SearchDAO) Context.get().getBean(SearchDAO.class);
+			SearchDAO dao = Context.get(SearchDAO.class);
 			com.logicaldoc.core.searchengine.saved.SavedSearch clone = new com.logicaldoc.core.searchengine.saved.SavedSearch(
 					search);
 			clone.setUserId(userId);
@@ -345,7 +354,7 @@ public class SearchServiceImpl extends AbstractRemoteService implements SearchSe
 	}
 
 	private void addUsersFromGroups(Collection<Long> groupIds, Collection<Long> users) throws PersistenceException {
-		UserDAO gDao = (UserDAO) Context.get().getBean(UserDAO.class);
+		UserDAO gDao = Context.get(UserDAO.class);
 		for (Long gId : groupIds) {
 			Set<User> usrs = gDao.findByGroup(gId);
 			for (User user : usrs) {
@@ -357,7 +366,7 @@ public class SearchServiceImpl extends AbstractRemoteService implements SearchSe
 
 	private com.logicaldoc.core.searchengine.saved.SavedSearch loadSavedSearch(String name, Session session)
 			throws PersistenceException {
-		SearchDAO dao = (SearchDAO) Context.get().getBean(SearchDAO.class);
+		SearchDAO dao = Context.get(SearchDAO.class);
 		return dao.findByUserIdAndName(session.getUserId(), name);
 	}
 
