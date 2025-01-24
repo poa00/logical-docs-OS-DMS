@@ -12,7 +12,8 @@
 			</generator>
 		</id>
 		<version name="recordVersion" column="ld_recordversion" type="long" />
-		<property name="lastModified" type="timestamp" column="ld_lastmodified" />
+		<property name="lastModified" type="timestamp" column="ld_lastmodified" not-null="true"/>
+		<property name="creation" type="timestamp" column="ld_creation" not-null="true" />
 		<property name="deleted" type="int" column="ld_deleted" not-null="true" />
 		<property name="tenantId" type="long" column="ld_tenantid" not-null="true" />
 		<property name="docId" type="long" column="ld_docid" />
@@ -30,6 +31,7 @@
 		<property name="pathOld" type="string" column="ld_pathold" length="4000" />
 		<property name="notified" type="int" column="ld_notified" not-null="true" />
 		<property name="sessionId" type="string" column="ld_sessionid" length="255" />
+		<property name="keyLabel" type="string" column="ld_keylabel" length="255" />
 		<property name="isNew" type="int" column="ld_new" />
 		<property name="filename" type="string" column="ld_filename" length="255" />
 		<property name="fileSize" type="long" column="ld_filesize"/>

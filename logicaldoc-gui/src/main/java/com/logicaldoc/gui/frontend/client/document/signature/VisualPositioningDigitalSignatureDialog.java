@@ -1,13 +1,14 @@
 package com.logicaldoc.gui.frontend.client.document.signature;
 
 import java.util.Date;
+import java.util.List;
 
 import com.google.gwt.http.client.Request;
 import com.google.gwt.http.client.RequestBuilder;
 import com.google.gwt.http.client.RequestCallback;
 import com.google.gwt.http.client.RequestException;
 import com.google.gwt.http.client.Response;
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIDocument;
 import com.logicaldoc.gui.common.client.i18n.I18N;
 import com.logicaldoc.gui.common.client.log.GuiLog;
@@ -41,11 +42,11 @@ public class VisualPositioningDigitalSignatureDialog extends Window {
 
 	private ImageCropper cropper;
 
-	private Long[] docIds;
+	private List<Long> docIds;
 
 	private String reason;
 
-	public VisualPositioningDigitalSignatureDialog(Long[] docIds, String reason) {
+	public VisualPositioningDigitalSignatureDialog(List<Long> docIds, String reason) {
 		this.docIds = docIds;
 		this.reason = reason;
 
@@ -71,11 +72,11 @@ public class VisualPositioningDigitalSignatureDialog extends Window {
 				}
 
 				public void onResponseReceived(Request request, Response response) {
-					DocumentService.Instance.get().getById(docIds[0], new AsyncCallback<GUIDocument>() {
+					DocumentService.Instance.get().getById(docIds.get(0), new DefaultAsyncCallback<>() {
 
 						@Override
 						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
+							super.onFailure(caught);
 							LD.clearPrompt();
 						}
 
@@ -151,7 +152,7 @@ public class VisualPositioningDigitalSignatureDialog extends Window {
 	}
 
 	private String getPageUrl(int page) {
-		return Util.contextPath() + "convertjpg?docId=" + docIds[0] + "&page=" + page + "&random="
+		return Util.contextPath() + "convertjpg?docId=" + docIds.get(0) + "&page=" + page + "&random="
 				+ new Date().getTime();
 	}
 
@@ -165,20 +166,24 @@ public class VisualPositioningDigitalSignatureDialog extends Window {
 
 		LD.contactingServer();
 
-		SignService.Instance.get().signDocuments(docIds, reason, page, exprX, exprY, exprW, new AsyncCallback<Void>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				LD.clearPrompt();
-				GuiLog.serverError(caught);
-			}
-
+		SignService.Instance.get().signDocuments(docIds, reason, page, exprX, exprY, exprW, new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(Void arg0) {
-				destroy();
-				GuiLog.info(I18N.message("event.signed"), null);
 				LD.clearPrompt();
+				GuiLog.info(I18N.message("event.signed"), null);
+				showPage(pageCursor.getValueAsInteger());
 			}
 		});
+	}
+	
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+	
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

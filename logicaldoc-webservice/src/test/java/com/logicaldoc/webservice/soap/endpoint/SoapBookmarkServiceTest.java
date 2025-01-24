@@ -1,11 +1,12 @@
 package com.logicaldoc.webservice.soap.endpoint;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.SQLException;
+import java.util.List;
 
 import org.junit.Test;
 
+import com.logicaldoc.util.plugin.PluginException;
 import com.logicaldoc.webservice.AbstractWebserviceTestCase;
 import com.logicaldoc.webservice.model.WSBookmark;
 
@@ -17,7 +18,7 @@ public class SoapBookmarkServiceTest extends AbstractWebserviceTestCase {
 	private SoapBookmarkService bookmarkService;
 
 	@Override
-	public void setUp() throws FileNotFoundException, IOException, SQLException {
+	public void setUp() throws IOException, SQLException, PluginException {
 		super.setUp();
 
 		bookmarkService = new SoapBookmarkService();
@@ -29,8 +30,8 @@ public class SoapBookmarkServiceTest extends AbstractWebserviceTestCase {
 		bookmarkService.bookmarkDocument("", 1L);
 		bookmarkService.bookmarkDocument("", 2L);
 
-		WSBookmark[] bookmarks = bookmarkService.getBookmarks("");
-		Assert.assertEquals(2, bookmarks.length);
+		List<WSBookmark> bookmarks = bookmarkService.getBookmarks("");
+		Assert.assertEquals(2, bookmarks.size());
 
 		try {
 			bookmarkService.bookmarkDocument("", 3L);
@@ -46,8 +47,8 @@ public class SoapBookmarkServiceTest extends AbstractWebserviceTestCase {
 		bookmarkService.bookmarkFolder("", 5L);
 		bookmarkService.bookmarkFolder("", 4L);
 
-		WSBookmark[] bookmarks = bookmarkService.getBookmarks("");
-		Assert.assertEquals(2, bookmarks.length);
+		List<WSBookmark> bookmarks = bookmarkService.getBookmarks("");
+		Assert.assertEquals(2, bookmarks.size());
 
 		try {
 			bookmarkService.bookmarkDocument("", 99L);

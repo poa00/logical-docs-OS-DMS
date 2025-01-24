@@ -29,8 +29,6 @@ public class Ticket extends PersistentObject {
 
 	private int type = DOWNLOAD;
 
-	private Date creation = new Date();
-
 	/**
 	 * A date when this ticket expires
 	 */
@@ -100,14 +98,6 @@ public class Ticket extends PersistentObject {
 
 	public void setType(int type) {
 		this.type = type;
-	}
-
-	public Date getCreation() {
-		return creation;
-	}
-
-	public void setCreation(Date creation) {
-		this.creation = creation;
 	}
 
 	public Date getExpired() {
@@ -190,5 +180,30 @@ public class Ticket extends PersistentObject {
 
 	public void setExpireHours(Integer expireHours) {
 		this.expireHours = expireHours;
+	}
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = super.hashCode();
+		result = prime * result + ((ticketId == null) ? 0 : ticketId.hashCode());
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (!super.equals(obj))
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		Ticket other = (Ticket) obj;
+		if (ticketId == null) {
+			if (other.ticketId != null)
+				return false;
+		} else if (!ticketId.equals(other.ticketId))
+			return false;
+		return true;
 	}
 }

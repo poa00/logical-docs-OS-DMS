@@ -1,6 +1,8 @@
 package com.logicaldoc.gui.common.client.util;
 
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 
 import com.google.gwt.user.client.Timer;
 import com.logicaldoc.gui.common.client.i18n.I18N;
@@ -10,6 +12,7 @@ import com.smartgwt.client.types.ListGridFieldType;
 import com.smartgwt.client.widgets.Canvas;
 import com.smartgwt.client.widgets.grid.ListGrid;
 import com.smartgwt.client.widgets.grid.ListGridField;
+import com.smartgwt.client.widgets.grid.ListGridRecord;
 
 public class GridUtil {
 
@@ -40,12 +43,52 @@ public class GridUtil {
 			/*
 			 * With a timer we scroll the grid in order to fetch all the data
 			 */
-			final Timer timer = new Timer() {
+			new Timer() {
 				public void run() {
 					Integer[] visibleRows = listGrid.getVisibleRows();
 					if (visibleRows[1] >= listGrid.getTotalRows() - 1) {
 						try {
 							listGrid.scrollToRow(selectedRow);
+							if (listener != null)
+								listener.endScroll(listGrid);
+						} finally {
+							LD.clearPrompt();
+						}
+					} else if (visibleRows[0] != -1 && visibleRows[1] < listGrid.getTotalRows() - 1) {
+						listGrid.scrollToRow(visibleRows[1] + 1);
+						schedule(100);
+					}
+				}
+			}.schedule(100);
+		}
+	}
+
+	/**
+	 * Scrolls the grid all down
+	 * 
+	 * @param listGrid the grid to process
+	 * @param listener optional listener inoked at the end of the scroll
+	 */
+	public static void scrollDownGrid(ListGrid listGrid, EndScrollListener listener) {
+		if (listGrid.getTotalRows() > 0) {
+			LD.contactingServer();
+
+			listGrid.scrollToRow(0);
+			listGrid.draw();
+
+			if (listGrid.getVisibleRows()[0] == -1) {
+				LD.clearPrompt();
+				return;
+			}
+
+			/*
+			 * With a timer we scroll the grid in order to fetch all the data
+			 */
+			final Timer timer = new Timer() {
+				public void run() {
+					Integer[] visibleRows = listGrid.getVisibleRows();
+					if (visibleRows[1] >= listGrid.getTotalRows() - 1) {
+						try {
 							if (listener != null)
 								listener.endScroll(listGrid);
 						} finally {
@@ -189,6 +232,20 @@ public class GridUtil {
 																// ";"
 		stringBuilder.append("\n");
 		return fields;
+	}
+
+	/**
+	 * Collects all the IDs in an array of recods, the field 'id' is used.
+	 * 
+	 * @param records the records to list
+	 * 
+	 * @return the collection of extracted ids
+	 */
+	public static List<Long> getIds(ListGridRecord[] records) {
+		List<Long> ids = new ArrayList<>();
+		for (int i = 0; i < records.length; i++)
+			ids.add(records[i].getAttributeAsLong("id"));
+		return ids;
 	}
 
 	/**

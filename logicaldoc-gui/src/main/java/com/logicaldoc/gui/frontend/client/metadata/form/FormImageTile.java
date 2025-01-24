@@ -1,10 +1,10 @@
 package com.logicaldoc.gui.frontend.client.metadata.form;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIForm;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.widgets.Upload;
+import com.logicaldoc.gui.frontend.client.menu.QuickSearchTray;
 import com.logicaldoc.gui.frontend.client.services.DocumentService;
 import com.logicaldoc.gui.frontend.client.services.FormService;
 import com.smartgwt.client.types.Alignment;
@@ -114,13 +114,7 @@ public class FormImageTile extends HLayout {
 			layout.addMember(saveButton);
 
 			addCloseClickHandler(
-					event -> DocumentService.Instance.get().cleanUploadedFileFolder(new AsyncCallback<Void>() {
-
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
-						}
-
+					event -> DocumentService.Instance.get().cleanUploadedFileFolder(new DefaultAsyncCallback<>() {
 						@Override
 						public void onSuccess(Void result) {
 							destroy();
@@ -136,25 +130,12 @@ public class FormImageTile extends HLayout {
 				return;
 			}
 
-			FormService.Instance.get().processImage(new AsyncCallback<String>() {
-
-				@Override
-				public void onFailure(Throwable caught) {
-					GuiLog.serverError(caught);
-					close();
-				}
-
+			FormService.Instance.get().processImage(new DefaultAsyncCallback<>() {
 				@Override
 				public void onSuccess(String imageSrc) {
 					form.setHeaderImage(imageSrc);
 					FormImageTile.this.initGUI();
-					DocumentService.Instance.get().cleanUploadedFileFolder(new AsyncCallback<Void>() {
-
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
-						}
-
+					DocumentService.Instance.get().cleanUploadedFileFolder(new DefaultAsyncCallback<>() {
 						@Override
 						public void onSuccess(Void result) {
 							destroy();
@@ -166,5 +147,28 @@ public class FormImageTile extends HLayout {
 				}
 			});
 		}
+		
+		@Override
+		public boolean equals(Object other) {
+			return super.equals(other);
+		}
+
+		@Override
+		public int hashCode() {
+			return super.hashCode();
+		}
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (obj instanceof QuickSearchTray)
+			return super.equals(obj);
+		else
+			return false;
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

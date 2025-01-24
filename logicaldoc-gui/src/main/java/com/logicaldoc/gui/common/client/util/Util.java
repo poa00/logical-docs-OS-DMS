@@ -4,9 +4,11 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import com.google.gwt.core.client.GWT;
 import com.google.gwt.http.client.Request;
@@ -28,6 +30,7 @@ import com.logicaldoc.gui.common.client.beans.GUIParameter;
 import com.logicaldoc.gui.common.client.controllers.FolderController;
 import com.logicaldoc.gui.common.client.i18n.I18N;
 import com.logicaldoc.gui.common.client.log.EventPanel;
+import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.widgets.ApplicationRestarting;
 import com.logicaldoc.gui.common.client.widgets.ToastNotification;
 import com.smartgwt.client.widgets.Canvas;
@@ -41,6 +44,14 @@ import com.smartgwt.client.widgets.layout.Layout;
  * @since 8.8.3
  */
 public abstract class Util {
+
+	private static final String HEIGHT = "&height=";
+
+	private static final String WIDTH = "' width='";
+
+	private static final String PX_HEIGHT = "px' height='";
+
+	private static final String IMG_SRC = "<img src='";
 
 	private static final String FORMAT_PATTERN_ONE_DIGIT = "###.#";
 
@@ -60,24 +71,27 @@ public abstract class Util {
 
 	private static final String AND_FILEVERSION_EQUAL = "&fileVersion=";
 
-	private static final String[] officeExts = new String[] { ".doc", ".xls", ".xlsm", ".ppt", ".docx", ".docxm",
-			".dotm", ".xlsx", ".pptx", ".rtf", ".odt", ".ods", ".odp", ".vsd", ".vsdx", ".mpp" };
+	private static final Set<String> officeExts = new HashSet<>(Arrays.asList(".doc", ".xls", ".xlsm", ".ppt", ".docx",
+			".docxm", ".dotm", ".xlsx", ".pptx", ".rtf", ".odt", ".ods", ".odp", ".vsd", ".vsdx", ".mpp"));
 
-	private static final String[] spreadsheetExts = new String[] { ".xls", ".xlsm", ".xlsx", ".ods" };
+	private static final Set<String> spreadsheetExts = new HashSet<>(Arrays.asList(".xls", ".xlsm", ".xlsx", ".ods"));
 
-	private static final String[] imageExts = new String[] { ".gif", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff", ".png",
-			".jfif", ".webp" };
+	private static final Set<String> presentationExts = new HashSet<>(Arrays.asList(".ppt", ".pptx", ".pptm", ".odp"));
 
-	private static final String[] videoExts = new String[] { ".mp4", ".avi", ".mpg", ".wmv", ".wma", ".asf", ".mov",
-			".rm", ".flv", ".aac", ".vlc", ".ogg", ".webm", ".swf", ".mpeg", ".swf", ".m2v", ".m2ts", ".mkv", ".m4v" };
+	private static final Set<String> imageExts = new HashSet<>(
+			Arrays.asList(".gif", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff", ".png", ".jfif", ".webp"));
 
-	private static final String[] audioExts = new String[] { ".mp3", ".m4p", ".m4a", ".wav" };
+	private static final Set<String> videoExts = new HashSet<>(
+			Arrays.asList(".mp4", ".avi", ".mpg", ".wmv", ".wma", ".asf", ".mov", ".rm", ".flv", ".aac", ".vlc", ".ogg",
+					".webm", ".swf", ".mpeg", ".swf", ".m2v", ".m2ts", ".mkv", ".m4v"));
 
-	private static final String[] webcontentExts = new String[] { ".html", ".htm", ".xhtml" };
+	private static final Set<String> audioExts = new HashSet<>(Arrays.asList(".mp3", ".m4p", ".m4a", ".wav"));
 
-	private static final String[] emailExts = new String[] { ".eml", ".msg" };
+	private static final Set<String> webcontentExts = new HashSet<>(Arrays.asList(".html", ".htm", ".xhtml"));
 
-	private static final String[] dicomExts = new String[] { ".dcm", ".dicom" };
+	private static final Set<String> emailExts = new HashSet<>(Arrays.asList(".eml", ".msg"));
+
+	private static final Set<String> dicomExts = new HashSet<>(Arrays.asList(".dcm", ".dicom"));
 
 	private Util() {
 		// Empty constructor
@@ -155,16 +169,24 @@ public abstract class Util {
 		installCloseWindowAlert();
 	}
 
-	public static void downloadDoc(long docId) {
-		download(downloadURL(docId));
-	}
-
 	public static String downloadTicketURL(String ticketId) {
 		return Util.contextPath() + "download-ticket?ticketId=" + ticketId;
 	}
 
 	public static void downloadTicket(String ticketId) {
 		download(downloadTicketURL(ticketId));
+	}
+
+	public static String qrURL(String content, int size) {
+		return Util.contextPath() + "barcode?label=false&format=QR_CODE&width=" + size + HEIGHT + size + "&code="
+				+ content;
+	}
+
+	public static String qrImg(String content, int size) {
+		if (isCommunity())
+			return "";
+		else
+			return IMG_SRC + qrURL(content, size) + WIDTH + size + "' />";
 	}
 
 	public static String displayURL(Long docId, Long folderId) {
@@ -178,11 +200,11 @@ public abstract class Util {
 
 	public static String webEditorUrl(long docId, String fileName, int height) {
 		return contextPath() + "ckeditor/index.jsp?docId=" + docId + "&lang=" + I18N.getLocale() + "&fileName="
-				+ fileName + "&height=" + height + AND_SID_EQUAL + Session.get().getSid();
+				+ fileName + HEIGHT + height + AND_SID_EQUAL + Session.get().getSid();
 	}
 
 	public static String webEditorUrl(int height) {
-		return contextPath() + "ckeditor/index.jsp?docId=nodoc&lang=" + I18N.getLocale() + "&height=" + height
+		return contextPath() + "ckeditor/index.jsp?docId=nodoc&lang=" + I18N.getLocale() + HEIGHT + height
 				+ AND_SID_EQUAL + Session.get().getSid();
 	}
 
@@ -259,7 +281,7 @@ public abstract class Util {
 		if (height != null)
 			style += "height:" + height + "px; ";
 
-		return "<img src='" + thumbnailUrl(docId, fileVersion) + "' style='" + style + "' />";
+		return IMG_SRC + thumbnailUrl(docId, fileVersion) + "' style='" + style + "' />";
 	}
 
 	public static String tileUrl(long docId, String fileVersion) {
@@ -273,18 +295,50 @@ public abstract class Util {
 		if (height != null)
 			style += "height:" + height + "px; ";
 
-		return "<img src='" + tileUrl(docId, fileVersion) + "' style='" + style + "' />";
+		return IMG_SRC + tileUrl(docId, fileVersion) + "' style='" + style + "' />";
 	}
 
 	public static String imageUrl(String imageName) {
 		return imagePrefix() + imageName;
 	}
 
+	public static String fileIconUrl(String iconName) {
+		return imagePrefix() + "FileIcons/" + iconName;
+	}
+
 	public static String fileNameIcon(String iconName, int size) {
-		if (!iconName.toLowerCase().endsWith(".png"))
-			iconName += ".png";
-		return "<img class='filenameIcon' src='" + imageUrl(iconName) + "' width='" + size + "px' height='" + size
-				+ "px' />";
+
+		StringBuilder sb = new StringBuilder("<div class='icon-container filenameIcon'>");
+
+		if (iconName.contains("-")) {
+			String baseIconName = iconName.substring(0, iconName.indexOf('-'));
+
+			if (iconName.contains("-shortcut")) {
+				long shortcutSize = Math.round(size * 0.625D);
+				long shortcutMarginTop = Math.round(size * 0.4375D);
+				long shortcutMarginLeft = Math.round(size * 0.6D);
+				sb.append(IMG_SRC + fileIconUrl("shortcut.svg") + WIDTH + shortcutSize + PX_HEIGHT + shortcutSize
+						+ "px' style='position:absolute; z-index:1; margin-top: " + shortcutMarginTop
+						+ "px; margin-left:" + shortcutMarginLeft + "px'/>");
+			}
+
+			if (iconName.contains("-clip")) {
+				long clipSize = Math.round(size * 0.625D);
+				long clipMarginTop = Math.round(size * 0.125D);
+				long clipMarginLeft = 0;
+				sb.append(IMG_SRC + fileIconUrl("clip.svg") + WIDTH + clipSize + PX_HEIGHT + clipSize
+						+ "px' style='position:absolute; z-index:2; margin-top: " + clipMarginTop + "px; margin-left:"
+						+ clipMarginLeft + "px'/>");
+			}
+
+			iconName = baseIconName;
+		}
+
+		sb.append("<img class='filenameIcon' src='" + fileIconUrl(iconName + ".svg") + WIDTH + size + PX_HEIGHT + size
+				+ "px' />");
+
+		sb.append(END_DIV);
+		return sb.toString();
 	}
 
 	public static String iconWithFilename(String iconName, String fileName) {
@@ -309,7 +363,7 @@ public abstract class Util {
 
 	public static String avatarImg(String userIdOrName, int size) {
 		String url = avatarUrl(userIdOrName != null ? "" + userIdOrName : "0", false);
-		return "<img class='avatarIcon' src='" + url + "' width='" + size + "px' height='" + size + "px' />";
+		return "<img class='avatarIcon' src='" + url + WIDTH + size + PX_HEIGHT + size + "px' />";
 	}
 
 	public static String avatarUrl(long userId) {
@@ -402,31 +456,28 @@ public abstract class Util {
 		return !Feature.enabled(Feature.ADDITIONAL_FORMATS);
 	}
 
+	public static boolean isCommercial() {
+		return Feature.enabled(Feature.ADDITIONAL_FORMATS);
+	}
+
+	public static boolean isOfficeFileType(String type) {
+		return officeExts.stream().anyMatch(type::equalsIgnoreCase);
+	}
+
 	public static boolean isOfficeFile(String fileName) {
-		String tmp = fileName.toLowerCase();
-		for (String ext : officeExts) {
-			if (tmp.endsWith(ext))
-				return true;
-		}
-		return false;
+		return officeExts.stream().anyMatch(ext -> fileName.toLowerCase().endsWith(ext));
 	}
 
 	public static boolean isSpreadsheetFile(String fileName) {
-		String tmp = fileName.toLowerCase();
-		for (String ext : spreadsheetExts) {
-			if (tmp.endsWith(ext))
-				return true;
-		}
-		return false;
+		return spreadsheetExts.stream().anyMatch(ext -> fileName.toLowerCase().endsWith(ext));
+	}
+
+	public static boolean isPresentationFile(String fileName) {
+		return presentationExts.stream().anyMatch(ext -> fileName.toLowerCase().endsWith(ext));
 	}
 
 	public static boolean isDICOMFile(String fileName) {
-		String tmp = fileName.toLowerCase();
-		for (String ext : dicomExts) {
-			if (tmp.endsWith(ext))
-				return true;
-		}
-		return false;
+		return dicomExts.stream().anyMatch(ext -> fileName.toLowerCase().endsWith(ext));
 	}
 
 	public static boolean isTextFile(String fileName) {
@@ -450,67 +501,49 @@ public abstract class Util {
 	}
 
 	public static boolean isImageFile(String fileName) {
-		String tmp = fileName.toLowerCase();
-		for (String ext : imageExts) {
-			if (tmp.endsWith(ext))
-				return true;
-		}
-		return false;
+		return imageExts.stream().anyMatch(ext -> fileName.toLowerCase().endsWith(ext));
 	}
 
 	public static boolean isWebContentFile(String fileName) {
-		String tmp = fileName.toLowerCase();
-		for (String ext : webcontentExts) {
-			if (tmp.endsWith(ext))
-				return true;
-		}
-		return false;
+		return webcontentExts.stream().anyMatch(ext -> fileName.toLowerCase().endsWith(ext));
 	}
 
 	public static boolean isMediaFile(String fileName) {
-		String tmp = fileName.toLowerCase();
-		for (String ext : videoExts) {
-			if (tmp.endsWith(ext))
-				return true;
-		}
-		for (String ext : audioExts) {
-			if (tmp.endsWith(ext))
-				return true;
-		}
-		return false;
+		return videoExts.stream().anyMatch(ext -> fileName.toLowerCase().endsWith(ext)) || isAudioFile(fileName);
 	}
 
 	public static boolean isAudioFile(String fileName) {
-		String tmp = fileName.toLowerCase();
-		for (String ext : audioExts) {
-			if (tmp.endsWith(ext))
-				return true;
-		}
-		return false;
-	}
-
-	public static boolean isOfficeFileType(String type) {
-		for (String ext : officeExts) {
-			if (type.equalsIgnoreCase(ext))
-				return true;
-		}
-		return false;
+		return audioExts.stream().anyMatch(ext -> fileName.toLowerCase().endsWith(ext));
 	}
 
 	public static boolean isEmailFile(String fileName) {
-		String tmp = fileName.toLowerCase();
-		for (String ext : emailExts) {
-			if (tmp.endsWith(ext))
-				return true;
-		}
-		return false;
+		return emailExts.stream().anyMatch(ext -> fileName.toLowerCase().endsWith(ext));
 	}
+
+	/**
+	 * Copies a text into the client's clipboard
+	 * 
+	 * @param text the content to put into the clipboards
+	 */
+	public static void copyText(String text) {
+		writeToClipboard(text);
+		GuiLog.info(I18N.message("texthascopied"));
+	}
+
+	/**
+	 * Writes a text into the client's clipboard
+	 * 
+	 * @param text the content to put into the clipboards
+	 */
+	public static native void writeToClipboard(String text) /*-{		
+		$wnd.copy(text);
+	}-*/;
 
 	/**
 	 * Format file size in Bytes, KBytes, MBytes or GBytes.
 	 * 
-	 * @param size The file size in bytes.
-	 * @return The formated file size.
+	 * @param size The file size in bytes S
+	 * @return The formated file size
 	 */
 	public static native String formatSize(double size) /*-{
 		if (size / 1024 < 1) {
@@ -579,14 +612,14 @@ public abstract class Util {
 	public static String formatSizeKB(Object value) {
 		if (value == null)
 			return null;
-		if (value instanceof Double)
-			return Util.formatSizeKB(((Double) value).doubleValue());
-		if (value instanceof Long)
-			return Util.formatSizeKB(((Long) value).doubleValue());
-		else if (value instanceof Integer)
-			return Util.formatSizeKB(((Integer) value).doubleValue());
-		if (value instanceof String)
-			return Util.formatSizeKB(Long.parseLong(value.toString()));
+		if (value instanceof Double doubleVal)
+			return Util.formatSizeKB(doubleVal.doubleValue());
+		if (value instanceof Long longVal)
+			return Util.formatSizeKB(longVal.doubleValue());
+		else if (value instanceof Integer intVal)
+			return Util.formatSizeKB(intVal.doubleValue());
+		if (value instanceof String str)
+			return Util.formatSizeKB(Long.parseLong(str));
 		else
 			return Util.formatSizeKB(0L);
 	}
@@ -623,16 +656,14 @@ public abstract class Util {
 	public static String formatSizeW7(Object value) {
 		if (value == null)
 			return null;
-		if (value instanceof Float)
-			return Util.formatSizeKB(((Float) value).doubleValue());
-		if (value instanceof Long)
-			return Util.formatSizeW7(((Long) value).doubleValue());
-		else if (value instanceof Integer)
-			return Util.formatSizeW7(((Integer) value).doubleValue());
-		else if (value instanceof Float)
-			return Util.formatSizeW7(((Float) value).doubleValue());
-		if (value instanceof String)
-			return Util.formatSizeW7(Long.parseLong(value.toString()));
+		if (value instanceof Float floatVal)
+			return Util.formatSizeKB(floatVal.doubleValue());
+		if (value instanceof Long longVal)
+			return Util.formatSizeW7(longVal.doubleValue());
+		else if (value instanceof Integer intVal)
+			return Util.formatSizeW7(intVal.doubleValue());
+		if (value instanceof String str)
+			return Util.formatSizeW7(Long.parseLong(str));
 		else
 			return Util.formatSizeW7(0L);
 	}
@@ -756,10 +787,6 @@ public abstract class Util {
 		}
 	}-*/;
 
-	public static native void copyToClipboard(String text) /*-{
-		new $wnd.copyToClipboard(text);
-	}-*/;
-
 	public static native boolean isValidEmail(String email) /*-{
 		var reg1 = /(@.*@)|(\.\.)|(@\.)|(\.@)|(^\.)/; // not valid
 		var reg2 = /^.+\@(\[?)[a-zA-Z0-9\-\.]+\.([a-zA-Z]{2,3}|[0-9]{1,3})(\]?)$/; // valid
@@ -768,7 +795,7 @@ public abstract class Util {
 
 	public static native void redirect(String url)
 	/*-{
-		$wnd.location.replace(url);
+	    $wnd.location.href = url;
 	}-*/;
 
 	public static String padLeft(String s, int n) {
@@ -886,9 +913,15 @@ public abstract class Util {
 	 * @return the current tenant's name
 	 */
 	public static String detectTenant() {
+		String tenant = getTenantInRequest();
+		if (tenant == null)
+			tenant = Constants.TENANT_DEFAULTNAME;
+		return tenant;
+	}
+
+	public static String getTenantInRequest() {
 		RequestInfo request = WindowUtils.getRequestInfo();
-		// Tries to capture tenant parameter
-		String tenant = Constants.TENANT_DEFAULTNAME;
+		String tenant = null;
 		if (request.getParameter(Constants.TENANT) != null && !request.getParameter(Constants.TENANT).equals("")) {
 			tenant = request.getParameter(Constants.TENANT);
 		}
@@ -1019,7 +1052,7 @@ public abstract class Util {
 				url += "?locale=" + locale;
 			}
 		}
-		Util.redirect(url);
+		WindowUtils.openUrl(url);
 	}
 
 	/**
@@ -1040,12 +1073,9 @@ public abstract class Util {
 		return url;
 	}
 
-	public static String getValue(String name, GUIParameter[] parameters) {
-		if (parameters != null)
-			for (GUIParameter param : parameters)
-				if (name.equals(param.getName()))
-					return param.getValue();
-		return null;
+	public static String getValue(String name, List<GUIParameter> parameters) {
+		return parameters.stream().filter(param -> name.equals(param.getName())).map(GUIParameter::getValue).findFirst()
+				.orElse(null);
 	}
 
 	public static long[] toPrimitives(Long[] objects) {
@@ -1091,11 +1121,10 @@ public abstract class Util {
 		}
 	}
 
-	public static Map<String, String> convertToMap(GUIParameter[] parameters) {
+	public static Map<String, String> convertToMap(List<GUIParameter> parameters) {
 		Map<String, String> map = new HashMap<>();
-		if (parameters != null)
-			for (GUIParameter param : parameters)
-				map.put(param.getName(), param.getValue());
+		for (GUIParameter param : parameters)
+			map.put(param.getName(), param.getValue());
 		return map;
 	}
 
@@ -1146,7 +1175,7 @@ public abstract class Util {
 	}
 
 	/**
-	 * Converts some HTML specific cahrd into it's entity
+	 * Converts some HTML specific chars into it's entity
 	 * 
 	 * @param originalText the original string to filter
 	 * 
@@ -1180,15 +1209,14 @@ public abstract class Util {
 	 * 
 	 * @return the HTML content
 	 */
-	public static String getTagsHTML(String[] tags) {
+	public static String getTagsHTML(List<String> tags) {
 		StringBuilder buf = new StringBuilder(
 				"<div style='display: grid; grid-gap: 2px; padding: 1px; grid-auto-flow: row dense; grid-template-columns: auto auto auto; grid-template-rows: auto auto;'>");
-		if (tags != null)
-			for (String tag : tags) {
-				buf.append("<span class='button' style='white-space: nowrap;'>");
-				buf.append(tag);
-				buf.append("</span>");
-			}
+		for (String tag : tags) {
+			buf.append("<span class='button' style='white-space: nowrap;'>");
+			buf.append(tag);
+			buf.append("</span>");
+		}
 		buf.append(END_DIV);
 		return buf.toString();
 	}
@@ -1207,12 +1235,31 @@ public abstract class Util {
 		}
 	}
 
-	public static String getParameterValue(GUIParameter[] params, String name) {
-		for (GUIParameter param : params) {
-			if (param.getName().equals(Session.get().getTenantName() + "." + name) || param.getName().equals(name))
-				return param.getValue();
+	public static GUIParameter getParameter(List<GUIParameter> params, String name) {
+		try {
+			return params.stream().filter(param -> param.getName().equals(Session.get().getTenantName() + "." + name)
+					|| param.getName().equals(name)).findFirst().orElse(null);
+		} catch (RuntimeException re) {
+			return null;
 		}
-		return null;
+	}
+
+	public static String getParameterValue(List<GUIParameter> params, String name) {
+		try {
+			GUIParameter param = getParameter(params, name);
+			return param != null ? param.getValue() : null;
+		} catch (RuntimeException re) {
+			return null;
+		}
+	}
+
+	public static Boolean getParameterValueAsBoolean(List<GUIParameter> params, String name) {
+		try {
+			GUIParameter param = getParameter(params, name);
+			return param != null ? param.getValueAsBoolean() : null;
+		} catch (RuntimeException re) {
+			return Boolean.FALSE;
+		}
 	}
 
 	public static void removeChildren(Layout container) {

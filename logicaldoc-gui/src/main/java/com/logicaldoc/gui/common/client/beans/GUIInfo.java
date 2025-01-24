@@ -1,7 +1,9 @@
 package com.logicaldoc.gui.common.client.beans;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 
 import com.logicaldoc.gui.common.client.Constants;
 import com.logicaldoc.gui.common.client.i18n.I18N;
@@ -16,9 +18,9 @@ public class GUIInfo implements Serializable {
 
 	private static final long serialVersionUID = 1L;
 
-	private String release = "8.8.5";
+	private String release = "9.1.1";
 
-	private String year = "2006-2023";
+	private String year = "2006-2025";
 
 	private String userNo;
 
@@ -32,36 +34,46 @@ public class GUIInfo implements Serializable {
 
 	private String hostName;
 
+	private String changelog;
+
 	private Date date = new Date();
 
 	private GUITenant tenant = null;
 
 	// Optional list of messages to be shown to the user
-	private GUIMessage[] alerts = new GUIMessage[0];
+	private List<GUIMessage> alerts = new ArrayList<>();
 
-	private GUIValue[] supportedLanguages = new GUIValue[0];
+	private List<GUIValue> supportedLanguages = new ArrayList<>();
 
-	private GUIValue[] supportedGUILanguages = new GUIValue[0];
+	private List<GUIValue> supportedGUILanguages = new ArrayList<>();
 
-	private GUIValue[] bundle = new GUIValue[0];
+	private List<GUIValue> bundle = new ArrayList<>();
 
-	private GUIValue[] config = new GUIValue[0];
-	
-	private GUIReadingRequest[] unconfirmedReagings = new GUIReadingRequest[0];
+	private List<GUIValue> config = new ArrayList<>();
+
+	private List<GUIReadingRequest> unconfirmedReagings = new ArrayList<>();
 
 	// The definitions of attributes
-	private GUIAttribute[] attributeDefinitions = new GUIAttribute[0];
+	private List<GUIAttribute> attributeDefinitions = new ArrayList<>();
 
-	private String[] features = new String[0];
+	private List<String> features = new ArrayList<>();
 
 	private boolean databaseConnected = true;
 
 	private GUIAttributeSet defaultAttributeSet;
 
 	private GUIBranding branding = new GUIBranding();
-	
+
 	public String getRelease() {
 		return release;
+	}
+
+	public String getChangelog() {
+		return changelog;
+	}
+
+	public void setChangelog(String changelog) {
+		this.changelog = changelog;
 	}
 
 	public void setRelease(String release) {
@@ -76,47 +88,43 @@ public class GUIInfo implements Serializable {
 		this.year = year;
 	}
 
-	public GUIMessage[] getAlerts() {
+	public List<GUIMessage> getAlerts() {
 		return alerts;
 	}
 
-	public void setAlerts(GUIMessage[] alerts) {
+	public void setAlerts(List<GUIMessage> alerts) {
 		this.alerts = alerts;
 	}
 
-	public GUIValue[] getSupportedLanguages() {
+	public List<GUIValue> getSupportedLanguages() {
 		return supportedLanguages;
 	}
 
-	public void setSupportedLanguages(GUIValue[] supportedLanguages) {
+	public void setSupportedLanguages(List<GUIValue> supportedLanguages) {
 		this.supportedLanguages = supportedLanguages;
 	}
 
-	public GUIValue[] getBundle() {
+	public List<GUIValue> getBundle() {
 		return bundle;
 	}
 
-	public void setBundle(GUIValue[] bundle) {
+	public void setBundle(List<GUIValue> bundle) {
 		this.bundle = bundle;
 	}
 
-	public String[] getFeatures() {
+	public List<String> getFeatures() {
 		return features;
 	}
 
 	public boolean isEnabled(String feature) {
-		if (features == null || features.length == 0)
-			return false;
-		else {
-			for (String f : features) {
-				if (f.equals(feature))
-					return true;
-			}
+		for (String f : features) {
+			if (f.equals(feature))
+				return true;
 		}
 		return false;
 	}
 
-	public void setFeatures(String[] features) {
+	public void setFeatures(List<String> features) {
 		this.features = features;
 	}
 
@@ -128,11 +136,11 @@ public class GUIInfo implements Serializable {
 		this.installationId = installationId;
 	}
 
-	public GUIValue[] getSupportedGUILanguages() {
+	public List<GUIValue> getSupportedGUILanguages() {
 		return supportedGUILanguages;
 	}
 
-	public void setSupportedGUILanguages(GUIValue[] supportedGUILanguages) {
+	public void setSupportedGUILanguages(List<GUIValue> supportedGUILanguages) {
 		this.supportedGUILanguages = supportedGUILanguages;
 	}
 
@@ -152,8 +160,12 @@ public class GUIInfo implements Serializable {
 		this.sessionHeartbeat = sessionHeartbeat;
 	}
 
-	public GUIValue[] getConfig() {
+	public List<GUIValue> getConfig() {
 		return config;
+	}
+
+	public void setConfig(List<GUIValue> config) {
+		this.config = config;
 	}
 
 	/**
@@ -213,10 +225,6 @@ public class GUIInfo implements Serializable {
 				return;
 			}
 		}
-	}
-
-	public void setConfig(GUIValue[] config) {
-		this.config = config;
 	}
 
 	public String getRunLevel() {
@@ -305,19 +313,19 @@ public class GUIInfo implements Serializable {
 		this.branding = branding;
 	}
 
-	public GUIAttribute[] getAttributeDefinitions() {
+	public List<GUIAttribute> getAttributeDefinitions() {
 		return attributeDefinitions;
 	}
 
-	public void setAttributeDefinitions(GUIAttribute[] attributeDefinitions) {
+	public void setAttributeDefinitions(List<GUIAttribute> attributeDefinitions) {
 		this.attributeDefinitions = attributeDefinitions;
 	}
 
-	public GUIReadingRequest[] getUnconfirmedReagings() {
+	public List<GUIReadingRequest> getUnconfirmedReagings() {
 		return unconfirmedReagings;
 	}
 
-	public void setUnconfirmedReagings(GUIReadingRequest[] unconfirmedReagings) {
+	public void setUnconfirmedReagings(List<GUIReadingRequest> unconfirmedReagings) {
 		this.unconfirmedReagings = unconfirmedReagings;
 	}
 }

@@ -1,15 +1,14 @@
 package com.logicaldoc.gui.frontend.client.system;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.data.SessionsDS;
+import com.logicaldoc.gui.common.client.grid.DateListGridField;
+import com.logicaldoc.gui.common.client.grid.RefreshableListGrid;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.services.SecurityService;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.LD;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.RefreshableListGrid;
 import com.smartgwt.client.data.Record;
 import com.smartgwt.client.types.SelectionStyle;
 import com.smartgwt.client.widgets.form.fields.StaticTextItem;
@@ -92,6 +91,9 @@ public class SessionsPanel extends VLayout {
 		ListGridField username = new ListGridField("username", I18N.message("username"), 80);
 		username.setCanFilter(true);
 
+		ListGridField key = new ListGridField("key", I18N.message("key"), 80);
+		key.setCanFilter(true);
+
 		ListGridField client = new ListGridField("client", I18N.message("client"), 200);
 		client.setCanFilter(true);
 
@@ -101,6 +103,11 @@ public class SessionsPanel extends VLayout {
 		ListGridField created = new DateListGridField("created", "createdon");
 
 		ListGridField renew = new DateListGridField("renew", "lastrenew");
+
+		ListGridField finished = new DateListGridField("finished", "finishedon");
+		finished.setHidden(true);
+
+		ListGridField duration = new ListGridField("duration", I18N.message("duration"), 100);
 
 		ListGridField statusLabel = new ListGridField(STATUS_LABEL, I18N.message(STATUS), 80);
 		statusLabel.setCanFilter(false);
@@ -133,7 +140,8 @@ public class SessionsPanel extends VLayout {
 		sessionsGrid.setSelectionType(SelectionStyle.SINGLE);
 		sessionsGrid.setDataSource(new SessionsDS());
 
-		sessionsGrid.setFields(sid, statusLabel, username, tenant, created, renew, node, client);
+		sessionsGrid.setFields(sid, statusLabel, username, key, tenant, created, renew, finished, duration, node,
+				client);
 	}
 
 	private void showContextMenu() {
@@ -144,12 +152,7 @@ public class SessionsPanel extends VLayout {
 		killSession.addClickHandler(event -> LD.ask(I18N.message("question"), I18N.message("confirmkill"), yes -> {
 			if (Boolean.TRUE.equals(yes)) {
 				ListGridRecord rec = sessionsGrid.getSelectedRecord();
-				SecurityService.Instance.get().kill(rec.getAttributeAsString("sid"), new AsyncCallback<Void>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				SecurityService.Instance.get().kill(rec.getAttributeAsString("sid"), new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Void result) {
 						sessionsGrid.getSelectedRecord().setAttribute(STATUS_LABEL, "Closed");
@@ -171,5 +174,15 @@ public class SessionsPanel extends VLayout {
 
 		contextMenu.setItems(killSession);
 		contextMenu.showContextMenu();
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

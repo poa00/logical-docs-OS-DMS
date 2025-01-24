@@ -1,17 +1,15 @@
 package com.logicaldoc.gui.frontend.client.impex.archives;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIArchive;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.frontend.client.services.ImpexService;
 import com.smartgwt.client.types.HeaderControls;
 import com.smartgwt.client.types.TitleOrientation;
 import com.smartgwt.client.widgets.Window;
 import com.smartgwt.client.widgets.form.DynamicForm;
-import com.smartgwt.client.widgets.form.ValuesManager;
 import com.smartgwt.client.widgets.form.fields.ButtonItem;
 import com.smartgwt.client.widgets.form.fields.StaticTextItem;
 import com.smartgwt.client.widgets.form.fields.TextItem;
@@ -24,13 +22,7 @@ import com.smartgwt.client.widgets.form.fields.TextItem;
  */
 public class ArchiveDialog extends Window {
 
-	private ValuesManager vm = new ValuesManager();
-
-	private ExportArchivesList archivesPanel;
-
 	public ArchiveDialog(ExportArchivesList archivesPanel) {
-		this.archivesPanel = archivesPanel;
-
 		addCloseClickHandler(event -> destroy());
 
 		setHeaderControls(HeaderControls.HEADER_LABEL, HeaderControls.CLOSE_BUTTON);
@@ -44,7 +36,6 @@ public class ArchiveDialog extends Window {
 		setAutoSize(true);
 
 		final DynamicForm form = new DynamicForm();
-		form.setValuesManager(vm);
 		form.setWidth(280);
 		form.setMargin(5);
 		form.setTitleOrientation(TitleOrientation.TOP);
@@ -62,30 +53,23 @@ public class ArchiveDialog extends Window {
 		save.setTitle(I18N.message("save"));
 		save.setAutoFit(true);
 		save.addClickHandler(event -> {
-			vm.validate();
-			if (Boolean.FALSE.equals(vm.hasErrors())) {
+			if (form.validate()) {
 				GUIArchive archive = new GUIArchive();
-				archive.setType(ArchiveDialog.this.archivesPanel.getArchivesType());
-				archive.setName(vm.getValueAsString("name"));
-				archive.setDescription(vm.getValueAsString("description"));
+				archive.setType(archivesPanel.getArchivesType());
+				archive.setName(form.getValueAsString("name"));
+				archive.setDescription(form.getValueAsString("description"));
 				archive.setCreatorId(Session.get().getUser().getId());
 				archive.setCreatorName(Session.get().getUser().getFullName());
 				archive.setMode(GUIArchive.MODE_EXPORT);
 
-				ImpexService.Instance.get().save(archive, new AsyncCallback<GUIArchive>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-						destroy();
-					}
-
+				ImpexService.Instance.get().save(archive, new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(GUIArchive result) {
 						destroy();
 						// We can reload the archives list with the saved
 						// archive, because all archives of the same list
 						// have the same type
-						ArchiveDialog.this.archivesPanel.refresh(result.getType(), false);
+						archivesPanel.refresh(result.getType(), false);
 					}
 				});
 			}

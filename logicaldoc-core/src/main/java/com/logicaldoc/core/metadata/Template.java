@@ -1,8 +1,5 @@
 package com.logicaldoc.core.metadata;
 
-import java.util.HashSet;
-import java.util.Set;
-
 /**
  * A template collects a set of attributesets ant is itself an extensible
  * object.
@@ -16,40 +13,36 @@ public class Template extends AbstractAttributeSet {
 
 	private String validation;
 
-	private Set<TemplateGroup> templateGroups = new HashSet<>();
-
-	public Set<TemplateGroup> getTemplateGroups() {
-		return templateGroups;
-	}
-
-	public void setTemplateGroups(Set<TemplateGroup> templateGroups) {
-		this.templateGroups = templateGroups;
-	}
-
-	/**
-	 * Adds a new element, substituting a previous one with the same groupId.
-	 * 
-	 * @param tg the template group
-	 */
-	public void addTemplateGroup(TemplateGroup tg) {
-		TemplateGroup m = getWorkflowGroup(tg.getGroupId());
-		getTemplateGroups().remove(m);
-		getTemplateGroups().add(tg);
-	}
-
-	public TemplateGroup getWorkflowGroup(long groupId) {
-		for (TemplateGroup tg : templateGroups) {
-			if (tg.getGroupId() == groupId)
-				return tg;
-		}
-		return null;
-	}
-
 	public String getValidation() {
 		return validation;
 	}
 
 	public void setValidation(String validation) {
 		this.validation = validation;
+	}
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = super.hashCode();
+		result = prime * result + ((validation == null) ? 0 : validation.hashCode());
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (!super.equals(obj))
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		Template other = (Template) obj;
+		if (validation == null) {
+			if (other.validation != null)
+				return false;
+		} else if (!validation.equals(other.validation))
+			return false;
+		return true;
 	}
 }

@@ -11,6 +11,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 
 import org.apache.commons.io.IOUtils;
@@ -57,7 +58,11 @@ public class WebserviceInterceptor extends AbstractPhaseInterceptor<Message> {
 
 	protected static Logger log = LoggerFactory.getLogger(WebserviceInterceptor.class);
 
+	@Resource(name = "SequenceDAO")
 	private SequenceDAO sequenceDAO;
+
+	@Resource(name = "ContextProperties")
+	private ContextProperties settings;
 
 	/**
 	 * A cache of counters: key=countername-tenantId name value=actual total
@@ -74,8 +79,6 @@ public class WebserviceInterceptor extends AbstractPhaseInterceptor<Message> {
 	 * Last time the oldest calls were cleaned
 	 */
 	private Date lastClean;
-
-	private ContextProperties settings;
 
 	public WebserviceInterceptor() {
 		super(Phase.RECEIVE);
@@ -160,7 +163,7 @@ public class WebserviceInterceptor extends AbstractPhaseInterceptor<Message> {
 		if (call.getUri() != null)
 			call.setUri(maskCredentials(call.getUri()));
 
-		ThreadPools pools = (ThreadPools) Context.get().getBean(ThreadPools.class);
+		ThreadPools pools = Context.get(ThreadPools.class);
 		pools.schedule(new WebserviceCallStore(call), THREADPOOL_CALL_STORE, 5000);
 	}
 
@@ -230,7 +233,7 @@ public class WebserviceInterceptor extends AbstractPhaseInterceptor<Message> {
 
 		long timeSinceLastSync = ChronoUnit.MINUTES.between(lastSync.toInstant(), now.toInstant());
 		if (timeSinceLastSync >= 10) {
-			ThreadPools pools = (ThreadPools) Context.get().getBean(ThreadPools.class);
+			ThreadPools pools = Context.get(ThreadPools.class);
 			pools.schedule(new WebserviceCallCounterSync(), THREADPOOL_CALL_COUNTER, 5000);
 		}
 	}
@@ -349,7 +352,7 @@ public class WebserviceInterceptor extends AbstractPhaseInterceptor<Message> {
 		@Override
 		public void run() {
 			try {
-				WebserviceCallDAO dao = (WebserviceCallDAO) Context.get().getBean(WebserviceCallDAO.class);
+				WebserviceCallDAO dao = Context.get(WebserviceCallDAO.class);
 				Date now = new Date();
 
 				if (lastClean == null)

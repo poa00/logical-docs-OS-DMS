@@ -5,9 +5,9 @@ import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.smartgwt.client.types.TitleOrientation;
 import com.smartgwt.client.widgets.form.DynamicForm;
 import com.smartgwt.client.widgets.form.ValuesManager;
-import com.smartgwt.client.widgets.form.fields.RadioGroupItem;
 import com.smartgwt.client.widgets.form.fields.SelectItem;
 import com.smartgwt.client.widgets.form.fields.TextItem;
+import com.smartgwt.client.widgets.form.fields.ToggleItem;
 import com.smartgwt.client.widgets.form.fields.events.ChangedHandler;
 import com.smartgwt.client.widgets.layout.VLayout;
 
@@ -18,7 +18,7 @@ import com.smartgwt.client.widgets.layout.VLayout;
  * @since 6.0
  */
 public class ImportSettingsPanel extends VLayout {
-	
+
 	private static final String IMPORTTEMPLATES = "importtemplates";
 
 	private GUIArchive archive;
@@ -35,18 +35,17 @@ public class ImportSettingsPanel extends VLayout {
 
 		TextItem description = ItemFactory.newTextItem("description", archive.getDescription());
 		description.addChangedHandler(changedHandler);
-		description.setDisabled(archive.getStatus() != GUIArchive.STATUS_OPENED);
+		description.setDisabled(archive.getStatus() != GUIArchive.STATUS_OPEN);
 
-		RadioGroupItem importTemplates = ItemFactory.newBooleanSelector(IMPORTTEMPLATES, IMPORTTEMPLATES);
-		importTemplates.setValue(archive.getImportTemplate() == 1 ? "yes" : "no");
+		ToggleItem importTemplates = ItemFactory.newToggleItem(IMPORTTEMPLATES, archive.getImportTemplate() == 1);
 		importTemplates.addChangedHandler(changedHandler);
-		importTemplates.setDisabled(archive.getStatus() != GUIArchive.STATUS_OPENED);
+		importTemplates.setDisabled(archive.getStatus() != GUIArchive.STATUS_OPEN);
 
 		SelectItem options = ItemFactory.newImportCustomIds();
 		options.setWidth(200);
 		options.setValue(Integer.toString(archive.getImportCustomId()));
 		options.addChangedHandler(changedHandler);
-		options.setDisabled(archive.getStatus() != GUIArchive.STATUS_OPENED);
+		options.setDisabled(archive.getStatus() != GUIArchive.STATUS_OPEN);
 
 		form.setFields(description, importTemplates, options);
 
@@ -59,9 +58,19 @@ public class ImportSettingsPanel extends VLayout {
 		if (Boolean.FALSE.equals(vm.hasErrors())) {
 			archive.setDescription(vm.getValueAsString("description"));
 			archive.setImportCustomId(Integer.parseInt(vm.getValueAsString("importcids")));
-			archive.setImportTemplate("yes".equals(vm.getValueAsString(IMPORTTEMPLATES)) ? 1 : 0);
+			archive.setImportTemplate(Boolean.parseBoolean(vm.getValueAsString(IMPORTTEMPLATES)) ? 1 : 0);
 			return true;
 		} else
 			return false;
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

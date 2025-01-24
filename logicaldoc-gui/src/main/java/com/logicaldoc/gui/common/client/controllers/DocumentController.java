@@ -1,6 +1,9 @@
 package com.logicaldoc.gui.common.client.controllers;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import com.google.gwt.user.client.rpc.AsyncCallback;
@@ -24,9 +27,14 @@ public class DocumentController {
 	private Set<DocumentObserver> observers = new HashSet<>();
 
 	/**
-	 * The currently selected document
+	 * The currently selected document, the one you are currently working onwha
 	 */
 	private GUIDocument currentDocument = null;
+
+	/**
+	 * The current selection
+	 */
+	private List<GUIDocument> currentSelection = new ArrayList<>();
 
 	/**
 	 * If the current document under editing
@@ -63,7 +71,7 @@ public class DocumentController {
 		}
 	}
 
-	public void deleted(GUIDocument[] documents) {
+	public void deleted(List<GUIDocument> documents) {
 		synchronized (observers) {
 			for (DocumentObserver observer : observers)
 				try {
@@ -155,7 +163,7 @@ public class DocumentController {
 		currentDocument = document;
 		editing = true;
 		if (document.getStatus() == GUIDocument.DOC_UNLOCKED && Session.get().getConfigAsBoolean("gui.onedit.lock")) {
-			DocumentService.Instance.get().lock(new Long[] { document.getId() }, null, new AsyncCallback<Void>() {
+			DocumentService.Instance.get().lock(Arrays.asList(document.getId()), null, new AsyncCallback<>() {
 				@Override
 				public void onFailure(Throwable caught) {
 					GuiLog.error(I18N.message("cannotlockdoc"), null, null);
@@ -187,7 +195,7 @@ public class DocumentController {
 
 	public synchronized void cancelEditing(GUIDocument document) {
 		if (document != null && isEditing(document) && Session.get().getConfigAsBoolean("gui.onedit.lock")) {
-			DocumentService.Instance.get().unlock(new Long[] { document.getId() }, new AsyncCallback<Void>() {
+			DocumentService.Instance.get().unlock(Arrays.asList(document.getId()), new AsyncCallback<>() {
 
 				@Override
 				public void onFailure(Throwable caught) {
@@ -226,6 +234,14 @@ public class DocumentController {
 	public void setCurrentDocument(GUIDocument document) {
 		this.currentDocument = document;
 		selected(document);
+	}
+
+	public void setCurrentSelection(List<GUIDocument> documents) {
+		this.currentSelection = documents;
+	}
+
+	public List<GUIDocument> getCurrentSelection() {
+		return currentSelection;
 	}
 
 	public GUIDocument getCurrentDocument() {

@@ -1,6 +1,9 @@
 package com.logicaldoc.gui.frontend.client.settings.messages;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import java.util.ArrayList;
+import java.util.List;
+
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIMessageTemplate;
 import com.logicaldoc.gui.common.client.i18n.I18N;
 import com.logicaldoc.gui.common.client.log.GuiLog;
@@ -186,26 +189,19 @@ public class MessageTemplatesPanel extends VLayout {
 			return;
 
 		Record[] records = list.getRecords();
-		GUIMessageTemplate[] templates = new GUIMessageTemplate[records.length];
-		int i = 0;
+		List<GUIMessageTemplate> templates = new ArrayList<>();
 		for (Record rec : records) {
-			GUIMessageTemplate t = new GUIMessageTemplate();
-			t.setId(Long.parseLong(rec.getAttributeAsString("id")));
-			t.setLanguage(lang);
-			t.setName(rec.getAttributeAsString("name"));
-			t.setSubject(rec.getAttributeAsString(SUBJECT));
-			t.setBody(rec.getAttributeAsString("body"));
-			t.setType(rec.getAttributeAsString("type"));
-
-			templates[i++] = t;
+			GUIMessageTemplate template = new GUIMessageTemplate();
+			template.setId(Long.parseLong(rec.getAttributeAsString("id")));
+			template.setLanguage(lang);
+			template.setName(rec.getAttributeAsString("name"));
+			template.setSubject(rec.getAttributeAsString(SUBJECT));
+			template.setBody(rec.getAttributeAsString("body"));
+			template.setType(rec.getAttributeAsString("type"));
+			templates.add(template);
 		}
 
-		MessageService.Instance.get().saveTemplates(templates, new AsyncCallback<Void>() {
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
+		MessageService.Instance.get().saveTemplates(templates, new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(Void arg0) {
 				GuiLog.info(I18N.message("settingssaved"), null);
@@ -220,19 +216,14 @@ public class MessageTemplatesPanel extends VLayout {
 		copyFromDefault.setTitle(I18N.message("copyfromdefault"));
 		copyFromDefault.addClickHandler((MenuItemClickEvent event) -> {
 			ListGridRecord[] records = list.getSelectedRecords();
-			long[] ids = new long[records.length];
+			List<Long> ids = new ArrayList<>();
 			for (int i = 0; i < records.length; i++) {
 				// Avoid deletion of default templates
 				if (!"en".equals(records[i].getAttributeAsString(LANGUAGE)))
-					ids[i] = Long.parseLong(records[i].getAttributeAsString("id"));
+					ids.add(records[i].getAttributeAsLong("id"));
 			}
 
-			MessageService.Instance.get().deleteTemplates(ids, new AsyncCallback<Void>() {
-				@Override
-				public void onFailure(Throwable caught) {
-					GuiLog.serverError(caught);
-				}
-
+			MessageService.Instance.get().deleteTemplates(ids, new DefaultAsyncCallback<>() {
 				@Override
 				public void onSuccess(Void arg0) {
 					reload();
@@ -243,12 +234,7 @@ public class MessageTemplatesPanel extends VLayout {
 		MenuItem delete = new MenuItem();
 		delete.setTitle(I18N.message("ddelete"));
 		delete.addClickHandler(event -> MessageService.Instance.get()
-				.deleteTemplates(list.getSelectedRecord().getAttributeAsString("name"), new AsyncCallback<Void>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				.deleteTemplates(list.getSelectedRecord().getAttributeAsString("name"), new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Void arg) {
 						reload();
@@ -265,16 +251,10 @@ public class MessageTemplatesPanel extends VLayout {
 	private void reload() {
 		String lang = langSelector.getValueAsString();
 
-		MessageService.Instance.get().loadTemplates(lang, null, new AsyncCallback<GUIMessageTemplate[]>() {
+		MessageService.Instance.get().loadTemplates(lang, null, new DefaultAsyncCallback<>() {
 			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
-			@Override
-			public void onSuccess(GUIMessageTemplate[] templates) {
-				ListGridRecord[] records = new ListGridRecord[templates.length];
-				int i = 0;
+			public void onSuccess(List<GUIMessageTemplate> templates) {
+				List<ListGridRecord> records = new ArrayList<>();
 				for (GUIMessageTemplate pat : templates) {
 					ListGridRecord rec = new ListGridRecord();
 					rec.setAttribute("id", pat.getId());
@@ -283,10 +263,20 @@ public class MessageTemplatesPanel extends VLayout {
 					rec.setAttribute(SUBJECT, pat.getSubject());
 					rec.setAttribute("body", pat.getBody());
 					rec.setAttribute("type", pat.getType());
-					records[i++] = rec;
+					records.add(rec);
 				}
-				list.setData(records);
+				list.setData(records.toArray(new ListGridRecord[0]));
 			}
 		});
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

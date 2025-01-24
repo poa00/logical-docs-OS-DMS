@@ -13,6 +13,8 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.apache.commons.io.IOUtils;
@@ -98,8 +100,8 @@ public class Automation {
 				RuntimeSingleton.init();
 				log.info("Automation initialized with default settings");
 			}
-		} catch (Exception t) {
-			log.error("Unable to initialize the automation engine", t);
+		} catch (Exception e) {
+			log.error("Unable to initialize the automation engine", e);
 		}
 	}
 
@@ -137,6 +139,7 @@ public class Automation {
 	 * </ol>
 	 * 
 	 * @param clientDictionary Custom keys provided by the client
+	 * 
 	 * @return The complete dictionary to use
 	 */
 	@SuppressWarnings({ "rawtypes", "unchecked" })
@@ -148,7 +151,7 @@ public class Automation {
 		/*
 		 * Scan the classpath to add all the @AutomationDictionary classes
 		 */
-		ClassPathScanningCandidateComponentProvider scanner = new ClassPathScanningCandidateComponentProvider(true);
+		ClassPathScanningCandidateComponentProvider scanner = new ClassPathScanningCandidateComponentProvider(false);
 		scanner.addIncludeFilter(new AnnotationTypeFilter(AutomationDictionary.class));
 		for (BeanDefinition bd : scanner.findCandidateComponents("com.logicaldoc")) {
 			String beanClassName = bd.getBeanClassName();
@@ -263,9 +266,13 @@ public class Automation {
 	 * 
 	 * @param expression The string expression to process
 	 * @param clientDictionary The dictionary to use
+	 * 
 	 * @return The processed result
+	 * 
+	 * @throws AutomationException the script has been evaluated but produced an
+	 *         error
 	 */
-	public String evaluate(String expression, Map<String, Object> clientDictionary) {
+	public String evaluate(String expression, Map<String, Object> clientDictionary) throws AutomationException {
 		StringWriter writer = new StringWriter();
 		evaluate(expression, clientDictionary, writer);
 		return writer.toString();
@@ -278,26 +285,41 @@ public class Automation {
 	 * @param clientDictionary dictionary to be passed to the engine
 	 * @param reader the reader on the automation code
 	 * @param writer the writer that will receive the output
+	 * 
+	 * @throws IOException cannot read from reader
+	 * @throws AutomationException the script has been evaluated but produced an
+	 *         error
 	 */
-	public void evaluate(Map<String, Object> clientDictionary, Reader reader, Writer writer) {
-		try {
-			String expression = IOUtils.toString(reader);
-			evaluate(expression, clientDictionary, writer);
-		} catch (IOException e) {
-			log.error(e.getMessage(), e);
-		}
-
+	public void evaluate(Map<String, Object> clientDictionary, Reader reader, Writer writer)
+			throws IOException, AutomationException {
+		String expression = IOUtils.toString(reader);
+		evaluate(expression, clientDictionary, writer);
 	}
 
-	private void evaluate(String expression, Map<String, Object> clientDictionary, Writer writer) {
+	private void forbidRuntimeUsage(String expression) throws ForbiddenCodeException {
+		if (expression.contains("java.lang.Runtime")) {
+			throw new ForbiddenCodeException(expression);
+		} else {
+			Pattern runtimePattern = Pattern.compile("\\.\\s*(getRuntime|runtime)", Pattern.DOTALL);
+			Matcher m = runtimePattern.matcher(expression);
+			if (m.find()) {
+				String snippet = expression.substring(Math.max(0, m.start() - 50),
+						Math.min(expression.length() - 1, m.end() + 50));
+				log.error("Detected possible suspicious access to java.lang.Runtime: {}", snippet);
+				throw new ForbiddenCodeException(snippet, expression);
+			}
+		}
+	}
+
+	private void evaluate(String expression, Map<String, Object> clientDictionary, Writer writer)
+			throws AutomationException {
+		forbidRuntimeUsage(expression);
+
 		try {
-			if (expression.contains("java.lang.Runtime"))
-				throw new SecurityException(
-						"The script makes use of the forbidden class java.lang.Runtime and cannot be executed");
 			VelocityContext context = prepareContext(prepareDictionary(clientDictionary));
 			Velocity.evaluate(context, writer, StringUtils.isNotEmpty(logTag) ? logTag : "ScriptEngine", expression);
 		} catch (Exception e) {
-			log.error("Error in the script", e);
+			throw new AutomationException(expression, e);
 		}
 	}
 }

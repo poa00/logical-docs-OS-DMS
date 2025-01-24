@@ -3,8 +3,9 @@ package com.logicaldoc.gui.frontend.client.security;
 import java.util.Map;
 
 import com.google.gwt.core.client.GWT;
-import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.logicaldoc.gui.common.client.Feature;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
+import com.logicaldoc.gui.common.client.Menu;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUISecuritySettings;
 import com.logicaldoc.gui.common.client.beans.GUIUser;
@@ -17,6 +18,7 @@ import com.logicaldoc.gui.common.client.util.Util;
 import com.logicaldoc.gui.common.client.widgets.FeatureDisabled;
 import com.logicaldoc.gui.common.client.widgets.PasswordGenerator;
 import com.logicaldoc.gui.frontend.client.administration.AdminPanel;
+import com.logicaldoc.gui.frontend.client.system.SessionsPanel;
 import com.smartgwt.client.types.Alignment;
 import com.smartgwt.client.types.TitleOrientation;
 import com.smartgwt.client.util.SC;
@@ -25,11 +27,12 @@ import com.smartgwt.client.widgets.events.ClickEvent;
 import com.smartgwt.client.widgets.form.DynamicForm;
 import com.smartgwt.client.widgets.form.ValuesManager;
 import com.smartgwt.client.widgets.form.fields.ButtonItem;
-import com.smartgwt.client.widgets.form.fields.RadioGroupItem;
 import com.smartgwt.client.widgets.form.fields.SelectItem;
 import com.smartgwt.client.widgets.form.fields.SpinnerItem;
 import com.smartgwt.client.widgets.form.fields.StaticTextItem;
+import com.smartgwt.client.widgets.form.fields.TextAreaItem;
 import com.smartgwt.client.widgets.form.fields.TextItem;
+import com.smartgwt.client.widgets.form.fields.ToggleItem;
 import com.smartgwt.client.widgets.tab.Tab;
 
 /**
@@ -39,6 +42,8 @@ import com.smartgwt.client.widgets.tab.Tab;
  * @since 6.0
  */
 public class SecuritySettingsPanel extends AdminPanel {
+
+	private static final String ALLOWCLIENTID = "allowclientid";
 
 	private static final String ENABLEANONYMOUS = "enableanonymous";
 
@@ -149,10 +154,12 @@ public class SecuritySettingsPanel extends AdminPanel {
 		pwdOccurrence.setMin(1);
 		pwdOccurrence.setStep(1);
 
-		final ButtonItem generatePassword = prepareGeneratePasswordButton(passwordForm);
+		ButtonItem generatePassword = prepareGeneratePasswordButton(passwordForm);
+
+		ButtonItem tryPassword = prepareTryPasswordButton(passwordForm);
 
 		passwordForm.setItems(pwdSize, pwdDigit, pwUpperCase, pwdSpecial, pwLowerCase, pwdSequence, pwdOccurrence,
-				pwdExp, pwdEnforce, generatePassword);
+				pwdExp, pwdEnforce, generatePassword, tryPassword);
 
 		DynamicForm securityForm = new DynamicForm();
 		securityForm.setValuesManager(vm);
@@ -165,28 +172,31 @@ public class SecuritySettingsPanel extends AdminPanel {
 		maxInactivity.setWidth(50);
 		maxInactivity.setStep(1);
 
-		final RadioGroupItem savelogin = ItemFactory.newBooleanSelector("savelogin");
+		ToggleItem savelogin = ItemFactory.newToggleItem("savelogin", settings.isSaveLogin());
 		savelogin.setHint(I18N.message("saveloginhint"));
-		savelogin.setValue(settings.isSaveLogin() ? "yes" : "no");
 		savelogin.setWrapTitle(false);
 		savelogin.setRequired(true);
 
-		final RadioGroupItem ignorelogincase = ItemFactory.newBooleanSelector("ignorelogincase");
-		ignorelogincase.setValue(settings.isIgnoreLoginCase() ? "yes" : "no");
+		ToggleItem ignorelogincase = ItemFactory.newToggleItem("ignorelogincase", settings.isIgnoreLoginCase());
 		ignorelogincase.setWrapTitle(false);
 		ignorelogincase.setRequired(true);
 
-		final RadioGroupItem alertnewdevice = ItemFactory.newBooleanSelector("alertnewdevice",
-				I18N.message("alertloginfromnewdevice"));
-		alertnewdevice.setValue(settings.isIgnoreLoginCase() ? "yes" : "no");
+		ToggleItem alertnewdevice = ItemFactory.newToggleItem("alertnewdevice", I18N.message("alertloginfromnewdevice"),
+				settings.isAlertNewDevice());
 		alertnewdevice.setWrapTitle(false);
 		alertnewdevice.setRequired(true);
 
-		final RadioGroupItem allowSid = ItemFactory.newBooleanSelector("allowsid", I18N.message("allowsidinrequest"));
-		allowSid.setValue(settings.isAllowSidInRequest() ? "yes" : "no");
+		ToggleItem allowSid = ItemFactory.newToggleItem("allowsid", I18N.message("allowsidinrequest"),
+				settings.isAllowSidInRequest());
 		allowSid.setWrapTitle(false);
 		allowSid.setRequired(true);
 		allowSid.setDisabled(Session.get().isDemo());
+
+		ToggleItem allowClientId = ItemFactory.newToggleItem(ALLOWCLIENTID, I18N.message(ALLOWCLIENTID),
+				settings.isAllowClientId());
+		allowClientId.setWrapTitle(false);
+		allowClientId.setRequired(true);
+		allowClientId.setDisabled(Session.get().isDemo());
 
 		final SelectItem cookiesSameSite = ItemFactory.newSelectItem("cookiessamesite");
 		cookiesSameSite.setHint(I18N.message("cookiessamesitehint"));
@@ -197,27 +207,26 @@ public class SecuritySettingsPanel extends AdminPanel {
 		cookiesSameSite.setValueMap("unset", "lax", "strict");
 		cookiesSameSite.setValue(settings.getCookiesSameSite());
 
-		final RadioGroupItem secureCookies = ItemFactory.newBooleanSelector("secureCookies",
-				I18N.message("usesecurecookies"));
-		secureCookies.setValue(settings.isCookiesSecure() ? "yes" : "no");
+		ToggleItem secureCookies = ItemFactory.newToggleItem("secureCookies", I18N.message("usesecurecookies"),
+				settings.isCookiesSecure());
 		secureCookies.setWrapTitle(false);
 		secureCookies.setRequired(true);
 		secureCookies.setDisabled(Session.get().isDemo());
 
-		final RadioGroupItem forceSsl = ItemFactory.newBooleanSelector("forcessl");
-		forceSsl.setValue(settings.isForceSsl() ? "yes" : "no");
+		ToggleItem forceSsl = ItemFactory.newToggleItem("forcessl", settings.isForceSsl());
 		forceSsl.setWrapTitle(false);
 		forceSsl.setRequired(true);
 		forceSsl.setDisabled(Session.get().isDemo());
 
-		final TextItem contentSecurityPolicy = ItemFactory.newTextItem(CONTENTSECURITYPOLICY,
+		final TextAreaItem contentSecurityPolicy = ItemFactory.newTextAreaItem(CONTENTSECURITYPOLICY,
 				settings.getContentSecurityPolicy());
 		contentSecurityPolicy.setHint(I18N.message("contentsecuritypolicyhint"));
-		contentSecurityPolicy.setWidth(400);
+		contentSecurityPolicy.setWidth(450);
+		contentSecurityPolicy.setHeight(150);
 
 		if (Session.get().isDefaultTenant())
-			securityForm.setFields(maxInactivity, savelogin, alertnewdevice, ignorelogincase, allowSid, cookiesSameSite,
-					secureCookies, forceSsl, contentSecurityPolicy);
+			securityForm.setFields(maxInactivity, savelogin, alertnewdevice, ignorelogincase, allowSid, allowClientId,
+					cookiesSameSite, secureCookies, forceSsl, contentSecurityPolicy);
 		else
 			securityForm.setFields(maxInactivity, savelogin, alertnewdevice);
 
@@ -236,6 +245,12 @@ public class SecuritySettingsPanel extends AdminPanel {
 			tabs.addTab(geolocation);
 		}
 
+		Tab sessions = new Tab();
+		sessions.setTitle(I18N.message("sessions"));
+		sessions.setPane(new SessionsPanel());
+		if (Menu.enabled(Menu.ADMIN_SESSIONS))
+			tabs.addTab(sessions);
+
 		addSaveButton();
 	}
 
@@ -246,29 +261,27 @@ public class SecuritySettingsPanel extends AdminPanel {
 			if (Boolean.FALSE.equals(vm.validate()))
 				return;
 
-			onSave();
+			save();
 		});
 		addMember(save);
 	}
 
-	private void onSave() {
-		@SuppressWarnings("unchecked")
-		final Map<String, Object> values = vm.getValues();
-		SecuritySettingsPanel.this.settings.setPwdExpiration((Integer) values.get("pwdExp"));
-		SecuritySettingsPanel.this.settings.setPwdSize((Integer) values.get(PWD_SIZE));
-		SecuritySettingsPanel.this.settings.setPwdUpperCase((Integer) values.get(PWD_UPPER_CASE));
-		SecuritySettingsPanel.this.settings.setPwdLowerCase((Integer) values.get(PWD_LOWER_CASE));
-		SecuritySettingsPanel.this.settings.setPwdDigit((Integer) values.get(PWD_DIGIT));
-		SecuritySettingsPanel.this.settings.setPwdSpecial((Integer) values.get(PWD_SPECIAL));
-		SecuritySettingsPanel.this.settings.setPwdSequence((Integer) values.get(PWD_SEQUENCE));
-		SecuritySettingsPanel.this.settings.setPwdOccurrence((Integer) values.get(PWD_OCCURRENCE));
-		SecuritySettingsPanel.this.settings.setPwdEnforceHistory((Integer) values.get("pwdEnforce"));
-		SecuritySettingsPanel.this.settings.setMaxInactivity((Integer) values.get("maxinactivity"));
-		SecuritySettingsPanel.this.settings.setSaveLogin(values.get("savelogin").equals("yes"));
-		SecuritySettingsPanel.this.settings.setEnableAnonymousLogin(values.get(ENABLEANONYMOUS).equals("yes"));
-		SecuritySettingsPanel.this.settings.setAlertNewDevice(values.get("alertnewdevice").equals("yes"));
-
-		SecuritySettingsPanel.this.settings.setAnonymousKey((String) values.get("anonymousKey"));
+	private void save() {
+		SecuritySettingsPanel.this.settings.setPwdExpiration((Integer) vm.getValue("pwdExp"));
+		SecuritySettingsPanel.this.settings.setPwdSize((Integer) vm.getValue(PWD_SIZE));
+		SecuritySettingsPanel.this.settings.setPwdUpperCase((Integer) vm.getValue(PWD_UPPER_CASE));
+		SecuritySettingsPanel.this.settings.setPwdLowerCase((Integer) vm.getValue(PWD_LOWER_CASE));
+		SecuritySettingsPanel.this.settings.setPwdDigit((Integer) vm.getValue(PWD_DIGIT));
+		SecuritySettingsPanel.this.settings.setPwdSpecial((Integer) vm.getValue(PWD_SPECIAL));
+		SecuritySettingsPanel.this.settings.setPwdSequence((Integer) vm.getValue(PWD_SEQUENCE));
+		SecuritySettingsPanel.this.settings.setPwdOccurrence((Integer) vm.getValue(PWD_OCCURRENCE));
+		SecuritySettingsPanel.this.settings.setPwdEnforceHistory((Integer) vm.getValue("pwdEnforce"));
+		SecuritySettingsPanel.this.settings.setMaxInactivity((Integer) vm.getValue("maxinactivity"));
+		SecuritySettingsPanel.this.settings.setSaveLogin(Boolean.valueOf(vm.getValueAsString("savelogin")));
+		SecuritySettingsPanel.this.settings
+				.setEnableAnonymousLogin(Boolean.valueOf(vm.getValueAsString(ENABLEANONYMOUS)));
+		SecuritySettingsPanel.this.settings.setAlertNewDevice(Boolean.valueOf(vm.getValueAsString("alertnewdevice")));
+		SecuritySettingsPanel.this.settings.setAnonymousKey(vm.getValueAsString("anonymousKey"));
 
 		if (!SecuritySettingsPanel.this.settings.isEnableAnonymousLogin()) {
 			SecuritySettingsPanel.this.settings.setAnonymousUser(null);
@@ -278,37 +291,30 @@ public class SecuritySettingsPanel extends AdminPanel {
 			return;
 		}
 
-		collectDefaultTenantSettings(values);
+		collectDefaultTenantSettings();
 
 		doSaveSettings();
 	}
 
-	private void collectDefaultTenantSettings(final Map<String, Object> values) {
+	private void collectDefaultTenantSettings() {
 		if (Session.get().isDefaultTenant()) {
-			SecuritySettingsPanel.this.settings.setAllowSidInRequest(values.get("allowsid").equals("yes"));
-
-			SecuritySettingsPanel.this.settings.setIgnoreLoginCase(values.get("ignorelogincase").equals("yes"));
-			SecuritySettingsPanel.this.settings.setCookiesSecure(values.get("secureCookies").equals("yes"));
-			SecuritySettingsPanel.this.settings.setCookiesSameSite(values.get("cookiessamesite").toString());
-
-			SecuritySettingsPanel.this.settings.setForceSsl(values.get("forcessl").equals("yes"));
-			SecuritySettingsPanel.this.settings.setContentSecurityPolicy(
-					values.get(CONTENTSECURITYPOLICY) != null ? values.get(CONTENTSECURITYPOLICY).toString() : null);
-
-			SecuritySettingsPanel.this.settings.setGeolocationEnabled(values.get("geoEnabled").equals("yes"));
-			SecuritySettingsPanel.this.settings.setGeolocationCache(values.get("geoCache").equals("yes"));
-			SecuritySettingsPanel.this.settings.setGeolocationKey((String) values.get("geoKey"));
+			SecuritySettingsPanel.this.settings.setAllowSidInRequest(Boolean.valueOf(vm.getValueAsString("allowsid")));
+			SecuritySettingsPanel.this.settings.setAllowClientId(Boolean.valueOf(vm.getValueAsString(ALLOWCLIENTID)));
+			SecuritySettingsPanel.this.settings
+					.setIgnoreLoginCase(Boolean.valueOf(vm.getValueAsString("ignorelogincase")));
+			SecuritySettingsPanel.this.settings.setCookiesSecure(Boolean.valueOf(vm.getValueAsString("secureCookies")));
+			SecuritySettingsPanel.this.settings.setCookiesSameSite(vm.getValueAsString("cookiessamesite"));
+			SecuritySettingsPanel.this.settings.setForceSsl(Boolean.valueOf(vm.getValueAsString("forcessl")));
+			SecuritySettingsPanel.this.settings.setContentSecurityPolicy(vm.getValueAsString(CONTENTSECURITYPOLICY));
+			SecuritySettingsPanel.this.settings
+					.setGeolocationEnabled(Boolean.valueOf(vm.getValueAsString("geoEnabled")));
+			SecuritySettingsPanel.this.settings.setGeolocationCache(Boolean.valueOf(vm.getValueAsString("geoCache")));
+			SecuritySettingsPanel.this.settings.setGeolocationKey(vm.getValueAsString("geoKey"));
 		}
 	}
 
 	private void doSaveSettings() {
-		SecurityService.Instance.get().saveSettings(SecuritySettingsPanel.this.settings, new AsyncCallback<Boolean>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
+		SecurityService.Instance.get().saveSettings(SecuritySettingsPanel.this.settings, new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(Boolean restartRequired) {
 				GuiLog.info(I18N.message("settingssaved"), null);
@@ -320,11 +326,11 @@ public class SecuritySettingsPanel extends AdminPanel {
 	}
 
 	private ButtonItem prepareGeneratePasswordButton(DynamicForm passwordForm) {
-		final ButtonItem generatePassword = new ButtonItem(I18N.message("generate"));
+		ButtonItem generatePassword = new ButtonItem(I18N.message("generate"));
 		generatePassword.setStartRow(false);
 		generatePassword.setColSpan(2);
 		generatePassword.setAlign(Alignment.RIGHT);
-		generatePassword.addClickHandler((com.smartgwt.client.widgets.form.fields.events.ClickEvent event) -> {
+		generatePassword.addClickHandler(event -> {
 			if (passwordForm.validate()) {
 				@SuppressWarnings("unchecked")
 				final Map<String, Object> values = vm.getValues();
@@ -336,6 +342,25 @@ public class SecuritySettingsPanel extends AdminPanel {
 			}
 		});
 		return generatePassword;
+	}
+
+	private ButtonItem prepareTryPasswordButton(DynamicForm passwordForm) {
+		ButtonItem tryPassword = new ButtonItem(I18N.message("tryapassword"));
+		tryPassword.setStartRow(false);
+		tryPassword.setColSpan(4);
+		tryPassword.setAlign(Alignment.RIGHT);
+		tryPassword.addClickHandler(event -> {
+			if (passwordForm.validate()) {
+				@SuppressWarnings("unchecked")
+				final Map<String, Object> values = vm.getValues();
+				PasswordTrial trial = new PasswordTrial((Integer) values.get(PWD_SIZE),
+						(Integer) values.get(PWD_UPPER_CASE), (Integer) values.get(PWD_LOWER_CASE),
+						(Integer) values.get(PWD_DIGIT), (Integer) values.get(PWD_SPECIAL),
+						(Integer) values.get(PWD_SEQUENCE), (Integer) values.get(PWD_OCCURRENCE));
+				trial.show();
+			}
+		});
+		return tryPassword;
 	}
 
 	private Tab prepareGeolocationTab(GUISecuritySettings settings) {
@@ -351,17 +376,14 @@ public class SecuritySettingsPanel extends AdminPanel {
 		geolocationForm.setTitleOrientation(TitleOrientation.TOP);
 		geolocationForm.setNumCols(1);
 
-		final RadioGroupItem enableGeolocation = ItemFactory.newBooleanSelector("geoEnabled",
-				I18N.message("enablegeolocation"));
-		enableGeolocation.setValue(settings.isGeolocationEnabled() ? "yes" : "no");
+		ToggleItem enableGeolocation = ItemFactory.newToggleItem("geoEnabled", I18N.message("enablegeolocation"),
+				settings.isGeolocationEnabled());
 		enableGeolocation.setWrapTitle(false);
-		enableGeolocation.setWrap(false);
 		enableGeolocation.setRequired(true);
 
-		final RadioGroupItem useCache = ItemFactory.newBooleanSelector("geoCache", I18N.message("usecache"));
-		useCache.setValue(settings.isGeolocationCache() ? "yes" : "no");
+		ToggleItem useCache = ItemFactory.newToggleItem("geoCache", I18N.message("usecache"),
+				settings.isGeolocationCache());
 		useCache.setWrapTitle(false);
-		useCache.setWrap(false);
 		useCache.setRequired(true);
 
 		final TextItem licenseKey = ItemFactory.newTextItem("geoKey", "licensekey", settings.getGeolocationKey());
@@ -374,21 +396,20 @@ public class SecuritySettingsPanel extends AdminPanel {
 		ButtonItem syncGeoDB = new ButtonItem("geoSyncDb", I18N.message("syncgeolocationdb"));
 		syncGeoDB.addClickHandler((com.smartgwt.client.widgets.form.fields.events.ClickEvent event) -> {
 			LD.contactingServer();
-			SecurityService.Instance.get().syncGeolocationDB(licenseKey.getValueAsString(),
-					new AsyncCallback<String>() {
+			SecurityService.Instance.get().syncGeolocationDB(licenseKey.getValueAsString(), new DefaultAsyncCallback<>() {
 
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
-							LD.clearPrompt();
-						}
+				@Override
+				public void onFailure(Throwable caught) {
+					super.onFailure(caught);
+					LD.clearPrompt();
+				}
 
-						@Override
-						public void onSuccess(String dbVer) {
-							geoDBversion.setValue(dbVer);
-							LD.clearPrompt();
-						}
-					});
+				@Override
+				public void onSuccess(String dbVer) {
+					geoDBversion.setValue(dbVer);
+					LD.clearPrompt();
+				}
+			});
 		});
 
 		geolocationForm.setFields(enableGeolocation, useCache, licenseKey, geoDBversion, syncGeoDB);
@@ -404,9 +425,7 @@ public class SecuritySettingsPanel extends AdminPanel {
 		anonymousForm.setValuesManager(vm);
 		anonymousForm.setTitleOrientation(TitleOrientation.TOP);
 		anonymousForm.setNumCols(1);
-		final RadioGroupItem enableAnonymous = ItemFactory.newBooleanSelector(ENABLEANONYMOUS,
-				I18N.message(ENABLEANONYMOUS));
-		enableAnonymous.setValue(settings.isEnableAnonymousLogin() ? "yes" : "no");
+		ToggleItem enableAnonymous = ItemFactory.newToggleItem(ENABLEANONYMOUS, settings.isEnableAnonymousLogin());
 		enableAnonymous.setWrapTitle(false);
 		enableAnonymous.setRequired(true);
 
@@ -417,10 +436,10 @@ public class SecuritySettingsPanel extends AdminPanel {
 		TextItem anonymousKey = ItemFactory.newSimpleTextItem("anonymousKey", "key", settings.getAnonymousKey());
 		anonymousKey.setHintStyle("hint");
 		anonymousKey.setRequired(true);
-		anonymousKey.addChangedHandler(event -> {
-			if (event.getValue() != null)
+		anonymousKey.addChangedHandler(changed -> {
+			if (changed.getValue() != null)
 				url.setValue(Util.contextPath() + "frontend.jsp?anonymous=login&tenant=" + Session.get().getTenantName()
-						+ "&key=" + event.getValue().toString());
+						+ "&key=" + changed.getValue().toString());
 		});
 
 		anonymousUser = ItemFactory.newUserSelector("anonymousUser", "user", null, false, false);
@@ -442,5 +461,15 @@ public class SecuritySettingsPanel extends AdminPanel {
 		anonymousForm.setItems(enableAnonymous, anonymousUser, anonymousKey, url);
 		anonymous.setPane(anonymousForm);
 		return anonymous;
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

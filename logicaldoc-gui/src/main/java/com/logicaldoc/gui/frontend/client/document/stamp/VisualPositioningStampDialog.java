@@ -2,13 +2,15 @@ package com.logicaldoc.gui.frontend.client.document.stamp;
 
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import com.google.gwt.http.client.Request;
 import com.google.gwt.http.client.RequestBuilder;
 import com.google.gwt.http.client.RequestCallback;
 import com.google.gwt.http.client.RequestException;
 import com.google.gwt.http.client.Response;
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIDocument;
 import com.logicaldoc.gui.common.client.beans.GUIStamp;
 import com.logicaldoc.gui.common.client.controllers.DocumentController;
@@ -18,13 +20,13 @@ import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.common.client.util.Util;
 import com.logicaldoc.gui.common.client.widgets.ImageCropper;
-import com.logicaldoc.gui.frontend.client.document.grid.DocumentsGrid;
 import com.logicaldoc.gui.frontend.client.services.DocumentService;
 import com.logicaldoc.gui.frontend.client.services.StampService;
 import com.smartgwt.client.types.HeaderControls;
 import com.smartgwt.client.widgets.Window;
 import com.smartgwt.client.widgets.form.fields.CheckboxItem;
 import com.smartgwt.client.widgets.form.fields.RadioGroupItem;
+import com.smartgwt.client.widgets.form.fields.SelectItem;
 import com.smartgwt.client.widgets.form.fields.SpinnerItem;
 import com.smartgwt.client.widgets.form.fields.TextItem;
 import com.smartgwt.client.widgets.layout.HLayout;
@@ -53,12 +55,12 @@ public class VisualPositioningStampDialog extends Window {
 
 	private RadioGroupItem pageOption;
 
-	private DocumentsGrid sourceGrid;
-
 	private ImageCropper cropper;
 
-	public VisualPositioningStampDialog(DocumentsGrid sourceGrid, GUIStamp stamp) {
-		this.sourceGrid = sourceGrid;
+	private List<GUIDocument> documents;
+
+	public VisualPositioningStampDialog(List<GUIDocument> documents, GUIStamp stamp) {
+		this.documents = documents;
 		this.stamp = stamp;
 
 		setHeaderControls(HeaderControls.HEADER_LABEL, HeaderControls.CLOSE_BUTTON);
@@ -83,13 +85,13 @@ public class VisualPositioningStampDialog extends Window {
 				}
 
 				public void onResponseReceived(Request request, Response response) {
-					firstSelectedDoc = sourceGrid.getSelectedDocument();
+					firstSelectedDoc = documents.get(0);
 
-					DocumentService.Instance.get().getById(firstSelectedDoc.getId(), new AsyncCallback<GUIDocument>() {
+					DocumentService.Instance.get().getById(firstSelectedDoc.getId(), new DefaultAsyncCallback<>() {
 
 						@Override
 						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
+							super.onFailure(caught);
 							LD.clearPrompt();
 						}
 
@@ -117,8 +119,8 @@ public class VisualPositioningStampDialog extends Window {
 	}
 
 	private String getPageUrl(int page) {
-		return Util.contextPath() + "convertjpg?docId=" + sourceGrid.getSelectedDocument().getId() + "&page=" + page
-				+ "&random=" + new Date().getTime();
+		return Util.contextPath() + "convertjpg?docId=" + documents.get(0).getId() + "&page=" + page + "&random="
+				+ new Date().getTime();
 	}
 
 	public void onApply() {
@@ -129,8 +131,7 @@ public class VisualPositioningStampDialog extends Window {
 		stamp.setExprY("$PAGE_HEIGHT * "
 				+ (1 - ((double) cropper.getSelectionYCoordinate() / (double) cropper.getImageHeight())));
 		stamp.setExprW("$PAGE_WIDTH * " + (double) cropper.getSelectionWidth() / (double) cropper.getImageWidth());
-		stamp.setExprH(
-				"$PAGE_HEIGHT * " + ((double) cropper.getSelectionHeight() / (double) cropper.getImageHeight()));
+		stamp.setExprH("$PAGE_HEIGHT * " + ((double) cropper.getSelectionHeight() / (double) cropper.getImageHeight()));
 
 		if (("01" + CURRENTPAGE).equals(pageOption.getValue())) {
 			stamp.setPageOption(GUIStamp.PAGE_OPT_SEL);
@@ -142,37 +143,30 @@ public class VisualPositioningStampDialog extends Window {
 
 		LD.contactingServer();
 
-		StampService.Instance.get().applyStamp(sourceGrid.getSelectedIds(), stamp, new AsyncCallback<Void>() {
+		StampService.Instance.get().applyStamp(documents.stream().map(d -> d.getId()).collect(Collectors.toList()),
+				stamp, new DefaultAsyncCallback<>() {
 
-			@Override
-			public void onFailure(Throwable caught) {
-				LD.clearPrompt();
-				GuiLog.serverError(caught);
-			}
+					@Override
+					public void onFailure(Throwable caught) {
+						LD.clearPrompt();
+						super.onFailure(caught);
+					}
 
-			@Override
-			public void onSuccess(Void result) {
-				LD.clearPrompt();
-				GuiLog.info(I18N.message("event.stamped"), null);
-				GUIDocument[] docs = sourceGrid.getSelectedDocuments();
-				for (GUIDocument doc : docs) {
-					DocumentService.Instance.get().getById(doc.getId(), new AsyncCallback<GUIDocument>() {
-
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
+					@Override
+					public void onSuccess(Void result) {
+						LD.clearPrompt();
+						GuiLog.info(I18N.message("event.stamped"), null);
+						for (GUIDocument doc : documents) {
+							DocumentService.Instance.get().getById(doc.getId(), new DefaultAsyncCallback<>() {
+								@Override
+								public void onSuccess(GUIDocument document) {
+									DocumentController.get().modified(document);
+								}
+							});
 						}
-
-						@Override
-						public void onSuccess(GUIDocument document) {
-							sourceGrid.updateDocument(document);
-							DocumentController.get().modified(document);
-						}
-					});
-				}
-				destroy();
-			}
-		});
+						showPage(pageCursor.getValueAsInteger());
+					}
+				});
 	}
 
 	private void initGUI() {
@@ -180,6 +174,19 @@ public class VisualPositioningStampDialog extends Window {
 		toolStrip.setHeight(20);
 		toolStrip.setWidth100();
 		toolStrip.addSpacer(2);
+
+		SelectItem stampSelector = ItemFactory.newStampSelector();
+		stampSelector.setTitle(I18N.message("stamp"));
+		stampSelector.setWrapTitle(false);
+		stampSelector.setRequired(true);
+		stampSelector.setValue(stamp.getId());
+		stampSelector.addChangedHandler(changed -> StampService.Instance.get()
+				.getStamp(Long.parseLong(stampSelector.getValueAsString()), new DefaultAsyncCallback<>() {
+					@Override
+					public void onSuccess(GUIStamp stmp) {
+						VisualPositioningStampDialog.this.stamp = stmp;
+					}
+				}));
 
 		ToolStripButton apply = new ToolStripButton();
 		apply.setTitle(I18N.message("apply"));
@@ -232,6 +239,7 @@ public class VisualPositioningStampDialog extends Window {
 		pageSelection = ItemFactory.newTextItem("pageSelection", I18N.message("selection"), stamp.getPageSelection());
 		pageSelection.setShowTitle(false);
 
+		toolStrip.addFormItem(stampSelector);
 		toolStrip.addFormItem(pageCursor);
 		toolStrip.addButton(zoomIn);
 		toolStrip.addButton(zoomOut);
@@ -248,5 +256,15 @@ public class VisualPositioningStampDialog extends Window {
 		addItem(bottom);
 
 		showPage(1);
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

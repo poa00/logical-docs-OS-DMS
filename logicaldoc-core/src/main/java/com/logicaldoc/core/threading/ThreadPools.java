@@ -9,8 +9,12 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import javax.annotation.PreDestroy;
+import javax.annotation.Resource;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
 
 import com.logicaldoc.util.Context;
 import com.logicaldoc.util.config.ContextProperties;
@@ -34,6 +38,7 @@ import com.logicaldoc.util.config.ContextProperties;
  * @author Marco Meschieri - LogicalDOC
  * @since 8.5.3
  */
+@Component("threadPools")
 public class ThreadPools {
 
 	private static final String THREADPOOL = "threadpool.";
@@ -44,14 +49,16 @@ public class ThreadPools {
 
 	private Map<String, ExecutorService> pools = new HashMap<>();
 
+	@Resource(name = "ContextProperties")
 	private ContextProperties config;
-
-	public void setConfig(ContextProperties config) {
+	
+	public ThreadPools(ContextProperties config) {
+		super();
 		this.config = config;
 	}
 
 	public static ThreadPools get() {
-		return (ThreadPools) Context.get().getBean(ThreadPools.class);
+		return Context.get(ThreadPools.class);
 	}
 
 	/**
@@ -97,8 +104,8 @@ public class ThreadPools {
 	public void schedule(Runnable task, String poolName, long delay) {
 		try {
 			ExecutorService pool = getPool(poolName);
-			if (pool instanceof ScheduledExecutorService)
-				((ScheduledExecutorService) pool).schedule(task, delay, TimeUnit.MILLISECONDS);
+			if (pool instanceof ScheduledExecutorService executorService)
+				executorService.schedule(task, delay, TimeUnit.MILLISECONDS);
 			else {
 				log.debug("Pool {} does not support scheduling so the task has been started immediately", poolName);
 				execute(task, poolName);
@@ -137,6 +144,7 @@ public class ThreadPools {
 	/**
 	 * Shuts down all the pools
 	 */
+	@PreDestroy
 	public void shutdown() {
 		log.info("Shutting down {} thread pools", pools.size());
 		for (Map.Entry<String, ExecutorService> entry : pools.entrySet()) {

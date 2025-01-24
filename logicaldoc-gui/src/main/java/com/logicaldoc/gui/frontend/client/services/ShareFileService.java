@@ -1,5 +1,7 @@
 package com.logicaldoc.gui.frontend.client.services;
 
+import java.util.List;
+
 import com.google.gwt.core.client.GWT;
 import com.google.gwt.user.client.rpc.RemoteService;
 import com.google.gwt.user.client.rpc.RemoteServiceRelativePath;
@@ -27,9 +29,9 @@ public interface ShareFileService extends RemoteService {
 	 * 
 	 * @throws ServerException an error happened in the server application
 	 */
-	public boolean exportDocuments(String targetFolder, Long[] folderIds, Long[] docIds) throws ServerException;
+	public boolean exportDocuments(String targetFolder, List<Long> folderIds, List<Long> docIds) throws ServerException;
 
-	public int importDocuments(long targetFolder, String[] itemIds) throws ServerException;
+	public int importDocuments(long targetFolder, List<String> itemIds) throws ServerException;
 
 	/**
 	 * Retrieve the settings saved for connecting to FileShare
@@ -38,7 +40,7 @@ public interface ShareFileService extends RemoteService {
 	 * 
 	 * @throws ServerException an error happened in the server application
 	 */
-	public String[] loadSettings() throws ServerException;
+	public List<String> loadSettings() throws ServerException;
 
 	/**
 	 * Saves the settings into the database and returns the authorization URL
@@ -67,7 +69,7 @@ public interface ShareFileService extends RemoteService {
 
 		private Instance() {
 		}
-		
+
 		public static ShareFileServiceAsync get() {
 			if (inst == null) {
 				inst = GWT.create(ShareFileService.class);

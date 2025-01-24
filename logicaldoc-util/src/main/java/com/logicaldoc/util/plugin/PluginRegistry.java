@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.net.MalformedURLException;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -24,8 +25,11 @@ import org.java.plugin.registry.ExtensionPoint;
 import org.java.plugin.registry.Identity;
 import org.java.plugin.registry.PluginDescriptor;
 import org.java.plugin.util.ExtendedProperties;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.logicaldoc.util.config.ContextProperties;
+import com.logicaldoc.util.http.UrlUtil;
 import com.logicaldoc.util.io.FileUtil;
 
 /**
@@ -51,20 +55,24 @@ public abstract class PluginRegistry {
 				ContextProperties config = new ContextProperties();
 				pluginregistry = config.getProperty("plugin.registry");
 			} catch (IOException e1) {
-				System.err.println(e1.getMessage());
+				console().error(e1.getMessage());
 			}
 
 			if (StringUtils.isEmpty(pluginregistry)) {
 				pluginregistry = DefaultPluginRegistry.class.getName();
 			}
 			try {
-				System.out.println("Instantiate concrete PluginRegistry: " + pluginregistry);
+				console().info("Instantiate concrete PluginRegistry: {}", pluginregistry);
 				instance = (PluginRegistry) Class.forName(pluginregistry).getDeclaredConstructor().newInstance();
 			} catch (Exception e) {
-				System.err.println(e.getMessage());
+				console().error(e.getMessage());
 			}
 		}
 		return instance;
+	}
+
+	private static Logger console() {
+		return LoggerFactory.getLogger("console");
 	}
 
 	/**
@@ -98,7 +106,8 @@ public abstract class PluginRegistry {
 				throw new PluginException("Error publishing plugins", e);
 			}
 
-			System.out.println("Succesfully registered " + plugins.size() + " plugins");
+			Logger console = console();
+			console.info("Succesfully registered {} plugins", plugins.size());
 			initPlugins(plugins);
 		}
 	}
@@ -119,13 +128,13 @@ public abstract class PluginRegistry {
 		// look for all zip files in plugin directory
 		File pluginDirectory = new File(pluginsDirectoryPath);
 
-		System.out.println("Searching for plugins in " + pluginDirectory.getAbsolutePath());
+		Logger console = console();
+		console.info("Searching for plugins in {}", pluginDirectory.getAbsolutePath());
 
 		FilenameFilter filter = (dir, fileName) -> (fileName.endsWith(".jar") && fileName.contains("-plugin"));
 
-		if (!pluginDirectory.isDirectory()) {
-			System.out.println("No Plugins Found");
-		}
+		if (!pluginDirectory.isDirectory())
+			console.info("No Plugins Found");
 
 		// find the plugins
 		List<String> pluginsList = Arrays.asList(pluginDirectory.list(filter));
@@ -142,12 +151,11 @@ public abstract class PluginRegistry {
 					throw new IOException("file not Found:" + pluginZIPFile.getAbsolutePath());
 
 				try {
-
-					final URL manifestURL = new URL("jar:file:" + pluginZIPFile.getAbsolutePath() + "!/plugin.xml");
-
+					final URL manifestURL = UrlUtil
+							.toURL("jar:file:" + pluginZIPFile.getAbsolutePath() + "!/plugin.xml");
 					final URL contextURL = pluginZIPFile.toURI().toURL();
 
-					System.out.println("Found plugin file: " + pluginZIPFile.getName());
+					console.info("Found plugin file: {}", pluginZIPFile.getName());
 
 					pluginLocations.add(new PluginManager.PluginLocation() {
 						public URL getManifestLocation() {
@@ -158,8 +166,8 @@ public abstract class PluginRegistry {
 							return contextURL;
 						}
 					});
-				} catch (MalformedURLException e) {
-					System.err.println(e.getMessage());
+				} catch (MalformedURLException | URISyntaxException e) {
+					console.error(e.getMessage(), e);
 				}
 			}
 

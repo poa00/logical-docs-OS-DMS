@@ -1,5 +1,7 @@
 package com.logicaldoc.webservice.model;
 
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
@@ -13,11 +15,11 @@ import org.apache.commons.collections.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.logicaldoc.core.security.Group;
-import com.logicaldoc.core.security.User;
-import com.logicaldoc.core.security.WorkingTime;
-import com.logicaldoc.core.security.dao.GroupDAO;
-import com.logicaldoc.core.security.dao.UserDAO;
+import com.logicaldoc.core.security.user.Group;
+import com.logicaldoc.core.security.user.GroupDAO;
+import com.logicaldoc.core.security.user.User;
+import com.logicaldoc.core.security.user.UserDAO;
+import com.logicaldoc.core.security.user.WorkingTime;
 import com.logicaldoc.util.Context;
 import com.logicaldoc.util.crypt.CryptUtil;
 import com.logicaldoc.util.time.DateUtil;
@@ -31,6 +33,7 @@ import com.logicaldoc.webservice.doc.WSDoc;
  */
 @XmlType(name = "WSUser")
 public class WSUser {
+	@WSDoc(documented = false)
 	protected static Logger log = LoggerFactory.getLogger(WSUser.class);
 
 	@WSDoc(documented = false)
@@ -59,10 +62,13 @@ public class WSUser {
 
 	private String username = "";
 
+	@WSDoc(required = false)
 	private String password = "";
 
+	@WSDoc(required = false)
 	private String decodedPassword = "";
 
+	@WSDoc(required = false)
 	private String passwordmd4 = "";
 
 	@WSDoc(required = false)
@@ -86,16 +92,16 @@ public class WSUser {
 	@WSDoc(required = false)
 	private String state = "";
 
-	@WSDoc(description = "default language; <a href='/wiki/LanguageSpecification'>See specification</a>")
+	@WSDoc(description = "default language; <a href='/wiki/LanguageSpecification'>See specification</a>", required = false)
 	private String language = "";
 
-	@WSDoc(required = true, description = "address used for notifications, must be a valid e-mail")
+	@WSDoc(description = "address used for notifications, must be a valid e-mail", required = true)
 	private String email = "";
 
 	@WSDoc(description = "a simple text to be used as a signature in the footer of the outgoing emails", required = false)
 	private String emailSignature;
 
-	@WSDoc(required = false, description = "secondary email address, must be a valid e-mail")
+	@WSDoc(description = "secondary email address, must be a valid e-mail", required = false)
 	private String email2 = "";
 
 	@WSDoc(description = "a simple text to be used as a signature in the footer of the outgoing emails", required = false)
@@ -107,11 +113,23 @@ public class WSUser {
 	@WSDoc(required = false)
 	private String telephone2 = "";
 
+	@WSDoc(required = false)
+	private String company;
+
+	@WSDoc(required = false)
+	private String department;
+
+	@WSDoc(required = false)
+	private String organizationalUnit;
+
+	@WSDoc(required = false)
+	private String building;
+
 	@WSDoc(description = "must be <b>0: normal or 2: guest</b>")
 	private int type = TYPE_DEFAULT;
 
 	@WSDoc(description = "ids of the groups this user belongs to")
-	private long[] groupIds = new long[0];
+	private List<Long> groupIds = new ArrayList<>();
 
 	@WSDoc(description = "if <b>1</b> the user is enabled, if <b>0</b> the user is disabled")
 	private int enabled = 1;
@@ -125,6 +143,9 @@ public class WSUser {
 	@WSDoc(description = "if <b>1</b> the password is eligible for expiration, if <b>0</b> the password never expires")
 	private int passwordExpires = 0;
 
+	@WSDoc(description = "if <b>1</b> the evaluation form is available, if <b>0</b> the evaluation form is not evailable")
+	private int evalFormEnabled = 1;
+
 	@WSDoc(description = "must be <b>0</b>")
 	private int source = 0;
 
@@ -137,34 +158,40 @@ public class WSUser {
 	@WSDoc(required = false)
 	private String lastModified;
 
-	@WSDoc(description = "date format to use when display dates")
+	@WSDoc(description = "last time the user has logged in", required = false)
+	private String lastLogin;
+
+	@WSDoc(description = "when the user has been created", required = false)
+	private String creation;
+
+	@WSDoc(description = "date format to use when display dates", required = false)
 	private String dateFormat;
 
-	@WSDoc(description = "date format to use when display dates in short format")
+	@WSDoc(description = "date format to use when display dates in short format", required = false)
 	private String dateFormatShort;
 
-	@WSDoc(description = "date format to use when display dates and times")
+	@WSDoc(description = "date format to use when display dates and times", required = false)
 	private String dateFormatLong;
 
-	@WSDoc(description = "comma separated list of searches that defines the order they are displayed in the user interface")
+	@WSDoc(description = "comma separated list of searches that defines the order they are displayed in the user interface", required = false)
 	private String searchPref;
 
-	@WSDoc(required = false, description = "when this account expires")
+	@WSDoc(description = "when this account expires", required = false)
 	private String expire;
 
-	@WSDoc(required = false, description = "the working time specification")
-	private WSWorkingTime[] workingTimes = null;
+	@WSDoc(description = "the working time specification", required = false)
+	private List<WSWorkingTime> workingTimes = new ArrayList<>();
 
-	@WSDoc(required = false, description = "maximum number of inactivity days after which the account gets disabled")
+	@WSDoc(description = "maximum number of inactivity days after which the account gets disabled", required = false)
 	private Integer maxInactivity;
 
-	@WSDoc(required = false, description = "the time zone of the suer")
+	@WSDoc(description = "the time zone of the suer", required = false)
 	private String timeZone;
 
-	@WSDoc(required = false, description = "the second factor authenticator to use")
+	@WSDoc(description = "the second factor authenticator to use", required = false)
 	private String secondFactor;
 
-	@WSDoc(required = false, description = "key used by the second factor authenticator")
+	@WSDoc(description = "key used by the second factor authenticator", required = false)
 	private String key;
 
 	public long getId() {
@@ -246,12 +273,14 @@ public class WSUser {
 	 * Sets the password and encode it
 	 * 
 	 * @param passwd The password in readable format
+	 * 
+	 * @throws NoSuchAlgorithmException Cripting error
 	 */
-	public void setPassword(String passwd) {
+	public void setPassword(String passwd) throws NoSuchAlgorithmException {
 		decodedPassword = passwd;
 		password = null;
 		if (org.apache.commons.lang.StringUtils.isNotEmpty(passwd))
-			password = CryptUtil.cryptString(passwd);
+			password = CryptUtil.encryptSHA256(passwd);
 	}
 
 	public void setName(String name) {
@@ -290,11 +319,11 @@ public class WSUser {
 		telephone = phone;
 	}
 
-	public long[] getGroupIds() {
+	public List<Long> getGroupIds() {
 		return groupIds;
 	}
 
-	public void setGroupIds(long[] groupIds) {
+	public void setGroupIds(List<Long> groupIds) {
 		this.groupIds = groupIds;
 	}
 
@@ -396,6 +425,30 @@ public class WSUser {
 		this.lastModified = lastModified;
 	}
 
+	public String getDepartment() {
+		return department;
+	}
+
+	public void setDepartment(String department) {
+		this.department = department;
+	}
+
+	public String getOrganizationalUnit() {
+		return organizationalUnit;
+	}
+
+	public void setOrganizationalUnit(String organizationalUnit) {
+		this.organizationalUnit = organizationalUnit;
+	}
+
+	public String getBuilding() {
+		return building;
+	}
+
+	public void setBuilding(String building) {
+		this.building = building;
+	}
+
 	public User toUser() {
 		User user = new User();
 
@@ -413,9 +466,14 @@ public class WSUser {
 			user.setStreet(getStreet());
 			user.setTelephone(getTelephone());
 			user.setTelephone2(getTelephone2());
+			user.setCompany(getCompany());
+			user.setDepartment(getDepartment());
+			user.setBuilding(getBuilding());
+			user.setOrganizationalUnit(getOrganizationalUnit());
 			user.setUsername(getUsername());
 			user.setEnabled(getEnabled());
 			user.setPasswordExpires(getPasswordExpires());
+			user.setEvalFormEnabled(getEvalFormEnabled());
 			user.setQuota(getQuota());
 			user.setType(getType());
 			user.setSource(getSource());
@@ -434,8 +492,8 @@ public class WSUser {
 			user.setKey(getKey());
 			user.setSecondFactor(getSecondFactor());
 
-			if (getGroupIds().length > 0) {
-				GroupDAO groupDao = (GroupDAO) Context.get().getBean(GroupDAO.class);
+			if (CollectionUtils.isNotEmpty(groupIds)) {
+				GroupDAO groupDao = Context.get(GroupDAO.class);
 				Set<Group> groups = new HashSet<>();
 				for (long groupId : getGroupIds()) {
 					Group group = groupDao.findById(groupId);
@@ -446,7 +504,7 @@ public class WSUser {
 					user.setGroups(groups);
 			}
 
-			if (workingTimes != null && workingTimes.length > 0)
+			if (CollectionUtils.isNotEmpty(workingTimes))
 				for (WSWorkingTime wswt : workingTimes) {
 					WorkingTime wt = new WorkingTime();
 					BeanUtils.copyProperties(wt, wswt);
@@ -460,13 +518,11 @@ public class WSUser {
 	}
 
 	public static WSUser fromUser(User user) {
-		if (user.getId() != 0L) {
-			UserDAO dao = (UserDAO) Context.get().getBean(UserDAO.class);
-			dao.initialize(user);
-		}
-
 		WSUser wsUser = new WSUser();
 		try {
+			UserDAO dao = Context.get(UserDAO.class);
+			dao.initialize(user);
+			
 			wsUser.setId(user.getId());
 			wsUser.setCity(user.getCity());
 			wsUser.setCountry(user.getCountry());
@@ -480,9 +536,14 @@ public class WSUser {
 			wsUser.setStreet(user.getStreet());
 			wsUser.setTelephone(user.getTelephone());
 			wsUser.setTelephone2(user.getTelephone2());
+			wsUser.setCompany(user.getCompany());
+			wsUser.setDepartment(user.getDepartment());
+			wsUser.setBuilding(user.getBuilding());
+			wsUser.setOrganizationalUnit(user.getOrganizationalUnit());
 			wsUser.setUsername(user.getUsername());
 			wsUser.setEnabled(user.getEnabled());
 			wsUser.setPasswordExpires(user.getPasswordExpires());
+			wsUser.setEvalFormEnabled(user.getEvalFormEnabled());
 			wsUser.setQuota(user.getQuota());
 			wsUser.setType(user.getType());
 			wsUser.setSource(user.getSource());
@@ -490,6 +551,8 @@ public class WSUser {
 			wsUser.setPasswordmd4(user.getPasswordmd4());
 			wsUser.setPasswordChanged(DateUtil.format(user.getPasswordChanged()));
 			wsUser.setLastModified(DateUtil.format(user.getLastModified()));
+			wsUser.setLastLogin(DateUtil.format(user.getLastLogin()));
+			wsUser.setCreation(DateUtil.format(user.getCreation()));
 			wsUser.setEmailSignature(user.getEmailSignature());
 			wsUser.setEmailSignature2(user.getEmailSignature2());
 			wsUser.setDateFormat(user.getDateFormat());
@@ -502,31 +565,19 @@ public class WSUser {
 			wsUser.setTimeZone(user.getTimeZone());
 			wsUser.setKey(user.getKey());
 			wsUser.setSecondFactor(user.getSecondFactor());
+			wsUser.setGroupIds(user.getGroups().stream().map(g -> g.getId()).collect(Collectors.toList()));
 
-			if (CollectionUtils.isNotEmpty(user.getGroups())) {
-				long[] groupIds = new long[user.getGroups().size()];
-				int i = 0;
-				for (Group group : user.getGroups()) {
-					if (group.getType() == Group.TYPE_DEFAULT) {
-						groupIds[i] = group.getId();
-						i++;
-					}
+			List<WSWorkingTime> tmp = user.getWorkingTimes().stream().map(wt -> {
+				WSWorkingTime wswt = new WSWorkingTime();
+				try {
+					BeanUtils.copyProperties(wswt, wt);
+				} catch (Exception t) {
+					// Nothing to do
 				}
-				wsUser.setGroupIds(groupIds);
-			}
+				return wswt;
+			}).collect(Collectors.toList());
+			wsUser.setWorkingTimes(tmp);
 
-			if (user.getWorkingTimes() != null && !user.getWorkingTimes().isEmpty()) {
-				List<WSWorkingTime> tmp = user.getWorkingTimes().stream().map(wt -> {
-					WSWorkingTime wswt = new WSWorkingTime();
-					try {
-						BeanUtils.copyProperties(wswt, wt);
-					} catch (Exception t) {
-						// Nothing to do
-					}
-					return wswt;
-				}).collect(Collectors.toList());
-				wsUser.setWorkingTimes(tmp.toArray(new WSWorkingTime[0]));
-			}
 		} catch (Exception e) {
 			log.error(e.getMessage(), e);
 		}
@@ -614,11 +665,11 @@ public class WSUser {
 		this.enforceWorkingTime = enforceWorkingTime;
 	}
 
-	public WSWorkingTime[] getWorkingTimes() {
+	public List<WSWorkingTime> getWorkingTimes() {
 		return workingTimes;
 	}
 
-	public void setWorkingTimes(WSWorkingTime[] workingTimes) {
+	public void setWorkingTimes(List<WSWorkingTime> workingTimes) {
 		this.workingTimes = workingTimes;
 	}
 
@@ -660,5 +711,37 @@ public class WSUser {
 
 	public void setDecodedPassword(String decodedPassword) {
 		this.decodedPassword = decodedPassword;
+	}
+
+	public String getLastLogin() {
+		return lastLogin;
+	}
+
+	public void setLastLogin(String lastLogin) {
+		this.lastLogin = lastLogin;
+	}
+
+	public String getCreation() {
+		return creation;
+	}
+
+	public void setCreation(String creation) {
+		this.creation = creation;
+	}
+
+	public String getCompany() {
+		return company;
+	}
+
+	public void setCompany(String company) {
+		this.company = company;
+	}
+
+	public int getEvalFormEnabled() {
+		return evalFormEnabled;
+	}
+
+	public void setEvalFormEnabled(int evalFormEnabled) {
+		this.evalFormEnabled = evalFormEnabled;
 	}
 }

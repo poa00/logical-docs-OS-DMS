@@ -1,5 +1,7 @@
 package com.logicaldoc.gui.frontend.client.services;
 
+import java.util.List;
+
 import com.google.gwt.core.client.GWT;
 import com.google.gwt.user.client.rpc.RemoteService;
 import com.google.gwt.user.client.rpc.RemoteServiceRelativePath;
@@ -38,7 +40,31 @@ public interface SignService extends RemoteService {
 	 */
 	public void generateNewKeystore(GUIKeystore keystore) throws ServerException;
 
+	/**
+	 * Generates a self-signes certificate for the current user.
+	 * 
+	 * @throws ServerException an error happened manipulating the keystore
+	 */
 	public void generateNewCertificate() throws ServerException;
+
+	/**
+	 * Imports an uploaded certificate
+	 * 
+	 * @param certificate the certificate to import (x509 format)
+	 * @param privateKey the private key to import (PKCS8 format)
+	 * 
+	 * @throws ServerException an error happened manipulating the keystore
+	 */
+	public void importCertificate(String certificate, String privateKey) throws ServerException;
+
+	/**
+	 * Read the uploaded file and returns it's content
+	 * 
+	 * @return the file's content
+	 * 
+	 * @throws ServerException an error happened manipulating the keystore
+	 */
+	public String getUploadedContent() throws ServerException;
 
 	/**
 	 * Delete the certificate of the current user
@@ -62,7 +88,7 @@ public interface SignService extends RemoteService {
 
 	public boolean isVisualSignatureEnabled() throws ServerException;
 
-	public void signDocuments(Long[] docIds, String reason, int page, String signX, String signY, String signWidth)
+	public void signDocuments(List<Long> docIds, String reason, int page, String signX, String signY, String signWidth)
 			throws ServerException;
 
 	public static class Instance {

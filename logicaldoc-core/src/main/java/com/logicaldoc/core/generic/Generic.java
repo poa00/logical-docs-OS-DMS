@@ -41,6 +41,8 @@ public class Generic extends ExtensibleObject implements Comparable<Generic> {
 
 	private String string8;
 
+	private String text1;
+
 	private Long integer1;
 
 	private Long integer2;
@@ -160,22 +162,6 @@ public class Generic extends ExtensibleObject implements Comparable<Generic> {
 		this.date2 = date2;
 	}
 
-	@Override
-	public int compareTo(Generic o) {
-		if (getType().compareTo(o.getType()) != 0)
-			return getType().compareTo(o.getType());
-		else
-			return getSubtype().compareTo(o.getSubtype());
-	}
-
-	@Override
-	public boolean equals(Object obj) {
-		if (!(obj instanceof Generic))
-			return false;
-		Generic other = (Generic) obj;
-		return other.getId() == this.getId();
-	}
-
 	public String getDisplayString1() {
 		return StringUtils.abbreviate(getString1(), 65);
 	}
@@ -242,5 +228,61 @@ public class Generic extends ExtensibleObject implements Comparable<Generic> {
 
 	public void setString8(String string8) {
 		this.string8 = string8;
+	}
+
+	public String getText1() {
+		return text1;
+	}
+
+	public void setText1(String text1) {
+		this.text1 = text1;
+	}
+
+	@Override
+	public int compareTo(Generic o) {
+		if(equals(o))
+			return 0;
+		
+		if (getType().compareTo(o.getType()) != 0)
+			return getType().compareTo(o.getType());
+		else
+			return getSubtype().compareTo(o.getSubtype());
+	}
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = super.hashCode();
+		result = prime * result + ((qualifier == null) ? 0 : qualifier.hashCode());
+		result = prime * result + ((subtype == null) ? 0 : subtype.hashCode());
+		result = prime * result + ((type == null) ? 0 : type.hashCode());
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (!super.equals(obj))
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		Generic other = (Generic) obj;
+		if (qualifier == null) {
+			if (other.qualifier != null)
+				return false;
+		} else if (!qualifier.equals(other.qualifier))
+			return false;
+		if (subtype == null) {
+			if (other.subtype != null)
+				return false;
+		} else if (!subtype.equals(other.subtype))
+			return false;
+		if (type == null) {
+			if (other.type != null)
+				return false;
+		} else if (!type.equals(other.type))
+			return false;
+		return true;
 	}
 }

@@ -2,8 +2,9 @@ package com.logicaldoc.gui.frontend.client.document;
 
 import com.logicaldoc.gui.common.client.beans.GUIDocument;
 import com.logicaldoc.gui.common.client.data.DocumentAliasesDS;
+import com.logicaldoc.gui.common.client.grid.FileNameListGridField;
+import com.logicaldoc.gui.common.client.grid.IdListGridField;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.widgets.grid.FileNameListGridField;
 import com.smartgwt.client.widgets.grid.ListGrid;
 import com.smartgwt.client.widgets.grid.ListGridField;
 
@@ -23,8 +24,7 @@ public class AliasesPanel extends DocumentDetailTab {
 
 	@Override
 	protected void onDraw() {
-		ListGridField id = new ListGridField("id", I18N.message("id"), 50);
-		id.setHidden(true);
+		ListGridField id = new IdListGridField();
 
 		ListGridField folderId = new ListGridField("folderId", I18N.message("id"), 50);
 		folderId.setHidden(true);
@@ -51,5 +51,15 @@ public class AliasesPanel extends DocumentDetailTab {
 		super.destroy();
 		if (dataSource != null)
 			dataSource.destroy();
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

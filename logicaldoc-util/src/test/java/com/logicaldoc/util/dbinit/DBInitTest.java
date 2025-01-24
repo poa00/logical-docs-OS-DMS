@@ -1,13 +1,14 @@
 package com.logicaldoc.util.dbinit;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
+
+import com.logicaldoc.util.plugin.PluginException;
 
 import junit.framework.TestCase;
 
@@ -19,29 +20,37 @@ import junit.framework.TestCase;
 public class DBInitTest extends TestCase {
 
 	// Instance under test
-	private DBInit dbinit;
+	private DBInit testSubject;
 
-	public void setUp() throws FileNotFoundException, IOException, SQLException {
+	@Before
+	public void setUp() throws IOException, SQLException, PluginException {
 		List<String> sqlList = new ArrayList<>();
 		sqlList.add("sql1.sql");
 		sqlList.add("sql2.sql");
-		dbinit = new DBInit(sqlList);
+		testSubject = new DBInit(sqlList);
+		assertEquals(2, testSubject.getSqlList().size());
+
 		// dbinit.setDriver("org.hsqldb.jdbcDriver"); // version 1.8
-		dbinit.setDriver("org.hsqldb.jdbc.JDBCDriver");
-		dbinit.setUrl("jdbc:hsqldb:mem:logicaldoc");
-		dbinit.setUsername("sa");
-		dbinit.setPassword("");
+		testSubject.setDriver("org.hsqldb.jdbc.JDBCDriver");
+		testSubject.setUrl("jdbc:hsqldb:mem:logicaldoc");
+		testSubject.setUsername("sa");
+		testSubject.setPassword("");
+		testSubject.setDbms("hsqldb");
+
+		assertEquals("hsqldb", testSubject.getDbms());
 	}
 
 	@Test
 	public void testExecute() {
-		String notThrownTest = null;
 		try {
-			dbinit.execute();
-			notThrownTest = "ok";
-		} catch (Throwable t) {
-			// Nothing to do
+			assertTrue(testSubject.testConnection());
+			testSubject.execute();
+			assertTrue(testSubject.isConnected());
+			testSubject.executeSql("select count(*) from co_menus;");
+			testSubject.rollback();
+		} finally {
+			// Make sure to leave HSQLDB down
+			testSubject.executeSql("shutdown");
 		}
-		Assert.assertNotNull(notThrownTest);
 	}
 }

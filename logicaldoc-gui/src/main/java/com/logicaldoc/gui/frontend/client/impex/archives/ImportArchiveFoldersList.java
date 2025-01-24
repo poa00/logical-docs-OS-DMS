@@ -1,13 +1,14 @@
 package com.logicaldoc.gui.frontend.client.impex.archives;
 
 import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.data.ImpexFoldersDS;
+import com.logicaldoc.gui.common.client.grid.DateListGridField;
+import com.logicaldoc.gui.common.client.grid.RefreshableListGrid;
 import com.logicaldoc.gui.common.client.i18n.I18N;
 import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.common.client.widgets.InfoPanel;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.RefreshableListGrid;
 import com.logicaldoc.gui.frontend.client.services.ImpexService;
 import com.smartgwt.client.types.Alignment;
 import com.smartgwt.client.types.SelectionStyle;
@@ -100,12 +101,7 @@ public class ImportArchiveFoldersList extends VLayout {
 		delete.setTitle(I18N.message("ddelete"));
 		delete.addClickHandler(event -> LD.ask(I18N.message("question"), I18N.message("confirmdelete"), confirm -> {
 			if (Boolean.TRUE.equals(confirm)) {
-				ImpexService.Instance.get().deleteFolder(name, new AsyncCallback<Void>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				ImpexService.Instance.get().deleteFolder(name, new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Void result) {
 						list.removeSelectedData();
@@ -118,9 +114,9 @@ public class ImportArchiveFoldersList extends VLayout {
 		MenuItem importBundle = new MenuItem();
 		importBundle.setTitle(I18N.message("importbundle"));
 		importBundle.addClickHandler(
-				event -> LD.ask(I18N.message("question"), I18N.message("confirmimportbundle"),  confirm -> {
+				event -> LD.ask(I18N.message("question"), I18N.message("confirmimportbundle"), confirm -> {
 					if (Boolean.TRUE.equals(confirm)) {
-						ImpexService.Instance.get().startImport(name, new AsyncCallback<Void>() {
+						ImpexService.Instance.get().startImport(name, new AsyncCallback<>() {
 							@Override
 							public void onFailure(Throwable caught) {
 								GuiLog.warn(I18N.message("archiveimportingerror"), null);
@@ -142,5 +138,15 @@ public class ImportArchiveFoldersList extends VLayout {
 
 	public ListGrid getList() {
 		return list;
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

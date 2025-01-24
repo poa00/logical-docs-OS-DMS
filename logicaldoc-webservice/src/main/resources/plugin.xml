@@ -88,7 +88,7 @@
 <!ELEMENT value (#PCDATA)>
 ]>
 
-<plugin id="logicaldoc-webservice" version="8.8.6" class="com.logicaldoc.webservice.WebservicePlugin">
+<plugin id="logicaldoc-webservice" version="9.1.1" class="com.logicaldoc.webservice.WebservicePlugin">
 	<requires>
 		<import plugin-id="logicaldoc-core" />
 	</requires>
@@ -101,7 +101,6 @@
     </extension>
     <extension plugin-id="logicaldoc-core" point-id="DbInit" id="webservicesDbInit">
 	  <parameter id="position" value="20" />
-	  <parameter id="name" value="logicaldoc-webservices" />
 	  <parameter id="sqlFile" value="sql/logicaldoc-webservices.sql" />
     </extension>
     <extension plugin-id="logicaldoc-core" point-id="Aspect" id="aspSaveApiCall">

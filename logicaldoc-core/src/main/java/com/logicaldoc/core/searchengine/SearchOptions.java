@@ -10,16 +10,28 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.Serializable;
+import java.lang.reflect.Array;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+
+import javax.persistence.Transient;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
+import org.apache.commons.lang3.builder.ToStringStyle;
+
+import com.logicaldoc.core.security.user.UserHistory;
 
 /**
  * Search options
  * 
  * @author Michael Scholz
  */
-public class SearchOptions implements Serializable, Comparable<SearchOptions> {
+public abstract class SearchOptions implements Serializable, Comparable<SearchOptions> {
 
 	private static final long serialVersionUID = 2L;
 
@@ -67,6 +79,9 @@ public class SearchOptions implements Serializable, Comparable<SearchOptions> {
 
 	private Long tenantId = null;
 
+	@Transient
+	private UserHistory transaction;
+
 	public Long getTemplate() {
 		return template;
 	}
@@ -80,7 +95,7 @@ public class SearchOptions implements Serializable, Comparable<SearchOptions> {
 	 * 
 	 * @param type the type of search
 	 */
-	public SearchOptions(int type) {
+	protected SearchOptions(int type) {
 		this.type = type;
 	}
 
@@ -236,6 +251,14 @@ public class SearchOptions implements Serializable, Comparable<SearchOptions> {
 		this.parameters = parameters;
 	}
 
+	public UserHistory getTransaction() {
+		return transaction;
+	}
+
+	public void setTransaction(UserHistory transaction) {
+		this.transaction = transaction;
+	}
+
 	@Override
 	public int compareTo(SearchOptions o) {
 		return this.getName().compareTo(o.getName());
@@ -248,9 +271,32 @@ public class SearchOptions implements Serializable, Comparable<SearchOptions> {
 		SearchOptions other = (SearchOptions) obj;
 		return getName().equals(other.getName());
 	}
-	
+
 	@Override
 	public int hashCode() {
 		return getName().hashCode();
+	}
+
+	@Override
+	public String toString() {
+		return this.getClass().getSimpleName().replace("Options", "")
+				+ new ReflectionToStringBuilder(this, ToStringStyle.NO_CLASS_NAME_STYLE) {
+					@Override
+					protected boolean accept(Field field) {
+						try {
+							Object value = field.get(getObject());
+							// avoid to print null values and empty collections
+							return super.accept(field) && !field.getName().equals("name")
+									&& !field.getName().equals("description") && !field.getName().equals("transaction")
+									&& value != null && StringUtils.isNotEmpty(value.toString())
+									&& (!field.getType().isArray() || Array.getLength(value) > 0)
+									&& (!Collection.class.isAssignableFrom(field.getType()) || Boolean.FALSE
+											.equals(value.getClass().getDeclaredMethod("isEmpty").invoke(value)));
+						} catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException
+								| NoSuchMethodException | SecurityException e) {
+							return false;
+						}
+					}
+				}.toString();
 	}
 }

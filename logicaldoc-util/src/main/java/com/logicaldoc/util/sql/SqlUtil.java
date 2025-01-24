@@ -1,5 +1,11 @@
 package com.logicaldoc.util.sql;
 
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
+import java.util.Date;
+
 /**
  * This class contains methods about SQL handling
  * 
@@ -9,6 +15,7 @@ package com.logicaldoc.util.sql;
 public class SqlUtil {
 
 	private SqlUtil() {
+		throw new IllegalStateException("Utility class");
 	}
 
 	/**
@@ -39,5 +46,25 @@ public class SqlUtil {
 
 	public static String doubleQuotesAndBackslashes(String input) {
 		return doubleBackslashes(doubleQuotes(input));
+	}
+
+	/**
+	 * Retrieves the date stored in a given column
+	 * 
+	 * @param resultSet The resultset to use
+	 * @param column The column index
+	 * @return The date value
+	 * 
+	 * @throws SQLException Error in the database
+	 */
+	public static Date getColumnDateValue(ResultSet resultSet, int column) throws SQLException {
+		Date date;
+		if (resultSet.getObject(column) instanceof Timestamp)
+			date = resultSet.getTimestamp(column);
+		else if (resultSet.getObject(column) instanceof LocalDateTime localDateTime)
+			date = java.sql.Timestamp.valueOf(localDateTime);
+		else
+			date = resultSet.getDate(column);
+		return date;
 	}
 }

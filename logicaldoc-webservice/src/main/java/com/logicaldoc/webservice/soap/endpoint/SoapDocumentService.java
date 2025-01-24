@@ -6,10 +6,10 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import javax.activation.DataHandler;
 import javax.mail.MessagingException;
@@ -27,32 +27,35 @@ import com.logicaldoc.core.communication.Recipient;
 import com.logicaldoc.core.conversion.FormatConverterManager;
 import com.logicaldoc.core.document.AbstractDocument;
 import com.logicaldoc.core.document.Document;
+import com.logicaldoc.core.document.DocumentComparator;
+import com.logicaldoc.core.document.DocumentDAO;
 import com.logicaldoc.core.document.DocumentEvent;
 import com.logicaldoc.core.document.DocumentHistory;
+import com.logicaldoc.core.document.DocumentHistoryDAO;
 import com.logicaldoc.core.document.DocumentLink;
+import com.logicaldoc.core.document.DocumentLinkDAO;
 import com.logicaldoc.core.document.DocumentManager;
 import com.logicaldoc.core.document.DocumentNote;
+import com.logicaldoc.core.document.DocumentNoteDAO;
 import com.logicaldoc.core.document.Rating;
+import com.logicaldoc.core.document.RatingDAO;
 import com.logicaldoc.core.document.Version;
-import com.logicaldoc.core.document.dao.DocumentDAO;
-import com.logicaldoc.core.document.dao.DocumentHistoryDAO;
-import com.logicaldoc.core.document.dao.DocumentLinkDAO;
-import com.logicaldoc.core.document.dao.DocumentNoteDAO;
-import com.logicaldoc.core.document.dao.RatingDAO;
-import com.logicaldoc.core.document.dao.VersionDAO;
+import com.logicaldoc.core.document.VersionDAO;
 import com.logicaldoc.core.document.thumbnail.ThumbnailManager;
 import com.logicaldoc.core.folder.Folder;
 import com.logicaldoc.core.folder.FolderDAO;
-import com.logicaldoc.core.parser.ParseException;
+import com.logicaldoc.core.parser.ParsingException;
 import com.logicaldoc.core.searchengine.SearchEngine;
-import com.logicaldoc.core.security.Group;
+import com.logicaldoc.core.security.AccessControlEntry;
 import com.logicaldoc.core.security.Permission;
 import com.logicaldoc.core.security.Session;
 import com.logicaldoc.core.security.SessionManager;
-import com.logicaldoc.core.security.User;
 import com.logicaldoc.core.security.authentication.AuthenticationException;
 import com.logicaldoc.core.security.authorization.PermissionException;
-import com.logicaldoc.core.store.Storer;
+import com.logicaldoc.core.security.authorization.UnexistingResourceException;
+import com.logicaldoc.core.security.user.Group;
+import com.logicaldoc.core.security.user.User;
+import com.logicaldoc.core.store.Store;
 import com.logicaldoc.core.ticket.Ticket;
 import com.logicaldoc.util.Context;
 import com.logicaldoc.util.MimeType;
@@ -60,6 +63,7 @@ import com.logicaldoc.util.config.ContextProperties;
 import com.logicaldoc.util.io.FileUtil;
 import com.logicaldoc.webservice.AbstractService;
 import com.logicaldoc.webservice.WebserviceException;
+import com.logicaldoc.webservice.model.WSAccessControlEntry;
 import com.logicaldoc.webservice.model.WSDocument;
 import com.logicaldoc.webservice.model.WSLink;
 import com.logicaldoc.webservice.model.WSNote;
@@ -96,9 +100,10 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 	public WSDocument create(String sid, WSDocument document, InputStream content)
 			throws AuthenticationException, WebserviceException, PersistenceException, PermissionException {
 		User user = validateSession(sid);
-		checkWriteEnable(user, document.getFolderId());
 
-		FolderDAO fdao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+		checkFolderPermission(Permission.WRITE, user, document.getFolderId());
+
+		FolderDAO fdao = Context.get(FolderDAO.class);
 		Folder folder = fdao.findById(document.getFolderId());
 
 		long rootId = fdao.findRoot(user.getTenantId()).getId();
@@ -119,7 +124,7 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 		transaction.setComment(document.getComment());
 		transaction.setUser(user);
 
-		DocumentManager documentManager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+		DocumentManager documentManager = Context.get(DocumentManager.class);
 		doc = documentManager.create(content, doc, transaction);
 		return WSUtil.toWSDocument(doc);
 	}
@@ -148,14 +153,13 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 			InputStream content) throws AuthenticationException, WebserviceException, PersistenceException,
 			PermissionException, IOException {
 		User user = validateSession(sid);
-		DocumentDAO ddao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO ddao = Context.get(DocumentDAO.class);
 
 		Document document = ddao.findById(docId);
 		if (document.getImmutable() == 1)
 			throw new PermissionException(THE_DOCUMENT + docId + IS_IMMUTABLE);
-		Folder folder = document.getFolder();
 
-		checkWriteEnable(user, folder.getId());
+		checkDocumentPermission(Permission.READ, user, docId);
 
 		document = ddao.findDocument(docId);
 
@@ -179,7 +183,7 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 			/*
 			 * checkin the document; throws an exception if something goes wrong
 			 */
-			DocumentManager documentManager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+			DocumentManager documentManager = Context.get(DocumentManager.class);
 			documentManager.checkin(document.getId(), content, filename, release, doc, transaction);
 
 			/* create positive log message */
@@ -194,7 +198,7 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 	public void checkout(String sid, long docId)
 			throws AuthenticationException, WebserviceException, PersistenceException, PermissionException {
 		User user = validateSession(sid);
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
 		Document doc = docDao.findById(docId);
 		if (doc.getImmutable() == 1)
 			throw new PermissionException(THE_DOCUMENT + docId + IS_IMMUTABLE);
@@ -202,8 +206,8 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 		if (doc.getStatus() != AbstractDocument.DOC_UNLOCKED)
 			throw new PermissionException("The document is locked or already checked out");
 
-		checkWriteEnable(user, doc.getFolder().getId());
-		checkDownloadEnable(user, doc.getFolder().getId());
+		checkDocumentPermission(Permission.WRITE, user, docId);
+		checkDocumentPermission(Permission.DOWNLOAD, user, docId);
 
 		doc = docDao.findDocument(docId);
 		checkPublished(user, doc);
@@ -215,7 +219,7 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 		transaction.setComment("");
 		transaction.setUser(user);
 
-		DocumentManager documentManager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+		DocumentManager documentManager = Context.get(DocumentManager.class);
 		documentManager.checkout(doc.getId(), transaction);
 	}
 
@@ -223,10 +227,10 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 	public void delete(String sid, long docId)
 			throws AuthenticationException, WebserviceException, PersistenceException, PermissionException {
 		User user = validateSession(sid);
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
 		Document doc = docDao.findById(docId);
 		checkLocked(user, doc);
-		checkPermission(Permission.DELETE, user, doc.getFolder().getId());
+		checkFolderPermission(Permission.DELETE, user, doc.getFolder().getId());
 		checkPublished(user, doc);
 
 		// Create the document history event
@@ -261,7 +265,7 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 			WebserviceException, PersistenceException, PermissionException, IOException {
 		String fileVersion = null;
 		if (version != null) {
-			VersionDAO vDao = (VersionDAO) Context.get().getBean(VersionDAO.class);
+			VersionDAO vDao = Context.get(VersionDAO.class);
 			Version v = vDao.findByVersion(docId, version);
 			fileVersion = v.getFileVersion();
 		}
@@ -275,12 +279,11 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 			IOException {
 		User user = validateSession(sid);
 
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
-		Document doc = docDao.findById(docId);
-		checkReadEnable(user, doc.getFolder().getId());
-		checkDownloadEnable(user, doc.getFolder().getId());
+		checkDocumentPermission(Permission.READ, user, docId);
+		checkDocumentPermission(Permission.DOWNLOAD, user, docId);
 
-		doc = docDao.findDocument(docId);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
+		Document doc = docDao.findDocument(docId);
 		checkPublished(user, doc);
 
 		if (doc.isPasswordProtected()) {
@@ -289,10 +292,10 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 				throw new PermissionException(String.format("The document is protected by a password %s", doc));
 		}
 
-		Storer storer = (Storer) Context.get().getBean(Storer.class);
-		String resourceName = storer.getResourceName(doc, fileVersion, suffix);
+		Store store = Context.get(Store.class);
+		String resourceName = store.getResourceName(doc, fileVersion, suffix);
 
-		if (!storer.exists(doc.getId(), resourceName)) {
+		if (!store.exists(doc.getId(), resourceName)) {
 			throw new WebserviceException("Resource " + resourceName + " not found");
 		}
 
@@ -302,20 +305,20 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 		if (StringUtils.isNotEmpty(suffix))
 			fileName = suffix;
 		String mime = MimeType.getByFilename(fileName);
-		return new DataHandler(new InputStreamDataSource(storer.getStream(doc.getId(), resourceName), mime));
+		return new DataHandler(new InputStreamDataSource(store.getStream(doc.getId(), resourceName), mime));
 	}
 
 	@Override
 	public void createPdf(String sid, long docId, String fileVersion) throws AuthenticationException,
 			WebserviceException, PersistenceException, PermissionException, IOException {
 		User user = validateSession(sid);
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
-		Document doc = docDao.findById(docId);
-		checkReadEnable(user, doc.getFolder().getId());
 
-		doc = docDao.findDocument(docId);
+		checkDocumentPermission(Permission.READ, user, docId);
 
-		FormatConverterManager manager = (FormatConverterManager) Context.get().getBean(FormatConverterManager.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
+		Document doc = docDao.findDocument(docId);
+
+		FormatConverterManager manager = Context.get(FormatConverterManager.class);
 		manager.convertToPdf(doc, fileVersion, sid);
 	}
 
@@ -324,15 +327,15 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 			throws AuthenticationException, WebserviceException, PersistenceException, IOException {
 		validateSession(sid);
 
-		ThumbnailManager manager = (ThumbnailManager) Context.get().getBean(ThumbnailManager.class);
-		Storer storer = (Storer) Context.get().getBean(Storer.class);
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		ThumbnailManager manager = Context.get(ThumbnailManager.class);
+		Store store = Context.get(Store.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
 		Document doc = docDao.findDocument(docId);
 
 		if (!type.toLowerCase().endsWith(".png"))
 			type += ".png";
-		String resource = storer.getResourceName(doc, fileVersion, type);
-		if (!storer.exists(docId, resource)) {
+		String resource = store.getResourceName(doc, fileVersion, type);
+		if (!store.exists(docId, resource)) {
 			if (type.equals(ThumbnailManager.SUFFIX_THUMB))
 				manager.createTumbnail(doc, fileVersion, sid);
 			else if (type.equals(ThumbnailManager.SUFFIX_TILE))
@@ -359,10 +362,11 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 		if (StringUtils.isEmpty(suffix))
 			throw new WebserviceException("Please provide a suffix");
 
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
 		Document doc = docDao.findById(docId);
-		checkReadEnable(user, doc.getFolder().getId());
-		checkWriteEnable(user, doc.getFolder().getId());
+
+		checkDocumentPermission(Permission.READ, user, doc.getId());
+		checkDocumentPermission(Permission.WRITE, user, doc.getId());
 
 		doc = docDao.findDocument(docId);
 
@@ -372,17 +376,17 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 		if ("sign.p7m".equalsIgnoreCase(suffix))
 			throw new PermissionException("You cannot upload a signature");
 
-		Storer storer = (Storer) Context.get().getBean(Storer.class);
-		String resource = storer.getResourceName(doc, fileVersion, suffix);
+		Store store = Context.get(Store.class);
+		String resource = store.getResourceName(doc, fileVersion, suffix);
 
 		log.debug("Attach file {}", resource);
 
-		storer.store(content.getInputStream(), doc.getId(), resource);
+		store.store(content.getInputStream(), doc.getId(), resource);
 	}
 
 	@Override
-	public WSDocument getDocument(String sid, long docId)
-			throws AuthenticationException, WebserviceException, PersistenceException, PermissionException {
+	public WSDocument getDocument(String sid, long docId) throws AuthenticationException, WebserviceException,
+			PersistenceException, PermissionException, UnexistingResourceException {
 		User user = validateSession(sid);
 		Document doc = retrieveReadableDocument(docId, user);
 		checkPublished(user, doc);
@@ -393,42 +397,26 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 	public WSDocument getDocumentByCustomId(String sid, String customId)
 			throws AuthenticationException, WebserviceException, PersistenceException, PermissionException {
 		User user = validateSession(sid);
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
 		Document doc = docDao.findByCustomId(customId, user.getTenantId());
 		if (doc == null)
 			return null;
-		checkReadEnable(user, doc.getFolder().getId());
+
+		checkDocumentPermission(Permission.READ, user, doc.getId());
 		checkPublished(user, doc);
 
 		return getDoc(doc.getId());
 	}
 
 	@Override
-	public boolean isReadable(String sid, long docId)
-			throws AuthenticationException, WebserviceException, PersistenceException {
+	public void lock(String sid, long docId) throws AuthenticationException, WebserviceException, PersistenceException,
+			PermissionException, UnexistingResourceException {
 		User user = validateSession(sid);
-
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
-		Document doc = docDao.findById(docId);
-		if (doc == null)
-			return false;
-
-		try {
-			checkReadEnable(user, doc.getFolder().getId());
-		} catch (PermissionException e) {
-			return false;
-		}
-		return true;
-	}
-
-	@Override
-	public void lock(String sid, long docId)
-			throws AuthenticationException, WebserviceException, PersistenceException, PermissionException {
-		User user = validateSession(sid);
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
 		Document doc = retrieveReadableDocument(docId, user);
 		checkLocked(user, doc);
-		checkWriteEnable(user, doc.getFolder().getId());
+
+		checkDocumentPermission(Permission.WRITE, user, docId);
 
 		doc = docDao.findDocument(docId);
 		checkPublished(user, doc);
@@ -440,31 +428,31 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 		transaction.setComment("");
 		transaction.setUser(user);
 
-		DocumentManager documentManager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+		DocumentManager documentManager = Context.get(DocumentManager.class);
 		documentManager.lock(doc.getId(), AbstractDocument.DOC_LOCKED, transaction);
 	}
 
 	@Override
-	public void move(String sid, long docId, long folderId)
-			throws AuthenticationException, WebserviceException, PersistenceException, PermissionException {
+	public void move(String sid, long docId, long folderId) throws AuthenticationException, WebserviceException,
+			PersistenceException, PermissionException, UnexistingResourceException {
 		User user = validateSession(sid);
-		FolderDAO fdao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+		FolderDAO fdao = Context.get(FolderDAO.class);
 		long rootId = fdao.findRoot(user.getTenantId()).getId();
 
 		if (folderId == rootId)
 			throw new PermissionException("Cannot move documents in the root");
 
 		Document doc = retrieveReadableDocument(docId, user);
-		checkPermission(Permission.MOVE, user, doc.getFolder().getId());
+		checkFolderPermission(Permission.MOVE, user, doc.getFolder().getId());
 
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
 		doc = docDao.findDocument(docId);
 		checkPublished(user, doc);
 
-		FolderDAO dao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+		FolderDAO dao = Context.get(FolderDAO.class);
 		Folder folder = dao.findById(folderId);
 		checkLocked(user, doc);
-		checkWriteEnable(user, folder.getId());
+		checkFolderPermission(Permission.WRITE, user, folder.getId());
 
 		// Create the document history event
 		DocumentHistory transaction = new DocumentHistory();
@@ -473,23 +461,24 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 		transaction.setComment("");
 		transaction.setUser(user);
 
-		DocumentManager documentManager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+		DocumentManager documentManager = Context.get(DocumentManager.class);
 		documentManager.moveToFolder(doc, folder, transaction);
 	}
 
 	@Override
-	public WSDocument copy(String sid, long docId, long folderId) throws AuthenticationException, WebserviceException,
-			PersistenceException, PermissionException, IOException {
+	public WSDocument copy(String sid, long docId, long folderId, boolean links, boolean notes, boolean security)
+			throws AuthenticationException, WebserviceException, PersistenceException, PermissionException,
+			IOException {
 		User user = validateSession(sid);
-		FolderDAO fdao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+		FolderDAO fdao = Context.get(FolderDAO.class);
 		long rootId = fdao.findRoot(user.getTenantId()).getId();
 
 		if (folderId == rootId)
 			throw new PermissionException("Cannot create documents in the root");
 
-		checkWriteEnable(user, folderId);
+		checkFolderPermission(Permission.WRITE, user, folderId);
 
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
 		Document doc = docDao.findDocument(docId);
 		checkPublished(user, doc);
 
@@ -502,21 +491,21 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 
 		Folder folder = fdao.findFolder(folderId);
 
-		DocumentManager documentManager = (DocumentManager) Context.get().getBean(DocumentManager.class);
-		Document createdDoc = documentManager.copyToFolder(doc, folder, transaction);
+		DocumentManager documentManager = Context.get(DocumentManager.class);
+		Document createdDoc = documentManager.copyToFolder(doc, folder, transaction, links, notes, security);
 		return getDoc(createdDoc.getId());
 	}
 
 	@Override
-	public void rename(String sid, long docId, String name)
-			throws AuthenticationException, WebserviceException, PersistenceException, PermissionException {
+	public void rename(String sid, long docId, String name) throws AuthenticationException, WebserviceException,
+			PersistenceException, PermissionException, UnexistingResourceException {
 		User user = validateSession(sid);
 
 		Document doc = retrieveReadableDocument(docId, user);
-		checkPermission(Permission.RENAME, user, doc.getFolder().getId());
+		checkFolderPermission(Permission.RENAME, user, doc.getFolder().getId());
 		checkPublished(user, doc);
 
-		DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+		DocumentManager manager = Context.get(DocumentManager.class);
 
 		DocumentHistory transaction = new DocumentHistory();
 		transaction.setSessionId(sid);
@@ -528,7 +517,7 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 	public void restore(String sid, long docId, long folderId)
 			throws AuthenticationException, WebserviceException, PersistenceException {
 		User user = validateSession(sid);
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
 
 		DocumentHistory transaction = new DocumentHistory();
 		transaction.setUser(user);
@@ -537,8 +526,8 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 	}
 
 	@Override
-	public void unlock(String sid, long docId)
-			throws AuthenticationException, WebserviceException, PersistenceException, PermissionException {
+	public void unlock(String sid, long docId) throws AuthenticationException, WebserviceException,
+			PersistenceException, PermissionException, UnexistingResourceException {
 		User user = validateSession(sid);
 
 		Document doc = retrieveReadableDocument(docId, user);
@@ -555,34 +544,34 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 		transaction.setComment("");
 		transaction.setUser(user);
 
-		DocumentManager documentManager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+		DocumentManager documentManager = Context.get(DocumentManager.class);
 		documentManager.unlock(docId, transaction);
 	}
 
 	@Override
-	public void update(String sid, WSDocument document)
-			throws AuthenticationException, PermissionException, WebserviceException, PersistenceException {
+	public void update(String sid, WSDocument document) throws AuthenticationException, PermissionException,
+			WebserviceException, PersistenceException, UnexistingResourceException {
 		updateDocument(sid, document);
 	}
 
-	private void updateDocument(String sid, WSDocument document)
-			throws AuthenticationException, WebserviceException, PersistenceException, PermissionException {
+	private void updateDocument(String sid, WSDocument document) throws AuthenticationException, WebserviceException,
+			PersistenceException, PermissionException, UnexistingResourceException {
 		User user = validateSession(sid);
 
 		Document doc = retrieveReadableDocument(document.getId(), user);
 		checkLocked(user, doc);
-		checkWriteEnable(user, doc.getFolder().getId());
+		checkDocumentPermission(Permission.WRITE, user, doc.getId());
 		checkPublished(user, doc);
 
 		// Initialize the lazy loaded collections
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
 		docDao.initialize(doc);
 
 		long originalFolderId = doc.getFolder().getId();
 
 		doc.setCustomId(document.getCustomId());
 
-		DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+		DocumentManager manager = Context.get(DocumentManager.class);
 
 		// Create the document history event
 		DocumentHistory transaction = new DocumentHistory();
@@ -599,44 +588,65 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 	}
 
 	@Override
-	public WSDocument[] listDocuments(String sid, long folderId, String fileName)
+	public List<WSDocument> listDocuments(String sid, long folderId, String fileName)
+			throws AuthenticationException, WebserviceException, PersistenceException, PermissionException {
+		return list(sid, folderId, fileName, "fileName asc", null, null);
+	}
+
+	@Override
+	public List<WSDocument> list(String sid, long folderId, String fileName, String sort, Integer page, Integer max)
 			throws AuthenticationException, WebserviceException, PersistenceException, PermissionException {
 		User user = validateSession(sid);
-		checkReadEnable(user, folderId);
+		checkFolderPermission(Permission.READ, user, folderId);
 
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
+
+		// Get the documents in folder sorted by file name
 		List<Document> docs = docDao.findByFolder(folderId, null);
-		if (docs.size() > 1)
-			Collections.sort(docs, (doc1, doc2) -> doc1.getFileName().compareTo(doc2.getFileName()));
+
+		// Sort based on the given criteria
+		if (StringUtils.isNotEmpty(sort))
+			Collections.sort(docs, DocumentComparator.getComparator(sort));
+
+		// Retain just those files accessible by the user that also matches the
+		// file name
+		docs = docs.stream().filter(doc -> mustList(doc, user, fileName)).collect(Collectors.toList());
+
+		// In case of pagination, extract just the wanted page
+		if (max != null && page != null && max < docs.size())
+			docs = docs.stream().skip((page - 1) * (long) max).limit(max).collect(Collectors.toList());
 
 		List<WSDocument> wsDocs = new ArrayList<>();
 		for (Document doc : docs) {
-			try {
-				checkPublished(user, doc);
-				checkNotArchived(doc);
-
-				if (fileName != null && !FileUtil.matches(doc.getFileName(), new String[] { fileName }, null))
-					throw new ParseException("no match");
-			} catch (Exception t) {
-				continue;
-			}
-
 			docDao.initialize(doc);
 			wsDocs.add(WSUtil.toWSDocument(doc));
 		}
 
-		return wsDocs.toArray(new WSDocument[0]);
+		return wsDocs;
+	}
+
+	private boolean mustList(Document document, User user, String fileName) {
+		try {
+			checkPublished(user, document);
+			checkNotArchived(document);
+
+			if (fileName != null && !FileUtil.matches(document.getFileName(), List.of(fileName), null))
+				throw new ParsingException("no match");
+			return true;
+		} catch (Exception t) {
+			return false;
+		}
 	}
 
 	@Override
-	public WSDocument[] getDocuments(String sid, Long[] docIds)
+	public List<WSDocument> getDocuments(String sid, List<Long> docIds)
 			throws AuthenticationException, WebserviceException, PersistenceException {
 		User user = validateSession(sid);
-		FolderDAO fdao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+		FolderDAO fdao = Context.get(FolderDAO.class);
 		Collection<Long> folderIds = fdao.findFolderIdByUserId(user.getId(), null, true);
 
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
-		List<Document> docs = docDao.findByIds(docIds, null);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
+		List<Document> docs = docDao.findByIds(Set.copyOf(docIds), null);
 		List<WSDocument> wsDocs = new ArrayList<>();
 		for (int i = 0; i < docs.size(); i++) {
 			try {
@@ -649,42 +659,41 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 				wsDocs.add(getDoc(docs.get(i).getId()));
 		}
 
-		return wsDocs.toArray(new WSDocument[0]);
+		return wsDocs;
 	}
 
 	@Override
-	public WSDocument[] getRecentDocuments(String sid, Integer max)
+	public List<WSDocument> getRecentDocuments(String sid, Integer max)
 			throws AuthenticationException, WebserviceException, PersistenceException {
 		User user = validateSession(sid);
 
-		DocumentHistoryDAO dao = (DocumentHistoryDAO) Context.get().getBean(DocumentHistoryDAO.class);
+		DocumentHistoryDAO dao = Context.get(DocumentHistoryDAO.class);
 		StringBuilder query = new StringBuilder(
 				"select docId from DocumentHistory where deleted=0 and (docId is not NULL) and userId=" + user.getId());
 		query.append(" order by date desc");
-		List<Object> records = dao.findByQuery(query.toString(), (Map<String, Object>) null, max);
+		List<Long> records = dao.findByQuery(query.toString(), (Map<String, Object>) null, Long.class, max);
 
-		Set<Long> docIds = new HashSet<>();
+		List<Long> docIds = new ArrayList<>();
 
 		/*
 		 * Iterate over records composing the response XML document
 		 */
-		for (Object gridRecord : records) {
-			Long id = (Long) gridRecord;
+		for (Long id : records) {
 			// Discard a gridRecord if already visited
 			if (!docIds.contains(id))
 				docIds.add(id);
 		}
 
-		return getDocuments(sid, docIds.toArray(new Long[0]));
+		return getDocuments(sid, docIds);
 	}
 
 	@Override
-	public void sendEmail(String sid, Long[] docIds, String recipients, String subject, String message)
+	public void sendEmail(String sid, List<Long> docIds, String recipients, String subject, String message)
 			throws AuthenticationException, WebserviceException, PersistenceException, IOException, MessagingException {
 		User user = validateSession(sid);
 
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
-		FolderDAO folderDao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
+		FolderDAO folderDao = Context.get(FolderDAO.class);
 		ContextProperties config = Context.get().getProperties();
 		Session session = SessionManager.get().get(sid);
 
@@ -708,14 +717,12 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 		 * Only readable documents can be sent
 		 */
 		List<Document> docs = new ArrayList<>();
-		if (docIds != null && docIds.length > 0) {
-			for (long id : docIds) {
-				Document doc = docDao.findById(id);
-				if (doc != null && folderDao.isReadEnabled(doc.getFolder().getId(), user.getId())) {
-					doc = docDao.findDocument(id);
-					createAttachment(mail, doc);
-					docs.add(doc);
-				}
+		for (long id : docIds) {
+			Document doc = docDao.findById(id);
+			if (doc != null && folderDao.isReadAllowed(doc.getFolder().getId(), user.getId())) {
+				doc = docDao.findDocument(id);
+				createAttachment(mail, doc);
+				docs.add(doc);
 			}
 		}
 
@@ -747,7 +754,7 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 	}
 
 	private WSDocument getDoc(long docId) throws PersistenceException {
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
 
 		Document doc = docDao.findById(docId);
 		Long aliasId = null;
@@ -775,9 +782,9 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 	private void createAttachment(EMail email, Document doc) throws IOException {
 		EMailAttachment att = new EMailAttachment();
 		att.setIcon(doc.getIcon());
-		Storer storer = (Storer) Context.get().getBean(Storer.class);
-		String resource = storer.getResourceName(doc, null, null);
-		att.setData(storer.getBytes(doc.getId(), resource));
+		Store store = Context.get(Store.class);
+		String resource = store.getResourceName(doc, null, null);
+		att.setData(store.getBytes(doc.getId(), resource));
 		att.setFileName(doc.getFileName());
 		String extension = doc.getFileExtension();
 		att.setMimeType(MimeType.get(extension));
@@ -790,18 +797,18 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 			throws AuthenticationException, WebserviceException, PersistenceException, PermissionException {
 		User user = validateSession(sid);
 
-		FolderDAO fdao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+		FolderDAO fdao = Context.get(FolderDAO.class);
 		long rootId = fdao.findRoot(user.getTenantId()).getId();
 
 		if (folderId == rootId)
 			throw new PermissionException("Cannot create alias in the root");
 
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
 		Document originalDoc = docDao.findById(docId);
-		checkDownloadEnable(user, originalDoc.getFolder().getId());
-		checkWriteEnable(user, folderId);
+		checkDocumentPermission(Permission.DOWNLOAD, user, docId);
+		checkFolderPermission(Permission.WRITE, user, folderId);
 
-		FolderDAO mdao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+		FolderDAO mdao = Context.get(FolderDAO.class);
 		Folder folder = mdao.findById(folderId);
 		if (folder == null)
 			throw new WebserviceException("error - folder not found");
@@ -813,7 +820,7 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 		transaction.setComment("");
 		transaction.setUser(user);
 
-		DocumentManager documentManager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+		DocumentManager documentManager = Context.get(DocumentManager.class);
 
 		Document doc = documentManager.createAlias(originalDoc, folder, type, transaction);
 
@@ -824,9 +831,9 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 
 	@Override
 	public void reindex(String sid, long docId, String content)
-			throws ParseException, AuthenticationException, WebserviceException, PersistenceException {
+			throws ParsingException, AuthenticationException, WebserviceException, PersistenceException {
 		User user = validateSession(sid);
-		DocumentManager documentManager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+		DocumentManager documentManager = Context.get(DocumentManager.class);
 
 		DocumentHistory transaction = new DocumentHistory();
 		transaction.setSessionId(sid);
@@ -835,16 +842,16 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 	}
 
 	@Override
-	public WSDocument[] getAliases(String sid, long docId)
+	public List<WSDocument> getAliases(String sid, long docId)
 			throws AuthenticationException, WebserviceException, PersistenceException {
 		User user = validateSession(sid);
 		Collection<Long> folderIds = null;
 		if (!user.isMemberOf(Group.GROUP_ADMIN)) {
-			FolderDAO fdao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+			FolderDAO fdao = Context.get(FolderDAO.class);
 			folderIds = fdao.findFolderIdByUserId(user.getId(), null, true);
 		}
 
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
 		List<Document> docs = new ArrayList<>();
 		if (user.isMemberOf(Group.GROUP_ADMIN))
 			docs = docDao.findByWhere("_entity.docRef=" + docId, null, null);
@@ -861,7 +868,7 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 				wsDocs.add(WSUtil.toWSDocument(docs.get(i)));
 		}
 
-		return wsDocs.toArray(new WSDocument[0]);
+		return wsDocs;
 	}
 
 	@Override
@@ -889,17 +896,17 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 	}
 
 	@Override
-	public WSLink link(String sid, long doc1, long doc2, String type)
-			throws AuthenticationException, WebserviceException, PersistenceException, PermissionException {
+	public WSLink link(String sid, long doc1, long doc2, String type) throws AuthenticationException,
+			WebserviceException, PersistenceException, PermissionException, UnexistingResourceException {
 		User user = validateSession(sid);
 
-		DocumentLinkDAO linkDao = (DocumentLinkDAO) Context.get().getBean(DocumentLinkDAO.class);
+		DocumentLinkDAO linkDao = Context.get(DocumentLinkDAO.class);
 		DocumentLink link = linkDao.findByDocIdsAndType(doc1, doc2, type);
 
 		Document document1 = retrieveReadableDocument(doc1, user);
 		Document document2 = retrieveReadableDocument(doc2, user);
 
-		checkWriteEnable(user, document2.getFolder().getId());
+		checkDocumentPermission(Permission.WRITE, user, document2.getId());
 
 		if (link == null) {
 			// The link doesn't exist and must be created
@@ -922,15 +929,14 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 	}
 
 	@Override
-	public WSLink[] getLinks(String sid, long docId)
+	public List<WSLink> getLinks(String sid, long docId)
 			throws AuthenticationException, WebserviceException, PersistenceException, PermissionException {
 		User user = validateSession(sid);
 
-		Document document = retrieveReadableDocument(docId, user);
+		DocumentLinkDAO linkDao = Context.get(DocumentLinkDAO.class);
 
-		DocumentLinkDAO linkDao = (DocumentLinkDAO) Context.get().getBean(DocumentLinkDAO.class);
+		checkDocumentPermission(Permission.READ, user, docId);
 
-		checkReadEnable(user, document.getFolder().getId());
 		List<DocumentLink> links = linkDao.findByDocId(docId);
 		List<WSLink> lnks = new ArrayList<>();
 		for (DocumentLink link : links) {
@@ -942,14 +948,14 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 			lnks.add(lnk);
 		}
 
-		return lnks.toArray(new WSLink[0]);
+		return lnks;
 	}
 
 	@Override
 	public void deleteLink(String sid, long id)
 			throws AuthenticationException, WebserviceException, PersistenceException {
 		validateSession(sid);
-		DocumentLinkDAO linkDao = (DocumentLinkDAO) Context.get().getBean(DocumentLinkDAO.class);
+		DocumentLinkDAO linkDao = Context.get(DocumentLinkDAO.class);
 		linkDao.delete(id);
 	}
 
@@ -957,7 +963,7 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 	public String getExtractedText(String sid, long docId)
 			throws AuthenticationException, WebserviceException, PersistenceException {
 		validateSession(sid);
-		SearchEngine indexer = (SearchEngine) Context.get().getBean(SearchEngine.class);
+		SearchEngine indexer = Context.get(SearchEngine.class);
 		return indexer.getHit(docId).getContent();
 	}
 
@@ -967,7 +973,7 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 			throws AuthenticationException, WebserviceException, PersistenceException, PermissionException {
 		validateSession(sid);
 
-		DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+		DocumentManager manager = Context.get(DocumentManager.class);
 		DocumentHistory transaction = new DocumentHistory();
 		transaction.setSession(SessionManager.get().get(sid));
 
@@ -991,7 +997,7 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 			throws AuthenticationException, WebserviceException, PersistenceException, PermissionException {
 		validateSession(sid);
 
-		DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+		DocumentManager manager = Context.get(DocumentManager.class);
 		DocumentHistory transaction = new DocumentHistory();
 		transaction.setSession(SessionManager.get().get(sid));
 
@@ -1011,15 +1017,15 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 	}
 
 	@Override
-	public void setPassword(String sid, long docId, String password)
-			throws AuthenticationException, WebserviceException, PersistenceException, PermissionException {
+	public void setPassword(String sid, long docId, String password) throws AuthenticationException,
+			WebserviceException, PersistenceException, PermissionException, UnexistingResourceException {
 		User user = validateSession(sid);
 
 		Document doc = retrieveReadableDocument(docId, user);
 
-		checkPermission(Permission.PASSWORD, user, doc.getFolder().getId());
+		checkFolderPermission(Permission.PASSWORD, user, doc.getFolder().getId());
 
-		DocumentDAO dao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO dao = Context.get(DocumentDAO.class);
 		doc = dao.findDocument(docId);
 
 		Session session = SessionManager.get().get(sid);
@@ -1033,14 +1039,14 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 	}
 
 	@Override
-	public void unsetPassword(String sid, long docId, String currentPassword)
-			throws AuthenticationException, WebserviceException, PersistenceException, PermissionException {
+	public void unsetPassword(String sid, long docId, String currentPassword) throws AuthenticationException,
+			WebserviceException, PersistenceException, PermissionException, UnexistingResourceException {
 		User user = validateSession(sid);
 		Document doc = retrieveReadableDocument(docId, user);
 
-		checkPermission(Permission.PASSWORD, user, doc.getFolder().getId());
+		checkFolderPermission(Permission.PASSWORD, user, doc.getFolder().getId());
 
-		DocumentDAO dao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO dao = Context.get(DocumentDAO.class);
 		doc = dao.findDocument(docId);
 
 		Session session = SessionManager.get().get(sid);
@@ -1060,15 +1066,15 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 	public boolean unprotect(String sid, long docId, String password)
 			throws PersistenceException, AuthenticationException, WebserviceException {
 		validateSession(sid);
-		DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
-		DocumentDAO dao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentManager manager = Context.get(DocumentManager.class);
+		DocumentDAO dao = Context.get(DocumentDAO.class);
 		Document doc = dao.findDocument(docId);
 		return manager.unprotect(sid, doc.getId(), password);
 	}
 
 	@Override
-	public WSNote addNote(String sid, long docId, String note)
-			throws AuthenticationException, WebserviceException, PersistenceException, PermissionException {
+	public WSNote addNote(String sid, long docId, String note) throws AuthenticationException, WebserviceException,
+			PersistenceException, PermissionException, UnexistingResourceException {
 		User user = validateSession(sid);
 		WSDocument document = getDocument(sid, docId);
 		if (document == null)
@@ -1080,7 +1086,7 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 		newNote.setUserId(user.getId());
 		newNote.setUsername(user.getFullName());
 
-		DocumentDAO ddao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO ddao = Context.get(DocumentDAO.class);
 		Document doc = ddao.findDocument(docId);
 		newNote.setFileName(doc.getFileName());
 
@@ -1088,21 +1094,21 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 		transaction.setSessionId(sid);
 		transaction.setUser(user);
 
-		DocumentNoteDAO dao = (DocumentNoteDAO) Context.get().getBean(DocumentNoteDAO.class);
+		DocumentNoteDAO dao = Context.get(DocumentNoteDAO.class);
 		dao.store(newNote, transaction);
 
 		return WSNote.fromDocumentNote(newNote);
 	}
 
 	@Override
-	public WSNote saveNote(String sid, long docId, WSNote wsNote)
-			throws AuthenticationException, WebserviceException, PersistenceException, PermissionException {
+	public WSNote saveNote(String sid, long docId, WSNote wsNote) throws AuthenticationException, WebserviceException,
+			PersistenceException, PermissionException, UnexistingResourceException {
 		User user = validateSession(sid);
 		WSDocument document = getDocument(sid, docId);
 		if (document == null)
 			throw new PermissionException(DOCUMENT_WITH_ID + docId + NOT_FOUND_OR_NOT_ACCESSIBLE);
 
-		DocumentNoteDAO dao = (DocumentNoteDAO) Context.get().getBean(DocumentNoteDAO.class);
+		DocumentNoteDAO dao = Context.get(DocumentNoteDAO.class);
 		DocumentNote note = dao.findById(wsNote.getId());
 		if (note == null) {
 			note = new DocumentNote();
@@ -1121,7 +1127,7 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 		note.setWidth(wsNote.getWidth());
 		note.setHeight(wsNote.getHeight());
 
-		DocumentDAO ddao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO ddao = Context.get(DocumentDAO.class);
 		Document doc = ddao.findDocument(docId);
 		note.setFileName(doc.getFileName());
 
@@ -1140,7 +1146,7 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 	public void deleteNote(String sid, long noteId)
 			throws AuthenticationException, WebserviceException, PersistenceException {
 		User user = validateSession(sid);
-		DocumentNoteDAO dao = (DocumentNoteDAO) Context.get().getBean(DocumentNoteDAO.class);
+		DocumentNoteDAO dao = Context.get(DocumentNoteDAO.class);
 		DocumentNote note = dao.findById(noteId);
 		if (note == null)
 			return;
@@ -1153,10 +1159,10 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 	public String deleteVersion(String sid, long docId, String version)
 			throws AuthenticationException, WebserviceException, PersistenceException {
 		validateSession(sid);
-		VersionDAO dao = (VersionDAO) Context.get().getBean(VersionDAO.class);
+		VersionDAO dao = Context.get(VersionDAO.class);
 		Version ver = dao.findByVersion(docId, version);
 
-		DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+		DocumentManager manager = Context.get(DocumentManager.class);
 
 		// Create the document history event
 		DocumentHistory transaction = new DocumentHistory();
@@ -1167,25 +1173,25 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 	}
 
 	@Override
-	public WSNote[] getNotes(String sid, long docId)
-			throws AuthenticationException, WebserviceException, PersistenceException, PermissionException {
+	public List<WSNote> getNotes(String sid, long docId) throws AuthenticationException, WebserviceException,
+			PersistenceException, PermissionException, UnexistingResourceException {
 		validateSession(sid);
 		WSDocument document = getDocument(sid, docId);
 		if (document == null)
 			throw new WebserviceException(DOCUMENT_WITH_ID + docId + NOT_FOUND_OR_NOT_ACCESSIBLE);
 
-		DocumentNoteDAO dao = (DocumentNoteDAO) Context.get().getBean(DocumentNoteDAO.class);
+		DocumentNoteDAO dao = Context.get(DocumentNoteDAO.class);
 		List<DocumentNote> notes = dao.findByDocId(docId, document.getFileVersion());
 		List<WSNote> wsNotes = new ArrayList<>();
 		if (notes != null)
 			for (DocumentNote note : notes)
 				wsNotes.add(WSNote.fromDocumentNote(note));
-		return wsNotes.toArray(new WSNote[0]);
+		return wsNotes;
 	}
 
 	@Override
-	public WSRating rateDocument(String sid, long docId, int vote)
-			throws AuthenticationException, WebserviceException, PersistenceException, PermissionException {
+	public WSRating rateDocument(String sid, long docId, int vote) throws AuthenticationException, WebserviceException,
+			PersistenceException, PermissionException, UnexistingResourceException {
 		User user = validateSession(sid);
 		WSDocument document = getDocument(sid, docId);
 		if (document == null)
@@ -1195,7 +1201,7 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 		transaction.setSessionId(sid);
 		transaction.setUser(user);
 
-		RatingDAO ratingDao = (RatingDAO) Context.get().getBean(RatingDAO.class);
+		RatingDAO ratingDao = Context.get(RatingDAO.class);
 
 		Rating rating = ratingDao.findByDocIdAndUserId(docId, user.getId());
 		if (rating == null) {
@@ -1211,37 +1217,36 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 	}
 
 	@Override
-	public WSRating[] getRatings(String sid, long docId)
-			throws AuthenticationException, WebserviceException, PersistenceException, PermissionException {
+	public List<WSRating> getRatings(String sid, long docId) throws AuthenticationException, WebserviceException,
+			PersistenceException, PermissionException, UnexistingResourceException {
 		validateSession(sid);
 		WSDocument document = getDocument(sid, docId);
 		if (document == null)
 			throw new WebserviceException(DOCUMENT_WITH_ID + docId + NOT_FOUND_OR_NOT_ACCESSIBLE);
 
-		RatingDAO ratingDao = (RatingDAO) Context.get().getBean(RatingDAO.class);
+		RatingDAO ratingDao = Context.get(RatingDAO.class);
 		List<Rating> ratings = ratingDao.findByDocId(docId);
 		List<WSRating> wsRatings = new ArrayList<>();
 		if (ratings != null)
 			for (Rating rating : ratings)
 				wsRatings.add(WSRating.fromRating(rating));
 
-		return wsRatings.toArray(new WSRating[0]);
+		return wsRatings;
 	}
 
 	@Override
 	public void replaceFile(String sid, long docId, String fileVersion, String comment, DataHandler content)
-			throws AuthenticationException, WebserviceException, PersistenceException, PermissionException,
-			IOException {
+			throws AuthenticationException, WebserviceException, PersistenceException, PermissionException, IOException,
+			UnexistingResourceException {
 		User user = validateSession(sid);
 
 		Document doc = retrieveReadableDocument(docId, user);
 		if (doc.getImmutable() == 1)
 			throw new PermissionException(THE_DOCUMENT + docId + IS_IMMUTABLE);
-		Folder folder = doc.getFolder();
 
-		checkWriteEnable(user, folder.getId());
+		checkDocumentPermission(Permission.WRITE, user, doc.getId());
 
-		DocumentDAO ddao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO ddao = Context.get(DocumentDAO.class);
 		doc = ddao.findDocument(docId);
 		if (doc.getStatus() != AbstractDocument.DOC_UNLOCKED)
 			throw new PermissionException(THE_DOCUMENT + docId + IS_LOCKED);
@@ -1251,20 +1256,20 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 		transaction.setUser(user);
 		transaction.setSession(SessionManager.get().get(sid));
 
-		DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+		DocumentManager manager = Context.get(DocumentManager.class);
 		manager.replaceFile(doc.getId(), fileVersion, content.getInputStream(), transaction);
 		log.info("Replaced fileVersion {} of document {}", fileVersion, doc);
 	}
 
 	@Override
 	public void promoteVersion(String sid, long docId, String version) throws AuthenticationException,
-			WebserviceException, PersistenceException, PermissionException, IOException {
+			WebserviceException, PersistenceException, PermissionException, IOException, UnexistingResourceException {
 		User user = validateSession(sid);
 		Document doc = retrieveReadableDocument(docId, user);
 
-		checkWriteEnable(user, doc.getFolder().getId());
+		checkDocumentPermission(Permission.WRITE, user, doc.getId());
 
-		DocumentDAO ddao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO ddao = Context.get(DocumentDAO.class);
 		doc = ddao.findDocument(docId);
 		if (doc.getStatus() != AbstractDocument.DOC_UNLOCKED)
 			throw new PermissionException(THE_DOCUMENT + docId + IS_LOCKED);
@@ -1273,20 +1278,20 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 		transaction.setUser(user);
 		transaction.setSession(SessionManager.get().get(sid));
 
-		DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+		DocumentManager manager = Context.get(DocumentManager.class);
 		manager.promoteVersion(doc.getId(), version, transaction);
 
 		log.info("Promoted version {} of document {}", version, doc);
 	}
 
 	@Override
-	public WSDocument getVersion(String sid, long docId, String version)
-			throws AuthenticationException, WebserviceException, PersistenceException, PermissionException {
+	public WSDocument getVersion(String sid, long docId, String version) throws AuthenticationException,
+			WebserviceException, PersistenceException, PermissionException, UnexistingResourceException {
 		User user = validateSession(sid);
 		Document doc = retrieveReadableDocument(docId, user);
 		checkPublished(user, doc);
 
-		VersionDAO versDao = (VersionDAO) Context.get().getBean(VersionDAO.class);
+		VersionDAO versDao = Context.get(VersionDAO.class);
 		Version ver = versDao.findByVersion(docId, version);
 		if (ver != null) {
 			versDao.initialize(ver);
@@ -1298,33 +1303,106 @@ public class SoapDocumentService extends AbstractService implements DocumentServ
 	}
 
 	@Override
-	public WSDocument[] getVersions(String sid, long docId)
-			throws AuthenticationException, WebserviceException, PersistenceException, PermissionException {
+	public List<WSDocument> getVersions(String sid, long docId) throws AuthenticationException, WebserviceException,
+			PersistenceException, PermissionException, UnexistingResourceException {
 		User user = validateSession(sid);
 		Document doc = retrieveReadableDocument(docId, user);
 
 		checkPublished(user, doc);
 
-		VersionDAO versDao = (VersionDAO) Context.get().getBean(VersionDAO.class);
+		VersionDAO versDao = Context.get(VersionDAO.class);
 		List<Version> versions = versDao.findByDocId(doc.getId());
-		WSDocument[] wsVersions = new WSDocument[versions.size()];
-		for (int i = 0; i < versions.size(); i++) {
-			versDao.initialize(versions.get(i));
-			wsVersions[i] = WSUtil.toWSDocument(versions.get(i));
-			wsVersions[i].setComment(versions.get(i).getComment());
+		List<WSDocument> wsVersions = new ArrayList<>();
+		for (Version version : versions) {
+			versDao.initialize(version);
+			WSDocument wsVersion = WSUtil.toWSDocument(version);
+			wsVersion.setComment(version.getComment());
+			wsVersions.add(wsVersion);
 		}
 
 		return wsVersions;
 	}
 
 	private Document retrieveReadableDocument(long docId, User user)
-			throws PersistenceException, WebserviceException, PermissionException {
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+			throws PersistenceException, PermissionException, UnexistingResourceException {
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
 		Document doc = docDao.findById(docId);
 		if (doc == null)
-			throw new WebserviceException("Unexisting document " + docId);
-		checkReadEnable(user, doc.getFolder().getId());
+			throw new UnexistingResourceException(user.getUsername(), "Document " + docId);
+		checkDocumentPermission(Permission.READ, user, docId);
 		doc = docDao.findDocument(docId);
 		return doc;
+	}
+
+	@Override
+	public void setAccessControlList(String sid, long docId, List<WSAccessControlEntry> acl)
+			throws PersistenceException, PermissionException, AuthenticationException, WebserviceException {
+		User sessionUser = validateSession(sid);
+
+		DocumentDAO documentDao = Context.get(DocumentDAO.class);
+		// Check if the session user has the Security Permission of this
+		// document
+		if (!documentDao.isPermissionAllowed(Permission.SECURITY, docId, sessionUser.getId()))
+			throw new PermissionException(sessionUser.getUsername(), "Document " + docId, Permission.SECURITY);
+
+		Document document = documentDao.findById(docId);
+		documentDao.initialize(document);
+		document.getAccessControlList().clear();
+		for (WSAccessControlEntry wsAcwe : acl)
+			document.addAccessControlEntry(WSUtil.toAccessControlEntry(wsAcwe));
+
+		DocumentHistory history = new DocumentHistory();
+		history.setEvent(DocumentEvent.PERMISSION.toString());
+		history.setSession(SessionManager.get().get(sid));
+		documentDao.store(document, history);
+
+	}
+
+	@Override
+	public List<WSAccessControlEntry> getAccessControlList(String sid, long docId)
+			throws AuthenticationException, WebserviceException, PersistenceException {
+		validateSession(sid);
+
+		List<WSAccessControlEntry> acl = new ArrayList<>();
+		DocumentDAO documentDao = Context.get(DocumentDAO.class);
+
+		Document document = documentDao.findById(docId);
+		documentDao.initialize(document);
+
+		for (AccessControlEntry ace : document.getAccessControlList())
+			acl.add(WSUtil.toWSAccessControlEntry(ace));
+
+		return acl;
+	}
+
+	@Override
+	public boolean isRead(String sid, long docId)
+			throws AuthenticationException, WebserviceException, PersistenceException {
+		return isGranted(sid, docId, Permission.READ.getName());
+	}
+
+	@Override
+	public boolean isWrite(String sid, long docId)
+			throws AuthenticationException, WebserviceException, PersistenceException {
+		return isGranted(sid, docId, Permission.WRITE.getName());
+	}
+
+	@Override
+	public boolean isDownload(String sid, long docId)
+			throws AuthenticationException, WebserviceException, PersistenceException {
+		return isGranted(sid, docId, Permission.DOWNLOAD.getName());
+	}
+
+	@Override
+	public boolean isGranted(String sid, long docId, String permission)
+			throws AuthenticationException, WebserviceException, PersistenceException {
+		User user = validateSession(sid);
+		try {
+			checkDocumentPermission(Permission.valueOf(permission.toUpperCase()), user, docId);
+		} catch (Exception e) {
+			log.error(e.getMessage(), e);
+			return false;
+		}
+		return true;
 	}
 }

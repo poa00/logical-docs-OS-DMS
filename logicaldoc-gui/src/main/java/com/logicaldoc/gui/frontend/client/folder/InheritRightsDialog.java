@@ -1,9 +1,8 @@
 package com.logicaldoc.gui.frontend.client.folder;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIFolder;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.common.client.widgets.FolderTree;
 import com.logicaldoc.gui.frontend.client.services.FolderService;
@@ -53,18 +52,17 @@ public class InheritRightsDialog extends Dialog {
 		inheritRights.setAutoFit(true);
 		inheritRights.setMargin(1);
 		inheritRights.addClickHandler(event -> LD.ask(I18N.message(INHERITRIGHTS),
-				I18N.message("inheritrightsask",
-						new String[] { FolderNavigator.get().getSelectedRecord().getAttributeAsString("name"),
-								folders.getSelectedRecord().getAttributeAsString("name") }),
+				I18N.message("inheritrightsask", FolderNavigator.get().getSelectedRecord().getAttributeAsString("name"),
+						folders.getSelectedRecord().getAttributeAsString("name")),
 				confirm -> {
 					if (Boolean.TRUE.equals(confirm)) {
-						FolderService.Instance.get().inheritRights(panel.getFolder().getId(),
+						FolderService.Instance.get().inheritACL(panel.getFolder().getId(),
 								Long.parseLong(folders.getSelectedRecord().getAttributeAsString("folderId")),
-								new AsyncCallback<GUIFolder>() {
+								new DefaultAsyncCallback<>() {
 
 									@Override
 									public void onFailure(Throwable caught) {
-										GuiLog.serverError(caught);
+										super.onFailure(caught);
 										destroy();
 									}
 
@@ -82,5 +80,15 @@ public class InheritRightsDialog extends Dialog {
 
 		content.setMembers(folders, buttons);
 		addItem(content);
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

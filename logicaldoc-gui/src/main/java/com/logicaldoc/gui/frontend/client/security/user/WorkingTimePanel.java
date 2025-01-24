@@ -1,15 +1,13 @@
 package com.logicaldoc.gui.frontend.client.security.user;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.Map;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIUser;
 import com.logicaldoc.gui.common.client.beans.GUIWorkingTime;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.services.SecurityService;
 import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.common.client.util.ValuesCallback;
@@ -57,8 +55,8 @@ public class WorkingTimePanel extends VLayout {
 
 	@Override
 	protected void onDraw() {
-		if (user.getWorkingTimes() != null && user.getWorkingTimes().length > 0) {
-			calendar.setChosenDate(user.getWorkingTimes()[0].getStart());
+		if (!user.getWorkingTimes().isEmpty()) {
+			calendar.setChosenDate(user.getWorkingTimes().get(0).getStart());
 			for (GUIWorkingTime wt : user.getWorkingTimes()) {
 				try {
 					calendar.addEvent(wt.getStart(), wt.getEnd(), wt.getLabel(), wt.getDescription());
@@ -87,14 +85,7 @@ public class WorkingTimePanel extends VLayout {
 						public void execute(Map<String, Object> values) {
 							LD.contactingServer();
 							SecurityService.Instance.get().cloneWorkTimes(user.getId(), usersSelector.getUserIds(),
-									groupsSelector.getGroupIds(), new AsyncCallback<Void>() {
-
-										@Override
-										public void onFailure(Throwable caught) {
-											LD.clearPrompt();
-											GuiLog.serverError(caught);
-										}
-
+									groupsSelector.getGroupIds(), new DefaultAsyncCallback<>() {
 										@Override
 										public void onSuccess(Void arg0) {
 											LD.clearPrompt();
@@ -164,23 +155,27 @@ public class WorkingTimePanel extends VLayout {
 
 	boolean validate() {
 		if (calendar != null) {
+			user.getWorkingTimes().clear();
 			CalendarEvent[] events = calendar.getData();
-			if (events != null && events.length > 0) {
-				ArrayList<GUIWorkingTime> wts = new ArrayList<>();
+			if (events != null && events.length > 0)
 				for (CalendarEvent calendarEvent : events) {
 					GUIWorkingTime wt = new GUIWorkingTime(calendarEvent.getName(), calendarEvent.getStartDate(),
 							calendarEvent.getEndDate());
 					wt.setDescription(calendarEvent.getDescription());
-					wts.add(wt);
+					user.getWorkingTimes().add(wt);
 				}
-				if (wts.isEmpty())
-					user.setWorkingTimes(new GUIWorkingTime[0]);
-				else
-					user.setWorkingTimes(wts.toArray(new GUIWorkingTime[0]));
-			} else
-				user.setWorkingTimes(new GUIWorkingTime[0]);
 		}
 
 		return true;
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

@@ -1,6 +1,8 @@
 package com.logicaldoc.gui.common.client.beans;
 
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Implementation of a Stamp
@@ -10,8 +12,6 @@ import java.io.Serializable;
  */
 public class GUIStamp extends GUIExtensibleObject implements Serializable {
 	private static final long serialVersionUID = 1L;
-
-	private long id = 0L;
 
 	public static final int TYPE_TEXT = 0;
 
@@ -69,7 +69,11 @@ public class GUIStamp extends GUIExtensibleObject implements Serializable {
 
 	private int imageHeight = 150;
 
-	private GUIUser[] users;
+	private List<GUIAccessControlEntry> accessControlList = new ArrayList<>();
+
+	private boolean read = true;
+
+	private boolean write = true;
 
 	public GUIStamp() {
 		super();
@@ -77,17 +81,7 @@ public class GUIStamp extends GUIExtensibleObject implements Serializable {
 
 	public GUIStamp(long id) {
 		super();
-		this.id = id;
-	}
-
-	@Override
-	public long getId() {
-		return id;
-	}
-	
-	@Override
-	public void setId(long id) {
-		this.id = id;
+		setId(id);
 	}
 
 	public int getType() {
@@ -170,12 +164,39 @@ public class GUIStamp extends GUIExtensibleObject implements Serializable {
 		this.color = color;
 	}
 
-	public GUIUser[] getUsers() {
-		return users;
+	public GUIAccessControlEntry getAce(long entityId) {
+		for (GUIAccessControlEntry ace : accessControlList) {
+			if (ace.getEntityId() == entityId)
+				return ace;
+		}
+		return null;
 	}
 
-	public void setUsers(GUIUser[] users) {
-		this.users = users;
+	public void removeAce(long entityId) {
+		List<GUIAccessControlEntry> newAcls = new ArrayList<>();
+		for (GUIAccessControlEntry ace : accessControlList) {
+			if (ace.getEntityId() != entityId)
+				newAcls.add(ace);
+		}
+		accessControlList = newAcls;
+	}
+
+	public void addAce(GUIAccessControlEntry ace) {
+		GUIAccessControlEntry existingAce = getAce(ace.getEntityId());
+		if(existingAce==null) {
+			accessControlList.add(ace);
+		} else {
+			existingAce.setRead(ace.isRead());
+			existingAce.setWrite(ace.isWrite());
+		}
+	}
+
+	public List<GUIAccessControlEntry> getAccessControlList() {
+		return accessControlList;
+	}
+
+	public void setAccessControlList(List<GUIAccessControlEntry> accessControlList) {
+		this.accessControlList = accessControlList;
 	}
 
 	public int getSize() {
@@ -263,5 +284,46 @@ public class GUIStamp extends GUIExtensibleObject implements Serializable {
 
 	public void setFont(String font) {
 		this.font = font;
+	}
+
+	public boolean isRead() {
+		return read;
+	}
+
+	public void setRead(boolean read) {
+		this.read = read;
+	}
+
+	public boolean isWrite() {
+		return write;
+	}
+
+	public void setWrite(boolean write) {
+		this.write = write;
+	}
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = super.hashCode();
+		result = prime * result + ((name == null) ? 0 : name.hashCode());
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (!super.equals(obj))
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		GUIStamp other = (GUIStamp) obj;
+		if (name == null) {
+			if (other.name != null)
+				return false;
+		} else if (!name.equals(other.name))
+			return false;
+		return true;
 	}
 }

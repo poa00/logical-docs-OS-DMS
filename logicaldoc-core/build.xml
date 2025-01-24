@@ -1,4 +1,4 @@
-<project name="logicaldoc-core" default="deploy" basedir="." xmlns:artifact="urn:maven-artifact-ant">
+<project name="logicaldoc-core" default="deploy" basedir="." xmlns:resolver="antlib:org.apache.maven.resolver.ant">
 	<property file="${user.home}/logicaldoc-dev.properties" />
 	<import file="${logicaldoc.devroot}/build/ant/build.xml" />
 
@@ -21,6 +21,16 @@
 						<exclude name="plugin.xml" />
 					</patternset>
 				</unzip>
+				<move file="@{webroot}/WEB-INF/lib/${pom.artifactId}-${pom.version}-plugin.jar" tofile="@{webroot}/WEB-INF/lib/${pom.artifactId}-${pom.version}-plugin.jar.skip" />
+				<unzip src="@{webroot}/WEB-INF/lib/${pom.artifactId}-${pom.version}-plugin.jar.skip" dest="@{webroot}/WEB-INF/lib/tmp" />
+				<delete>
+				  <fileset dir="@{webroot}/WEB-INF/lib/tmp">
+				  	<include name="com/logicaldoc/core/security/HibernateTenant*" />
+				  	<include name="com/logicaldoc/core/security/authentication/AuthenticationChain*" />
+				  </fileset>
+				</delete>
+				<zip basedir="@{webroot}/WEB-INF/lib/tmp" destfile="@{webroot}/WEB-INF/lib/${pom.artifactId}-${pom.version}-plugin.jar" />
+				<delete dir="@{webroot}/WEB-INF/lib/tmp"/>
 			</sequential>
 		</for>
 
@@ -37,6 +47,7 @@
 				<copy todir="@{webroot}/WEB-INF/classes" verbose="true">
 					<fileset dir="target/classes">
 						<include name="com/logicaldoc/core/**" />
+						<exclude name="com/logicaldoc/core/CorePlugin*" />
 						<exclude name="com/logicaldoc/core/security/dao/HibernateTenant*" />
 						<exclude name="com/logicaldoc/core/security/authentication/AuthenticationChain*" />
 					</fileset>
@@ -44,59 +55,4 @@
 			</sequential>
 		</for>
 	</target>
-
-	<target name="deploy-spring" depends="init-all" description="Updates a deployed webapp">
-		<property environment="env" />
-		<property id="properties" file="build.properties" />
-
-		<echo message="Deploying ${pom.artifactId}" />
-
-		<for list="${logicaldoc.webroot}" param="webroot">
-			<sequential>
-				<echo message="Deploying into @{webroot}" />
-				<copy todir="@{webroot}/WEB-INF/classes" verbose="true">
-					<fileset dir="target/classes">
-						<include name="**/security/spring/*" />
-					</fileset>
-				</copy>
-			</sequential>
-		</for>
-	</target>
-
-
-	<target name="deploy-doctool" depends="init-all" description="Copy classes into a deployed webapp">
-		<property environment="env" />
-		<property id="properties" file="build.properties" />
-
-		<for list="${logicaldoc.webroot}" param="webroot">
-			<sequential>
-				<echo message="Deploying into @{webroot}" />
-				<copy todir="@{webroot}/WEB-INF/classes" verbose="true">
-					<fileset dir="target/classes">
-						<include name="com/logicaldoc/core/automation/DocTool*" />
-						
-						<exclude name="com/logicaldoc/core/security/dao/HibernateTenant*" />
-						<exclude name="com/logicaldoc/core/security/authentication/AuthenticationChain*" />
-					</fileset>
-				</copy>
-			</sequential>
-		</for>
-	</target>
-
-
-	<target name="deploy-thumbnail" depends="init-all" description="Copy classes into a deployed webapp">
-		<property environment="env" />
-		<property id="properties" file="build.properties" />
-		<for list="${logicaldoc.webroot}" param="webroot">
-			<sequential>
-				<echo message="Deploying into @{webroot}" />
-				<copy todir="@{webroot}/WEB-INF/classes" verbose="true">
-					<fileset dir="target/classes">
-						<include name="**/document/thumbnail/*" />
-					</fileset>
-				</copy>
-			</sequential>
-		</for>
-	</target>
-
 </project>

@@ -1,18 +1,24 @@
 package com.logicaldoc.gui.frontend.client.reports;
 
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIFolder;
 import com.logicaldoc.gui.common.client.data.DeletedDocsDS;
+import com.logicaldoc.gui.common.client.grid.ColoredListGridField;
+import com.logicaldoc.gui.common.client.grid.DateListGridField;
+import com.logicaldoc.gui.common.client.grid.FileNameListGridField;
+import com.logicaldoc.gui.common.client.grid.FileSizeListGridField;
+import com.logicaldoc.gui.common.client.grid.IdListGridField;
+import com.logicaldoc.gui.common.client.grid.UserListGridField;
+import com.logicaldoc.gui.common.client.grid.VersionListGridField;
+import com.logicaldoc.gui.common.client.grid.DateListGridField.DateCellFormatter;
 import com.logicaldoc.gui.common.client.i18n.I18N;
+import com.logicaldoc.gui.common.client.util.GridUtil;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
+import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.common.client.widgets.FolderChangeListener;
 import com.logicaldoc.gui.common.client.widgets.FolderSelector;
-import com.logicaldoc.gui.common.client.widgets.grid.ColoredListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.FileNameListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.FileSizeListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.UserListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.VersionListGridField;
 import com.logicaldoc.gui.frontend.client.folder.RestoreDialog;
+import com.logicaldoc.gui.frontend.client.services.DocumentService;
 import com.smartgwt.client.types.Alignment;
 import com.smartgwt.client.types.ListGridFieldType;
 import com.smartgwt.client.widgets.form.fields.SelectItem;
@@ -37,16 +43,14 @@ public class DeletedDocsReport extends ReportPanel implements FolderChangeListen
 	private FolderSelector folderSelector;
 
 	private SpinnerItem max;
-	
+
 	public DeletedDocsReport() {
 		super("deleteddocs", "showndocuments");
 	}
 
 	@Override
 	protected void prepareListGrid() {
-		ListGridField id = new ListGridField("id");
-		id.setHidden(true);
-		id.setCanGroupBy(false);
+		ListGridField id = new IdListGridField();
 
 		ListGridField size = new FileSizeListGridField("size", I18N.message("size"), 70);
 		size.setCanFilter(false);
@@ -61,7 +65,8 @@ public class DeletedDocsReport extends ReportPanel implements FolderChangeListen
 		fileVersion.setCanGroupBy(false);
 		fileVersion.setHidden(true);
 
-		ListGridField lastModified = new DateListGridField("lastModified", "lastmodified");
+		ListGridField lastModified = new DateListGridField("lastModified", "lastmodified",
+				DateCellFormatter.FORMAT_LONG);
 		lastModified.setCanGroupBy(false);
 
 		ListGridField customId = new ColoredListGridField("customId", I18N.message("customid"), 110);
@@ -82,7 +87,7 @@ public class DeletedDocsReport extends ReportPanel implements FolderChangeListen
 		type.setHidden(true);
 		type.setCanGroupBy(false);
 
-		list.setFields(filename, version, fileVersion, size, lastModified, customId, deleteUser, type);
+		list.setFields(id, filename, version, fileVersion, size, lastModified, customId, deleteUser, type);
 	}
 
 	@Override
@@ -102,7 +107,7 @@ public class DeletedDocsReport extends ReportPanel implements FolderChangeListen
 		toolStrip.addButton(display);
 		toolStrip.addFormItem(max);
 		toolStrip.addSeparator();
-		
+
 		userSelector = ItemFactory.newUserSelector("user", "deletedby", null, false, false);
 		userSelector.setWrapTitle(false);
 		userSelector.setWidth(150);
@@ -115,7 +120,7 @@ public class DeletedDocsReport extends ReportPanel implements FolderChangeListen
 		folderSelector.addFolderChangeListener(this);
 		toolStrip.addFormItem(folderSelector);
 	}
-	
+
 	@Override
 	protected void refresh() {
 		Long folderId = folderSelector.getFolderId();
@@ -132,22 +137,53 @@ public class DeletedDocsReport extends ReportPanel implements FolderChangeListen
 
 		MenuItem restore = new MenuItem();
 		restore.setTitle(I18N.message("restore"));
-		restore.addClickHandler(event -> {
+		restore.addClickHandler(click -> {
 			if (selection == null || selection.length == 0)
 				return;
-			final Long[] ids = new Long[selection.length];
-			for (int i = 0; i < selection.length; i++)
-				ids[i] = Long.parseLong(selection[i].getAttribute("id"));
-
-			new RestoreDialog(ids, null, evt -> refresh()).show();
+			new RestoreDialog(GridUtil.getIds(selection), null, evt -> refresh()).show();
 		});
 
-		contextMenu.setItems(restore);
+		MenuItem delete = new MenuItem();
+		delete.setTitle(I18N.message("permanentlydelete"));
+		delete.addClickHandler(
+				click -> LD.ask(I18N.message("permanentlydelete"), I18N.message("permanentlydeletehint"), choice -> {
+					if (Boolean.TRUE.equals(choice)) {
+						LD.contactingServer();
+						DocumentService.Instance.get().destroyDocuments(GridUtil.getIds(selection),
+								new DefaultAsyncCallback<Void>() {
+									@Override
+									public void onFailure(Throwable caught) {
+										super.onFailure(caught);
+										refresh();
+									}
+
+									@Override
+									public void onSuccess(Void arg0) {
+										LD.clearPrompt();
+										refresh();
+									}
+								});
+					}
+				}));
+		delete.setEnabled(
+				com.logicaldoc.gui.common.client.Menu.enabled(com.logicaldoc.gui.common.client.Menu.DESTROY_DOCUMENTS));
+
+		contextMenu.setItems(restore, delete);
 		contextMenu.showContextMenu();
 	}
 
 	@Override
 	public void onChanged(GUIFolder folder) {
 		refresh();
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

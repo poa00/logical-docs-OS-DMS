@@ -1,5 +1,6 @@
 package com.logicaldoc.core.security;
 
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
@@ -20,11 +21,13 @@ import com.logicaldoc.core.SystemInfo;
 import com.logicaldoc.core.communication.EMail;
 import com.logicaldoc.core.communication.EMailSender;
 import com.logicaldoc.core.communication.Recipient;
-import com.logicaldoc.core.security.dao.DeviceDAO;
-import com.logicaldoc.core.security.dao.TenantDAO;
-import com.logicaldoc.core.security.dao.UserHistoryDAO;
+import com.logicaldoc.core.security.user.User;
+import com.logicaldoc.core.security.user.UserEvent;
+import com.logicaldoc.core.security.user.UserHistory;
+import com.logicaldoc.core.security.user.UserHistoryDAO;
 import com.logicaldoc.util.Context;
 import com.logicaldoc.util.config.ContextProperties;
+import com.logicaldoc.util.crypt.CryptUtil;
 
 /**
  * A single user session with it's unique identifier and the reference to the
@@ -54,9 +57,9 @@ public class Session extends PersistentObject implements Comparable<Session> {
 	// Map docId - Password used to unprotect it
 	private Map<Long, String> unprotectedDocs = Collections.synchronizedMap(new HashMap<>());
 
-	private Date creation = new Date();
+	private Date lastRenew = new Date();
 
-	private Date lastRenew = creation;
+	private Date finished;
 
 	/**
 	 * Represents the auto generated identifier of the session
@@ -64,15 +67,17 @@ public class Session extends PersistentObject implements Comparable<Session> {
 	private String sid;
 
 	/**
-	 * The password given by the user at login time
-	 */
-	private String password;
-
-	/**
 	 * A third parameter(other than the username and password) given by the
-	 * client at login time
+	 * client at login time, or an API Key generated in LogicalDOC.
 	 */
 	private String key;
+
+	private String decodedKey;
+
+	/**
+	 * A human readable visualization of part of the key
+	 */
+	private String keyLabel;
 
 	private String username;
 
@@ -104,10 +109,6 @@ public class Session extends PersistentObject implements Comparable<Session> {
 		return sid;
 	}
 
-	public Date getCreation() {
-		return creation;
-	}
-
 	public Date getLastRenew() {
 		return lastRenew;
 	}
@@ -137,17 +138,15 @@ public class Session extends PersistentObject implements Comparable<Session> {
 
 		/**
 		 * In order to compare the actual date and the last renewal date, we
-		 * prefer to drop milliseconds and seconds.
+		 * prefer to drop milliseconds.
 		 */
 		Calendar calendar = Calendar.getInstance();
 		calendar.setTime(new Date());
 		calendar.set(Calendar.MILLISECOND, 0);
-		calendar.set(Calendar.SECOND, 0);
 		Date now = calendar.getTime();
 
 		calendar.setTime(lastRenew);
 		calendar.set(Calendar.MILLISECOND, 0);
-		calendar.set(Calendar.SECOND, 0);
 		Date lastRen = calendar.getTime();
 
 		long diff = now.getTime() - lastRen.getTime();
@@ -164,8 +163,10 @@ public class Session extends PersistentObject implements Comparable<Session> {
 		logWarn("Session expired");
 
 		this.status = STATUS_EXPIRED;
+		this.finished = new Date();
+
 		// Add a user history entry
-		UserHistoryDAO userHistoryDAO = (UserHistoryDAO) Context.get().getBean(UserHistoryDAO.class);
+		UserHistoryDAO userHistoryDAO = Context.get(UserHistoryDAO.class);
 		userHistoryDAO.createUserHistory(user, UserEvent.TIMEOUT.toString(), null, sid, client);
 	}
 
@@ -174,16 +175,38 @@ public class Session extends PersistentObject implements Comparable<Session> {
 		logInfo("Session closed");
 
 		this.status = STATUS_CLOSED;
+		this.finished = new Date();
+
 		// Add a user history entry
-		UserHistoryDAO userHistoryDAO = (UserHistoryDAO) Context.get().getBean(UserHistoryDAO.class);
+		UserHistoryDAO userHistoryDAO = Context.get(UserHistoryDAO.class);
 		userHistoryDAO.createUserHistory(user, UserEvent.LOGOUT.toString(), null, sid, client);
 	}
 
-	private Session() {
-
+	public String getDecodedKey() {
+		return decodedKey;
 	}
 
-	Session(User user, String password, String key, Client client) {
+	/**
+	 * Sets the key and encode it
+	 * 
+	 * @param decodedKey The key in readable format
+	 * @throws NoSuchAlgorithmException Cripting error
+	 */
+	public void setDecodedKey(String decodedKey) throws NoSuchAlgorithmException {
+		if (StringUtils.isNotEmpty(decodedKey)) {
+			this.decodedKey = decodedKey;
+			this.key = CryptUtil.encryptSHA256(decodedKey);
+			this.keyLabel = StringUtils.abbreviate(decodedKey, 10)
+					+ (decodedKey.length() > 14 ? StringUtils.right(decodedKey, 4) : "");
+		}
+	}
+
+	@SuppressWarnings("unused")
+	private Session() {
+		// Just o avoid standard constructor
+	}
+
+	Session(User user, String key, Client client) {
 		super();
 
 		if (user == null)
@@ -193,33 +216,39 @@ public class Session extends PersistentObject implements Comparable<Session> {
 		this.tenantId = user.getTenantId();
 		this.user = user;
 		this.username = user.getUsername();
-		this.password = password;
-		this.key = key;
+		try {
+			setDecodedKey(key);
+		} catch (NoSuchAlgorithmException e) {
+			log.warn("Cannot save the key", e);
+		}
 		this.client = client;
 		this.node = SystemInfo.get().getInstallationId();
-		this.setLastRenew(creation);
+		this.setLastRenew(getCreation());
 
-		TenantDAO tenantDAO = (TenantDAO) Context.get().getBean(TenantDAO.class);
-		this.tenantName = tenantDAO.getTenantName(tenantId);
+		TenantDAO tenantDAO = Context.get(TenantDAO.class);
+		try {
+			this.tenantName = tenantDAO.getTenantName(tenantId);
+		} catch (PersistenceException e) {
+			log.warn("Cannot retrieve the name of tenant {}", tenantId);
+		}
 
-		UserHistory history = saveUserHistory(user, client);
+		UserHistory history = saveLoginEvent(user, client);
 
 		/*
 		 * Add / update the device in the DB
 		 */
-		UserHistoryDAO userHistoryDAO = (UserHistoryDAO) Context.get().getBean(UserHistoryDAO.class);
 		if (client != null && client.getDevice() != null) {
 			client.getDevice().setUserId(user.getId());
 			client.getDevice().setUsername(user.getFullName());
 
-			DeviceDAO deviceDAO = (DeviceDAO) Context.get().getBean(DeviceDAO.class);
+			DeviceDAO deviceDAO = Context.get(DeviceDAO.class);
 			Device device = deviceDAO.findByDevice(client.getDevice());
 			if (device == null)
 				device = client.getDevice();
 
 			device.setUserId(user.getId());
 			device.setUsername(user.getFullName());
-			device.setLastLogin(creation);
+			device.setLastLogin(getCreation());
 			device.setIp(client.getAddress());
 
 			try {
@@ -229,7 +258,7 @@ public class Session extends PersistentObject implements Comparable<Session> {
 				history.setDevice(client.getDevice().toString());
 				if (client.getGeolocation() != null)
 					history.setGeolocation(client.getGeolocation().toString());
-				userHistoryDAO.store(history);
+				Context.get(UserHistoryDAO.class).store(history);
 
 				// Send an email alert to the user in case of new device
 				if (newDevice && Context.get().getProperties().getBoolean(tenantName + ".alertnewdevice", true)) {
@@ -250,12 +279,10 @@ public class Session extends PersistentObject implements Comparable<Session> {
 					recipient.setMode(Recipient.MODE_EMAIL_TO);
 					email.getRecipients().add(recipient);
 
-					EMailSender sender = (EMailSender) Context.get().getBean(EMailSender.class);
-					sender.sendAsync(email, "newdevice", dictionaryMap);
+					Context.get(EMailSender.class).sendAsync(email, "newdevice", dictionaryMap);
 				}
-
 			} catch (PersistenceException e) {
-				log.warn("Cannot gridRecord the device {}", device);
+				log.warn("Cannot record the device {}", device);
 			}
 		}
 
@@ -263,7 +290,22 @@ public class Session extends PersistentObject implements Comparable<Session> {
 		logInfo("Session started");
 	}
 
-	private UserHistory saveUserHistory(User user, Client client) {
+	Session(Session other) {
+		this.setId(other.getId());
+		this.setTenantId(other.getTenantId());
+		this.setTenantName(other.tenantName);
+		this.setSid(other.sid);
+		this.key = other.key;
+		this.keyLabel = other.keyLabel;
+		this.decodedKey = other.decodedKey;
+		this.setNode(other.node);
+		this.username = other.username;
+		this.setCreation(other.getCreation());
+		this.setLastRenew(other.lastRenew);
+		this.setClient(other.client);
+	}
+
+	private UserHistory saveLoginEvent(User user, Client client) {
 		/*
 		 * The history comment the remote host and IP
 		 */
@@ -278,8 +320,20 @@ public class Session extends PersistentObject implements Comparable<Session> {
 		}
 
 		// Add a user history entry
-		UserHistoryDAO userHistoryDAO = (UserHistoryDAO) Context.get().getBean(UserHistoryDAO.class);
-		return userHistoryDAO.createUserHistory(user, UserEvent.LOGIN.toString(), historyComment, sid, client);
+		UserHistoryDAO userHistoryDAO = Context.get(UserHistoryDAO.class);
+		UserHistory history = userHistoryDAO.createUserHistory(user, UserEvent.LOGIN.toString(), historyComment, sid,
+				client);
+
+		// Update the last login into the DB
+		try {
+			user.setLastLogin(history.getDate());
+			userHistoryDAO.jdbcUpdate("update ld_user set ld_lastlogin = :lastLogin where ld_id = :userId",
+					Map.of("lastLogin", user.getLastLogin(), "userId", user.getId()));
+		} catch (PersistenceException e) {
+			log.warn("Last login of user {} not saved", user.getUsername());
+		}
+
+		return history;
 	}
 
 	public String getUsername() {
@@ -289,37 +343,6 @@ public class Session extends PersistentObject implements Comparable<Session> {
 	@Override
 	public String toString() {
 		return getSid();
-	}
-
-	@Override
-	public int compareTo(Session o) {
-		int compare = Integer.compare(status, o.status);
-		if (compare == 0)
-			compare = o.getCreation().compareTo(creation);
-		return compare;
-	}
-
-	@Override
-	public int hashCode() {
-		return sid.hashCode();
-	}
-
-	@Override
-	public boolean equals(Object obj) {
-		if (this == obj)
-			return true;
-		if (obj == null)
-			return false;
-		if (getClass() != obj.getClass())
-			return false;
-
-		final Session other = (Session) obj;
-		if (sid == null) {
-			return false;
-		} else {
-			return sid.equals(other.sid);
-		}
-
 	}
 
 	public long getUserId() {
@@ -333,10 +356,6 @@ public class Session extends PersistentObject implements Comparable<Session> {
 
 	public String getTenantName() {
 		return tenantName;
-	}
-
-	public String getPassword() {
-		return password;
 	}
 
 	public void logError(String message) {
@@ -367,6 +386,16 @@ public class Session extends PersistentObject implements Comparable<Session> {
 
 	public boolean isEmpty() {
 		return logs.isEmpty();
+	}
+
+	/**
+	 * Retrieves the total duration of the session
+	 * 
+	 * @return the duration in milliseconds
+	 */
+	public long getDuration() {
+		return Math.abs(
+				getCreation().getTime() - (getFinished() != null ? getFinished().getTime() : new Date().getTime()));
 	}
 
 	public class Log {
@@ -420,6 +449,10 @@ public class Session extends PersistentObject implements Comparable<Session> {
 		return user;
 	}
 
+	public void setUsername(String username) {
+		this.username = username;
+	}
+
 	@Override
 	public void setTenantId(long tenantId) {
 		this.tenantId = tenantId;
@@ -441,12 +474,16 @@ public class Session extends PersistentObject implements Comparable<Session> {
 		this.node = node;
 	}
 
-	public void setCreation(Date creation) {
-		this.creation = creation;
-	}
-
 	public void setLastRenew(Date lastRenew) {
 		this.lastRenew = lastRenew;
+	}
+
+	public Date getFinished() {
+		return finished;
+	}
+
+	public void setFinished(Date finished) {
+		this.finished = finished;
 	}
 
 	protected void setSid(String sid) {
@@ -457,28 +494,46 @@ public class Session extends PersistentObject implements Comparable<Session> {
 		this.status = status;
 	}
 
-	public void setUsername(String username) {
-		this.username = username;
+	public String getKeyLabel() {
+		return keyLabel;
 	}
 
-	public void setPassword(String password) {
-		this.password = password;
+	public void setKeyLabel(String keyLabel) {
+		this.keyLabel = keyLabel;
 	}
 
-	Session getClone() {
-		Session clone = new Session();
-		clone.setId(getId());
-		clone.setTenantId(getTenantId());
-		clone.setTenantName(tenantName);
-		clone.setSid(sid);
-		clone.setKey(key);
-		clone.setNode(node);
-		clone.setUsername(username);
-		clone.setPassword(password);
-		clone.setCreation(creation);
-		clone.setLastRenew(lastRenew);
-		clone.setClient(client);
-		return clone;
+	@Override
+	public int compareTo(Session other) {
+		if (equals(other))
+			return 0;
+		int compare = Integer.compare(status, other.status);
+		if (compare == 0)
+			compare = other.getCreation().compareTo(getCreation());
+		return compare;
 	}
 
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = super.hashCode();
+		result = prime * result + ((sid == null) ? 0 : sid.hashCode());
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (!super.equals(obj))
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		Session other = (Session) obj;
+		if (sid == null) {
+			if (other.sid != null)
+				return false;
+		} else if (!sid.equals(other.sid))
+			return false;
+		return true;
+	}
 }

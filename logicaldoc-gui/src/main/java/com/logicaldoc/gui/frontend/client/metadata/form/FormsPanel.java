@@ -1,18 +1,19 @@
 package com.logicaldoc.gui.frontend.client.metadata.form;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Feature;
 import com.logicaldoc.gui.common.client.beans.GUIForm;
 import com.logicaldoc.gui.common.client.data.FormsDS;
+import com.logicaldoc.gui.common.client.grid.IdListGridField;
+import com.logicaldoc.gui.common.client.grid.RefreshableListGrid;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.common.client.util.Util;
 import com.logicaldoc.gui.common.client.util.WindowUtils;
 import com.logicaldoc.gui.common.client.widgets.HTMLPanel;
 import com.logicaldoc.gui.common.client.widgets.InfoPanel;
-import com.logicaldoc.gui.common.client.widgets.grid.RefreshableListGrid;
 import com.logicaldoc.gui.frontend.client.administration.AdminPanel;
+import com.logicaldoc.gui.frontend.client.menu.QuickSearchTray;
 import com.logicaldoc.gui.frontend.client.services.FormService;
 import com.smartgwt.client.data.AdvancedCriteria;
 import com.smartgwt.client.data.Record;
@@ -66,8 +67,7 @@ public class FormsPanel extends AdminPanel {
 
 		final InfoPanel infoPanel = new InfoPanel("");
 
-		ListGridField id = new ListGridField("id", 70);
-		id.setHidden(true);
+		ListGridField id = new IdListGridField();
 
 		ListGridField name = new ListGridField("name", I18N.message("name"), 150);
 
@@ -137,13 +137,7 @@ public class FormsPanel extends AdminPanel {
 			Record rec = list.getSelectedRecord();
 			if (rec != null)
 				FormService.Instance.get().getById(Long.parseLong(rec.getAttributeAsString("id")),
-						new AsyncCallback<GUIForm>() {
-
-							@Override
-							public void onFailure(Throwable caught) {
-								GuiLog.serverError(caught);
-							}
-
+						new DefaultAsyncCallback<>() {
 							@Override
 							public void onSuccess(GUIForm form) {
 								showFormDetails(form);
@@ -171,12 +165,7 @@ public class FormsPanel extends AdminPanel {
 		delete.setTitle(I18N.message("ddelete"));
 		delete.addClickHandler(event -> LD.ask(I18N.message("question"), I18N.message("confirmdelete"), value -> {
 			if (Boolean.TRUE.equals(value)) {
-				FormService.Instance.get().delete(id, new AsyncCallback<Void>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				FormService.Instance.get().delete(id, new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Void result) {
 						list.removeSelectedData();
@@ -194,7 +183,7 @@ public class FormsPanel extends AdminPanel {
 		MenuItem preview = new MenuItem();
 		preview.setTitle(I18N.message(PREVIEW));
 		preview.addClickHandler(event -> WindowUtils.openUrlInNewTab(webformURL(formId)));
-		preview.setEnabled(rec.getAttributeAsBoolean(WEB_ENABLED));
+		preview.setEnabled(Boolean.TRUE.equals(rec.getAttributeAsBoolean(WEB_ENABLED)));
 
 		MenuItem invite = new MenuItem();
 		invite.setTitle(I18N.message("invite"));
@@ -204,7 +193,7 @@ public class FormsPanel extends AdminPanel {
 				new WebFormInvitationDialog(selectedForm.getId()).show();
 			}
 		});
-		invite.setEnabled(rec.getAttributeAsBoolean(WEB_ENABLED));
+		invite.setEnabled(Boolean.TRUE.equals(rec.getAttributeAsBoolean(WEB_ENABLED)));
 
 		MenuItem getPrefilledLink = new MenuItem();
 		getPrefilledLink.setTitle(I18N.message("getprefilledlink"));
@@ -214,7 +203,7 @@ public class FormsPanel extends AdminPanel {
 				new WebFormPrefilledLink(selectedForm.getId()).show();
 			}
 		});
-		getPrefilledLink.setEnabled(rec.getAttributeAsBoolean(WEB_ENABLED));
+		getPrefilledLink.setEnabled(Boolean.TRUE.equals(rec.getAttributeAsBoolean(WEB_ENABLED)));
 
 		if (Feature.enabled(Feature.WEB_FORM))
 			contextMenu.setItems(edit, preview, invite, getPrefilledLink, delete);
@@ -283,12 +272,25 @@ public class FormsPanel extends AdminPanel {
 
 	private void onEdit() {
 		GUIForm selectedForm = getSelectedForm();
-		if (selectedForm != null && details instanceof FormDetailsPanel
-				&& ((FormDetailsPanel) details).getForm().getId() == selectedForm.getId())
-			((FormDetailsPanel) details).openContentEditor();
+		if (selectedForm != null && details instanceof FormDetailsPanel formDetails
+				&& formDetails.getForm().getId() == selectedForm.getId())
+			formDetails.openContentEditor();
 	}
 
 	public static String webformURL(String formId) {
 		return Util.contextPath() + "webform/" + formId;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (obj instanceof QuickSearchTray)
+			return super.equals(obj);
+		else
+			return false;
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

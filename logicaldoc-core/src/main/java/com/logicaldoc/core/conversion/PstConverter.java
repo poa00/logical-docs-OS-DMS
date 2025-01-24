@@ -32,8 +32,7 @@ public class PstConverter extends AbstractFormatConverter {
 		if ("txt".equals(targetExtension)) {
 			FileUtil.writeFile(listing, dest.getAbsolutePath());
 		} else if ("pdf".equals(targetExtension)) {
-			FormatConverterManager manager = (FormatConverterManager) Context.get()
-					.getBean(FormatConverterManager.class);
+			FormatConverterManager manager = Context.get(FormatConverterManager.class);
 			FormatConverter converter = manager.getConverter("txt", targetExtension);
 
 			if (converter == null)
@@ -45,7 +44,7 @@ public class PstConverter extends AbstractFormatConverter {
 				FileUtil.writeFile(listing, tempFile.getAbsolutePath());
 				converter.convert(sid, document, tempFile, dest);
 			} finally {
-				FileUtil.strongDelete(tempFile);
+				FileUtil.delete(tempFile);
 			}
 		}
 

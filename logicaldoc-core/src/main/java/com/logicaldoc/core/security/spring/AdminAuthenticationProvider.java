@@ -1,8 +1,11 @@
 package com.logicaldoc.core.security.spring;
 
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Collection;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -11,11 +14,10 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
-import com.logicaldoc.core.security.User;
-import com.logicaldoc.core.security.dao.UserDAO;
+import com.logicaldoc.core.security.user.User;
+import com.logicaldoc.core.security.user.UserDAO;
 import com.logicaldoc.util.Context;
 import com.logicaldoc.util.config.ContextProperties;
-import com.logicaldoc.util.crypt.CryptUtil;
 
 /**
  * This Authentication provider extends the standard
@@ -28,6 +30,9 @@ import com.logicaldoc.util.crypt.CryptUtil;
  * @since 7.5
  */
 public class AdminAuthenticationProvider implements AuthenticationProvider {
+
+	protected static Logger log = LoggerFactory.getLogger(AdminAuthenticationProvider.class);
+
 	private static final String BADCREDENTIALS = "badcredentials";
 
 	private static final String ADMIN = "admin";
@@ -40,15 +45,19 @@ public class AdminAuthenticationProvider implements AuthenticationProvider {
 	public Authentication authenticate(Authentication authentication) throws AuthenticationException {
 		UsernamePasswordAuthenticationToken auth = (UsernamePasswordAuthenticationToken) authentication;
 		String username = String.valueOf(auth.getPrincipal());
-		String password = String.valueOf(auth.getCredentials());
 
 		if (!ADMIN.equals(username))
 			throw new BadCredentialsException(BADCREDENTIALS);
 
 		User user = new User();
 		user.setUsername(ADMIN);
+		try {
+			user.setDecodedPassword(String.valueOf(auth.getCredentials()));
+		} catch (NoSuchAlgorithmException e) {
+			log.error(e.getMessage(), e);
+		}
 
-		UserDAO uDao = (UserDAO) Context.get().getBean(UserDAO.class);
+		UserDAO uDao = Context.get(UserDAO.class);
 
 		/**
 		 * The standard authentication has failed, now check the database
@@ -59,7 +68,7 @@ public class AdminAuthenticationProvider implements AuthenticationProvider {
 			long userId = uDao.queryForLong("select ld_id from ld_user where ld_username='admin' and ld_deleted=0");
 			dbAvailable = userId == 1L;
 		} catch (Exception t) {
-			// Noting to do
+			log.error(t.getMessage(), t);
 		}
 
 		String adminPasswd = null;
@@ -70,7 +79,7 @@ public class AdminAuthenticationProvider implements AuthenticationProvider {
 				adminPasswd = uDao
 						.queryForString("select ld_password from ld_user where ld_username='admin' and ld_deleted=0");
 			} catch (Exception t) {
-				// Noting to do
+				log.error(t.getMessage(), t);
 			}
 		} else {
 			// If the database is not available, get the password from the
@@ -79,18 +88,14 @@ public class AdminAuthenticationProvider implements AuthenticationProvider {
 				ContextProperties config = Context.get().getProperties();
 				adminPasswd = config.getProperty("adminpasswd");
 			} catch (Exception t) {
-				// Noting to do
+				log.error(t.getMessage(), t);
 			}
 		}
 
 		if (adminPasswd == null || adminPasswd.isEmpty())
 			throw new BadCredentialsException(BADCREDENTIALS);
 
-		// Check the password match with one of the current or legacy algorithm
-		String testLegacy = CryptUtil.cryptStringLegacy(password);
-		user.setDecodedPassword(password);
-
-		if (!user.getPassword().equals(adminPasswd) && !testLegacy.equals(adminPasswd))
+		if (!user.getPassword().equals(adminPasswd))
 			throw new BadCredentialsException(BADCREDENTIALS);
 
 		Collection<GrantedAuthority> authorities = new ArrayList<>();

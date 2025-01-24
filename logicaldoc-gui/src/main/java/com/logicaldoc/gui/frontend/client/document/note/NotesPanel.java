@@ -1,17 +1,17 @@
 package com.logicaldoc.gui.frontend.client.document.note;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.logicaldoc.gui.common.client.Constants;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Feature;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIDocument;
 import com.logicaldoc.gui.common.client.data.NotesDS;
+import com.logicaldoc.gui.common.client.grid.DateListGridField;
+import com.logicaldoc.gui.common.client.grid.IdListGridField;
+import com.logicaldoc.gui.common.client.grid.UserListGridField;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.GridUtil;
 import com.logicaldoc.gui.common.client.util.LD;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.UserListGridField;
 import com.logicaldoc.gui.frontend.client.document.DocumentDetailTab;
 import com.logicaldoc.gui.frontend.client.services.DocumentService;
 import com.smartgwt.client.types.Alignment;
@@ -41,7 +41,7 @@ public class NotesPanel extends DocumentDetailTab {
 	private ListGrid notesGrid;
 
 	private ToolStrip toolStrip;
-	
+
 	private VLayout container = new VLayout();
 
 	public NotesPanel(final GUIDocument document) {
@@ -58,15 +58,11 @@ public class NotesPanel extends DocumentDetailTab {
 	public void refresh() {
 		if (notesGrid != null)
 			container.removeMember(notesGrid);
-		
+
 		if (toolStrip != null)
 			container.removeMember(toolStrip);
 
-		ListGridField id = new ListGridField("id", I18N.message("id"), 50);
-		id.setHidden(true);
-
-		ListGridField userId = new ListGridField(USER_ID, "userid", 50);
-		userId.setHidden(true);
+		ListGridField id = new IdListGridField();
 
 		UserListGridField user = new UserListGridField("user", USER_ID, "author");
 		ListGridField date = new DateListGridField("date", "date");
@@ -74,6 +70,9 @@ public class NotesPanel extends DocumentDetailTab {
 		ListGridField page = new ListGridField("page", I18N.message("page"), 50);
 		page.setAutoFitWidth(true);
 		page.setAlign(Alignment.CENTER);
+
+		ListGridField fileVersion = new ListGridField("fileVersion", I18N.message("fileversion"), 50);
+		fileVersion.setHidden(true);
 
 		ListGridField content = new ListGridField(MESSAGE, I18N.message("content"), 70);
 		content.setWidth("*");
@@ -83,24 +82,24 @@ public class NotesPanel extends DocumentDetailTab {
 		notesGrid.setCanFreezeFields(true);
 		notesGrid.setAutoFetchData(true);
 		notesGrid.setDataSource(new NotesDS(null, document.getId(), document.getFileVersion(), null));
-		notesGrid.setFields(id, userId, user, date, page, content);
+		notesGrid.setFields(id, user, date, page, fileVersion, content);
 
 		toolStrip = new ToolStrip();
 		toolStrip.setWidth100();
 
 		ToolStripButton addNote = new ToolStripButton(I18N.message("addnote"));
-		addNote.addClickHandler(event -> new NoteUpdateDialog(document.getId(), 0L, null, NotesPanel.this).show());
+		addNote.addClickHandler(click -> new NoteUpdateDialog(document.getId(), 0L, null, null, this::refresh).show());
 
 		ToolStripButton annotations = new ToolStripButton(I18N.message("annotations"));
 		annotations.addClickHandler(
-				event -> new com.logicaldoc.gui.frontend.client.document.note.AnnotationsWindow(document, null,
-						NotesPanel.this, true).show());
+				click -> new com.logicaldoc.gui.frontend.client.document.note.AnnotationsWindow(document, null,
+						this::refresh, true).show());
 
 		ToolStripButton export = new ToolStripButton(I18N.message("export"));
-		export.addClickHandler(event -> GridUtil.exportCSV(notesGrid, true));
+		export.addClickHandler(click -> GridUtil.exportCSV(notesGrid, true));
 
 		ToolStripButton print = new ToolStripButton(I18N.message("print"));
-		print.addClickHandler(event -> GridUtil.print(notesGrid));
+		print.addClickHandler(click -> GridUtil.print(notesGrid));
 
 		if (document.getFolder().isWrite()) {
 			toolStrip.addButton(addNote);
@@ -131,12 +130,9 @@ public class NotesPanel extends DocumentDetailTab {
 			MenuItem edit = new MenuItem();
 			edit.setTitle(I18N.message("edit"));
 			edit.setEnabled(false);
-			edit.addClickHandler(clickEvent -> {
-				NoteUpdateDialog note = new NoteUpdateDialog(document.getId(),
-						notesGrid.getSelectedRecord().getAttributeAsLong("id"),
-						notesGrid.getSelectedRecord().getAttribute(MESSAGE), NotesPanel.this);
-				note.show();
-			});
+			edit.addClickHandler(clickEvent -> new NoteUpdateDialog(document.getId(),
+					notesGrid.getSelectedRecord().getAttributeAsLong("id"), null,
+					notesGrid.getSelectedRecord().getAttribute(MESSAGE), this::refresh).show());
 
 			MenuItem prnt = new MenuItem();
 			prnt.setTitle(I18N.message("print"));
@@ -169,17 +165,10 @@ public class NotesPanel extends DocumentDetailTab {
 		ListGridRecord[] selection = notesGrid.getSelectedRecords();
 		if (selection == null || selection.length == 0)
 			return;
-		final long[] ids = new long[selection.length];
-		for (int i = 0; i < selection.length; i++)
-			ids[i] = selection[i].getAttributeAsLong("id");
 
 		LD.ask(I18N.message("question"), I18N.message("confirmdelete"), confirm -> {
 			if (Boolean.TRUE.equals(confirm)) {
-				DocumentService.Instance.get().deleteNotes(ids, new AsyncCallback<Void>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
+				DocumentService.Instance.get().deleteNotes(GridUtil.getIds(selection), new DefaultAsyncCallback<>() {
 
 					@Override
 					public void onSuccess(Void result) {
@@ -188,5 +177,16 @@ public class NotesPanel extends DocumentDetailTab {
 				});
 			}
 		});
+	}
+
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+	
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

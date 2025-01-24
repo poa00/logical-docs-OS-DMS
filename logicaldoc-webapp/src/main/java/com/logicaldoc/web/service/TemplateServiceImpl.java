@@ -1,11 +1,8 @@
 package com.logicaldoc.web.service;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -16,34 +13,33 @@ import org.hibernate.LazyInitializationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.logicaldoc.core.History;
 import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.document.Document;
+import com.logicaldoc.core.document.DocumentDAO;
 import com.logicaldoc.core.document.DocumentHistory;
-import com.logicaldoc.core.document.dao.DocumentDAO;
 import com.logicaldoc.core.folder.Folder;
 import com.logicaldoc.core.folder.FolderDAO;
 import com.logicaldoc.core.folder.FolderHistory;
+import com.logicaldoc.core.history.History;
 import com.logicaldoc.core.metadata.Attribute;
 import com.logicaldoc.core.metadata.AttributeSet;
 import com.logicaldoc.core.metadata.AttributeSetDAO;
 import com.logicaldoc.core.metadata.ExtensibleObject;
 import com.logicaldoc.core.metadata.Template;
 import com.logicaldoc.core.metadata.TemplateDAO;
-import com.logicaldoc.core.metadata.TemplateGroup;
 import com.logicaldoc.core.metadata.initialization.Initializer;
-import com.logicaldoc.core.security.Group;
+import com.logicaldoc.core.security.AccessControlEntry;
 import com.logicaldoc.core.security.Permission;
 import com.logicaldoc.core.security.Session;
 import com.logicaldoc.core.security.Tenant;
-import com.logicaldoc.core.security.User;
+import com.logicaldoc.core.security.user.User;
 import com.logicaldoc.gui.common.client.ServerException;
+import com.logicaldoc.gui.common.client.beans.GUIAccessControlEntry;
 import com.logicaldoc.gui.common.client.beans.GUIAttribute;
 import com.logicaldoc.gui.common.client.beans.GUIDocument;
 import com.logicaldoc.gui.common.client.beans.GUIExtensibleObject;
 import com.logicaldoc.gui.common.client.beans.GUIFolder;
 import com.logicaldoc.gui.common.client.beans.GUIForm;
-import com.logicaldoc.gui.common.client.beans.GUIRight;
 import com.logicaldoc.gui.common.client.beans.GUITemplate;
 import com.logicaldoc.gui.frontend.client.services.TemplateService;
 import com.logicaldoc.util.Context;
@@ -62,10 +58,10 @@ public class TemplateServiceImpl extends AbstractRemoteService implements Templa
 
 	@Override
 	public void delete(long templateId) throws ServerException {
-		Session session = validateSession(getThreadLocalRequest());
+		Session session = validateSession();
 
 		try {
-			TemplateDAO dao = (TemplateDAO) Context.get().getBean(TemplateDAO.class);
+			TemplateDAO dao = Context.get(TemplateDAO.class);
 			Template template = dao.findById(templateId);
 			if (template == null)
 				return;
@@ -81,7 +77,7 @@ public class TemplateServiceImpl extends AbstractRemoteService implements Templa
 
 	private void deleteTemplate(long templateId) throws ServerException {
 		try {
-			TemplateDAO dao = (TemplateDAO) Context.get().getBean(TemplateDAO.class);
+			TemplateDAO dao = Context.get(TemplateDAO.class);
 			dao.delete(templateId);
 		} catch (Exception e) {
 			throw new ServerException("Template has not been deleted", e);
@@ -90,15 +86,19 @@ public class TemplateServiceImpl extends AbstractRemoteService implements Templa
 
 	@Override
 	public long countDocuments(long templateId) throws ServerException {
-		validateSession(getThreadLocalRequest());
+		Session session = validateSession();
 
-		TemplateDAO dao = (TemplateDAO) Context.get().getBean(TemplateDAO.class);
-		return dao.countDocs(templateId);
+		TemplateDAO dao = Context.get(TemplateDAO.class);
+		try {
+			return dao.countDocs(templateId);
+		} catch (Exception e) {
+			return throwServerException(session, log, e);
+		}
 	}
 
 	@Override
 	public GUITemplate save(GUITemplate guiTemplate) throws ServerException {
-		Session session = validateSession(getThreadLocalRequest());
+		Session session = validateSession();
 		User sessionUser = session.getUser();
 
 		try {
@@ -110,13 +110,13 @@ public class TemplateServiceImpl extends AbstractRemoteService implements Templa
 			/*
 			 * Save the security settings
 			 */
-			saveSecuritySettings(template, guiTemplate, session, sessionUser);
+			saveACL(template, guiTemplate, session, sessionUser);
 
 			store(template);
 
 			guiTemplate.setId(template.getId());
 		} catch (Exception t) {
-			return (GUITemplate) throwServerException(session, log, t);
+			return throwServerException(session, log, t);
 		}
 
 		return guiTemplate;
@@ -124,7 +124,7 @@ public class TemplateServiceImpl extends AbstractRemoteService implements Templa
 
 	private void store(Template template) throws ServerException {
 		try {
-			TemplateDAO dao = (TemplateDAO) Context.get().getBean(TemplateDAO.class);
+			TemplateDAO dao = Context.get(TemplateDAO.class);
 			dao.store(template);
 		} catch (Exception e) {
 			throw new ServerException(
@@ -132,24 +132,29 @@ public class TemplateServiceImpl extends AbstractRemoteService implements Templa
 		}
 	}
 
+	@Override
+	public GUITemplate clone(long templateId, String cloneName) throws ServerException {
+		try {
+			TemplateDAO dao = Context.get(TemplateDAO.class);
+			Template clone = dao.clone(templateId, cloneName);
+			return getTemplate(clone.getId());
+		} catch (Exception e) {
+			throw new ServerException(String.format("Template %d has not been cloned", templateId), e);
+		}
+	}
+
 	private void updateTemplate(GUITemplate guiTemplate, Template template, Session session) {
 		template.setTenantId(session.getTenantId());
 		template.setName(guiTemplate.getName());
+		template.setLabel(guiTemplate.getLabel());
 		template.setDescription(guiTemplate.getDescription());
 		template.setValidation(guiTemplate.getValidation());
 		template.setReadonly(guiTemplate.isReadonly() ? 1 : 0);
 		template.setType(guiTemplate.getType());
 
-		Map<String, Attribute> attrs = new HashMap<>();
-		if (guiTemplate.getAttributes() != null && guiTemplate.getAttributes().length > 0) {
-			template.getAttributes().clear();
-			for (GUIAttribute attribute : guiTemplate.getAttributes()) {
-				Attribute att = prepareAttribute(attribute);
-				attrs.put(attribute.getName(), att);
-			}
-		}
-		if (attrs.size() > 0)
-			template.setAttributes(attrs);
+		template.getAttributes().clear();
+		for (GUIAttribute attribute : guiTemplate.getAttributes())
+			template.getAttributes().put(attribute.getName(), prepareAttribute(attribute));
 	}
 
 	private Attribute prepareAttribute(GUIAttribute attribute) {
@@ -186,12 +191,12 @@ public class TemplateServiceImpl extends AbstractRemoteService implements Templa
 
 	private Template getTemplate(GUITemplate guiTemplate, Session session, User sessionUser)
 			throws PersistenceException, ServerException {
-		TemplateDAO dao = (TemplateDAO) Context.get().getBean(TemplateDAO.class);
+		TemplateDAO dao = Context.get(TemplateDAO.class);
 		Template template;
 		if (guiTemplate.getId() != 0) {
 			template = dao.findById(guiTemplate.getId());
 			dao.initialize(template);
-			if (!sessionUser.isMemberOf(Group.GROUP_ADMIN)
+			if (!sessionUser.isAdmin()
 					&& (template.getReadonly() == 1 || !dao.isWriteEnable(template.getId(), session.getUserId())))
 				throw new ServerException("You do not have the permission");
 		} else {
@@ -200,60 +205,48 @@ public class TemplateServiceImpl extends AbstractRemoteService implements Templa
 		return template;
 	}
 
-	private Template newTemplate(GUITemplate guiTemplate, Session session, User sessionUser) {
+	private Template newTemplate(GUITemplate guiTemplate, Session session, User sessionUser)
+			throws PersistenceException {
 		Template template;
 		template = new Template();
-		if (!sessionUser.isMemberOf(Group.GROUP_ADMIN)
-				&& (guiTemplate.getRights() == null || guiTemplate.getRights().length == 0)) {
+		if (!sessionUser.isAdmin() && (guiTemplate.getAccessControlList().isEmpty())) {
 			// At least the current user must have write permission to
 			// this
 			// template
-			TemplateGroup wg = new TemplateGroup(session.getUser().getUserGroup().getId());
-			wg.setWrite(1);
-			template.addTemplateGroup(wg);
+			AccessControlEntry ace = new AccessControlEntry(session.getUser().getUserGroup().getId());
+			ace.setWrite(1);
+			template.addAccessControlEntry(ace);
 
-			GUIRight r = new GUIRight();
-			r.setEntityId(wg.getGroupId());
+			GUIAccessControlEntry r = new GUIAccessControlEntry();
+			r.setEntityId(ace.getGroupId());
 			r.setWrite(true);
-			guiTemplate.setRights(new GUIRight[] { r });
+			guiTemplate.getAccessControlList().add(r);
 		}
 		return template;
 	}
 
-	private void saveSecuritySettings(Template template, GUITemplate guiTemplate, Session session, User sessionUser) {
-		TemplateDAO dao = (TemplateDAO) Context.get().getBean(TemplateDAO.class);
+	private void saveACL(Template template, GUITemplate guiTemplate, Session session, User sessionUser) {
+		TemplateDAO dao = Context.get(TemplateDAO.class);
 		if ((template.getReadonly() == 1 || !dao.isWriteEnable(template.getId(), session.getUserId()))
-				&& !sessionUser.isMemberOf(Group.GROUP_ADMIN))
+				&& !sessionUser.isAdmin())
 			return;
 
-		Set<TemplateGroup> grps = new HashSet<>();
-		for (GUIRight right : guiTemplate.getRights()) {
-			boolean isAdmin = right.getEntityId() == 1;
-			TemplateGroup wg = null;
-			if (right.isRead()) {
-				wg = new TemplateGroup();
-				wg.setGroupId(right.getEntityId());
-			}
-
-			if (wg == null)
-				continue;
-
-			grps.add(wg);
-			if (isAdmin || right.isWrite())
-				wg.setWrite(1);
-			else
-				wg.setWrite(0);
+		template.getAccessControlList().clear();
+		for (GUIAccessControlEntry guiAce : guiTemplate.getAccessControlList()) {
+			AccessControlEntry ace = new AccessControlEntry();
+			ace.setGroupId(guiAce.getEntityId());
+			ace.setRead(guiAce.isRead() ? 1 : 0);
+			ace.setWrite(guiAce.isWrite() ? 1 : 0);
+			template.getAccessControlList().add(ace);
 		}
-		template.getTemplateGroups().clear();
-		template.getTemplateGroups().addAll(grps);
 	}
 
 	@Override
 	public GUITemplate getTemplate(long templateId) throws ServerException {
-		Session session = validateSession(getThreadLocalRequest());
+		Session session = validateSession();
 
 		try {
-			TemplateDAO dao = (TemplateDAO) Context.get().getBean(TemplateDAO.class);
+			TemplateDAO dao = Context.get(TemplateDAO.class);
 			Template template = dao.findById(templateId);
 			if (template == null)
 				return null;
@@ -267,58 +260,49 @@ public class TemplateServiceImpl extends AbstractRemoteService implements Templa
 		return null;
 	}
 
-	private GUITemplate toGuiTemplate(long templateId, Template template, Session session) {
+	private GUITemplate toGuiTemplate(long templateId, Template template, Session session) throws PersistenceException {
 		GUITemplate guiTemplate = new GUITemplate();
 		guiTemplate.setId(templateId);
 		guiTemplate.setName(template.getName());
+		guiTemplate.setLabel(template.getLabel());
 		guiTemplate.setDescription(template.getDescription());
 		guiTemplate.setValidation(template.getValidation());
 		guiTemplate.setReadonly(template.getReadonly() == 1);
 		guiTemplate.setType(template.getType());
 
-		TemplateDAO dao = (TemplateDAO) Context.get().getBean(TemplateDAO.class);
-		Set<Permission> permissions = dao.getEnabledPermissions(templateId, session.getUserId());
+		TemplateDAO dao = Context.get(TemplateDAO.class);
+		Set<Permission> permissions = dao.getAllowedPermissions(templateId, session.getUserId());
 		List<String> permissionsList = new ArrayList<>();
 		for (Permission permission : permissions)
 			permissionsList.add(permission.toString());
-		guiTemplate.setPermissions(permissionsList.toArray(new String[permissionsList.size()]));
+		guiTemplate.setPermissions(permissionsList);
 
-		AttributeSetDAO setDao = (AttributeSetDAO) Context.get().getBean(AttributeSetDAO.class);
+		AttributeSetDAO setDao = Context.get(AttributeSetDAO.class);
 		Map<Long, AttributeSet> sets = setDao.load(template.getTenantId());
 
 		toGuiAttributes(template, guiTemplate, sets);
-
-		if (template.getTemplateGroups() != null && !template.getTemplateGroups().isEmpty()) {
-			List<GUIRight> rights = new ArrayList<>();
-			for (TemplateGroup tg : template.getTemplateGroups()) {
-				GUIRight right = new GUIRight();
-				right.setEntityId(tg.getGroupId());
-				right.setRead(true);
-				right.setWrite(tg.getWrite() == 1);
-				rights.add(right);
-			}
-			guiTemplate.setRights(rights.toArray(new GUIRight[0]));
+		guiTemplate.getAccessControlList().clear();
+		for (AccessControlEntry tg : template.getAccessControlList()) {
+			GUIAccessControlEntry guiAce = new GUIAccessControlEntry();
+			guiAce.setEntityId(tg.getGroupId());
+			guiAce.setRead(tg.getRead() == 1);
+			guiAce.setWrite(tg.getWrite() == 1);
+			guiTemplate.getAccessControlList().add(guiAce);
 		}
+
 		return guiTemplate;
 	}
 
 	private void toGuiAttributes(Template template, GUITemplate guiTemplate, Map<Long, AttributeSet> sets) {
-		GUIAttribute[] attributes = new GUIAttribute[template.getAttributeNames().size()];
-		int i = 0;
+		guiTemplate.getAttributes().clear();
 		for (String attrName : template.getAttributeNames()) {
 			Attribute templateExtAttr = template.getAttributes().get(attrName);
 			AttributeSet aSet = sets.get(templateExtAttr.getSetId());
 			Attribute setExtAttr = aSet != null ? aSet.getAttribute(attrName) : null;
 
-			GUIAttribute guiAttribute = toGuiAttribute(attrName, templateExtAttr, setExtAttr, aSet);
-
-			attributes[i] = guiAttribute;
-			i++;
+			guiTemplate.getAttributes().add(toGuiAttribute(attrName, templateExtAttr, setExtAttr, aSet));
 		}
-		if (attributes.length > 0) {
-			Arrays.sort(attributes);
-			guiTemplate.setAttributes(attributes);
-		}
+		guiTemplate.getAttributes().sort(null);
 	}
 
 	private GUIAttribute toGuiAttribute(String attrName, Attribute templateExtAttr, Attribute setExtAttr,
@@ -360,31 +344,31 @@ public class TemplateServiceImpl extends AbstractRemoteService implements Templa
 	}
 
 	@Override
-	public GUIAttribute[] getAttributes(long templateId, GUIExtensibleObject extensibleObject) throws ServerException {
+	public List<GUIAttribute> getAttributes(long templateId, GUIExtensibleObject extensibleObject)
+			throws ServerException {
 		User sessionUser = null;
 		Session session = null;
 		try {
-			session = validateSession(getThreadLocalRequest());
+			session = validateSession();
 			sessionUser = session.getUser();
 		} catch (Exception t) {
 			// Nothing to do
 		}
 
 		try {
-			TemplateDAO templateDao = (TemplateDAO) Context.get().getBean(TemplateDAO.class);
+			TemplateDAO templateDao = Context.get(TemplateDAO.class);
 			Template template = templateDao.findById(templateId);
 			templateDao.initialize(template);
 
-			GUIAttribute[] attributes;
+			List<GUIAttribute> attributes;
 
 			if (extensibleObject == null) {
 				attributes = prepareGUIAttributes(template, null, sessionUser);
 			} else {
-				if (extensibleObject instanceof GUIDocument)
-					attributes = prepareGUIAttributes(template,
-							DocumentServiceImpl.toDocument((GUIDocument) extensibleObject), sessionUser);
-				else if (extensibleObject instanceof GUIFolder) {
-					GUIFolder guiFolder = (GUIFolder) extensibleObject;
+				if (extensibleObject instanceof GUIDocument guiDocument)
+					attributes = prepareGUIAttributes(template, DocumentServiceImpl.toDocument(guiDocument),
+							sessionUser);
+				else if (extensibleObject instanceof GUIFolder guiFolder) {
 					Folder folder = new Folder();
 					folder.setId(guiFolder.getId());
 					folder.setName(guiFolder.getName());
@@ -396,31 +380,32 @@ public class TemplateServiceImpl extends AbstractRemoteService implements Templa
 					Document dummyDoc = new Document();
 					dummyDoc.setFileName("webform");
 					dummyDoc.setTenantId(template.getTenantId());
+					dummyDoc.setTemplate(template);
 					attributes = prepareGUIAttributes(template, dummyDoc, sessionUser);
 				} else
 					attributes = prepareGUIAttributes(template, null, sessionUser);
 			}
 
-			Arrays.sort(attributes, (o1, o2) -> Integer.compare(o1.getPosition(), o2.getPosition()));
+			attributes.sort((o1, o2) -> Integer.compare(o1.getPosition(), o2.getPosition()));
 
 			return attributes;
 		} catch (Exception t) {
-			return (GUIAttribute[]) throwServerException(session, log, t);
+			return throwServerException(session, log, t);
 		}
 	}
 
-	public GUIAttribute[] prepareGUIAttributes(Template template, ExtensibleObject extensibleObject, User sessionUser) {
+	List<GUIAttribute> prepareGUIAttributes(Template template, ExtensibleObject extensibleObject,
+			User sessionUser) {
+		List<GUIAttribute> attributes = new ArrayList<>();
 		if (template == null)
-			return new GUIAttribute[0];
+			return attributes;
 
 		template = initializeTemplateAttributes(template);
 
-		AttributeSetDAO setDao = (AttributeSetDAO) Context.get().getBean(AttributeSetDAO.class);
+		AttributeSetDAO setDao = Context.get(AttributeSetDAO.class);
 		Map<String, Attribute> attrs = template.getAttributes();
-
-		List<GUIAttribute> attributes = new ArrayList<>();
 		if (template == null || attrs == null || attrs.isEmpty())
-			return new GUIAttribute[0];
+			return attributes;
 
 		try {
 			Template currentTemplate = loadExtensibleObjectTemplate(template, extensibleObject);
@@ -438,10 +423,10 @@ public class TemplateServiceImpl extends AbstractRemoteService implements Templa
 			}
 
 			Collections.sort(attributes);
-			return attributes.toArray(new GUIAttribute[0]);
+			return attributes;
 		} catch (Exception t) {
 			log.error(t.getMessage(), t);
-			return new GUIAttribute[0];
+			return new ArrayList<>();
 		}
 	}
 
@@ -457,7 +442,7 @@ public class TemplateServiceImpl extends AbstractRemoteService implements Templa
 				// not
 				// be loaded, so load the bean again and initialize it.
 				log.debug("Got error {} trying to reload the template {}", e.getMessage(), template.getId());
-				TemplateDAO tDao = (TemplateDAO) Context.get().getBean(TemplateDAO.class);
+				TemplateDAO tDao = Context.get(TemplateDAO.class);
 				try {
 					template = tDao.findById(template.getId());
 					tDao.initialize(template);
@@ -498,7 +483,7 @@ public class TemplateServiceImpl extends AbstractRemoteService implements Templa
 				guiAttribute.setIntValue(attribute.getIntValue());
 				guiAttribute.setBooleanValue(attribute.getBooleanValue());
 				guiAttribute.setDoubleValue(attribute.getDoubleValue());
-				guiAttribute.setDateValue(attribute.getDateValue());
+				guiAttribute.setDateValue(fixDateForGUI(attribute.getDateValue()));
 				if (attribute.getType() == Attribute.TYPE_USER)
 					guiAttribute.setUsername(attribute.getStringValue());
 			} else
@@ -506,8 +491,8 @@ public class TemplateServiceImpl extends AbstractRemoteService implements Templa
 		}
 
 		// Normalize dates
-		if (guiAttribute.getValue() instanceof Date)
-			guiAttribute.setValue(convertToDate((Date) guiAttribute.getValue()));
+		if (guiAttribute.getValue() instanceof Date date)
+			guiAttribute.setValue(convertToDate(date));
 
 		guiAttribute.setType(templateExtAttr.getType());
 		attributes.add(guiAttribute);
@@ -537,7 +522,7 @@ public class TemplateServiceImpl extends AbstractRemoteService implements Templa
 				list.add(buf.trim());
 			guiAttribute.setStringValue(buf);
 		}
-		guiAttribute.setOptions(list.toArray(new String[0]));
+		guiAttribute.setOptions(list);
 	}
 
 	private void addMultipleGuiAttributes(GUIAttribute guiAttribute, ExtensibleObject extensibleObject,
@@ -565,8 +550,8 @@ public class TemplateServiceImpl extends AbstractRemoteService implements Templa
 					valAtt.setStringValues(null);
 
 					// Normalize dates
-					if (valAtt.getValue() instanceof Date)
-						valAtt.setValue(convertToDate((Date) valAtt.getValue()));
+					if (valAtt.getValue() instanceof Date date)
+						valAtt.setValue(convertToDate(date));
 
 					if (valAtt.getType() == Attribute.TYPE_USER)
 						valAtt.setUsername(valAttribute.getStringValue());
@@ -586,13 +571,13 @@ public class TemplateServiceImpl extends AbstractRemoteService implements Templa
 				extensibleObject.setAttributes(template.getAttributes());
 
 			History transaction = null;
-			if (extensibleObject instanceof Document) {
+			if (extensibleObject instanceof Document document) {
 				transaction = new DocumentHistory();
-				transaction.setDocument((Document) extensibleObject);
+				transaction.setDocument(document);
 				transaction.setUser(sessionUser);
-			} else if (extensibleObject instanceof Folder) {
+			} else if (extensibleObject instanceof Folder folder) {
 				transaction = new FolderHistory();
-				transaction.setFolder((Folder) extensibleObject);
+				transaction.setFolder(folder);
 				transaction.setUser(sessionUser);
 			}
 
@@ -605,12 +590,12 @@ public class TemplateServiceImpl extends AbstractRemoteService implements Templa
 			throws PersistenceException {
 		Template currentTemplate = null;
 		if (extensibleObject instanceof Document) {
-			DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+			DocumentDAO docDao = Context.get(DocumentDAO.class);
 			Document doc = docDao.findDocument(extensibleObject.getId());
 			if (doc != null)
 				currentTemplate = doc.getTemplate();
 		} else if (extensibleObject instanceof Folder) {
-			FolderDAO foldDao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+			FolderDAO foldDao = Context.get(FolderDAO.class);
 			Folder folder = foldDao.findFolder(extensibleObject.getId());
 			if (folder != null)
 				currentTemplate = folder.getTemplate();

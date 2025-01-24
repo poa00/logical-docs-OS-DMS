@@ -2,10 +2,8 @@ package com.logicaldoc.core.util;
 
 import java.awt.image.BufferedImage;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URLDecoder;
-import java.sql.SQLException;
 import java.util.List;
 
 import javax.imageio.ImageIO;
@@ -19,7 +17,7 @@ public class PDFImageExtractorTest {
 	File destFolder = null;
 
 	@Before
-	public void setUp() throws FileNotFoundException, IOException, SQLException {
+	public void setUp() {
 		destFolder = new File("target", "destFolder");
 		if (!destFolder.exists())
 			destFolder.mkdir();
@@ -45,20 +43,16 @@ public class PDFImageExtractorTest {
 
 		File pdffile = new File(filePath);
 
-		PDFImageExtractor pdfReader = new PDFImageExtractor(pdffile);
-		try {
+		try (PDFImageExtractor pdfReader = new PDFImageExtractor(pdffile);) {
 			List<BufferedImage> imgs = pdfReader.extractImages();
 
 			Assert.assertNotNull(imgs);
 			Assert.assertTrue(imgs.size() > 0);
 
 			for (int i = 0; i < imgs.size(); i++) {
-				// System.err.println(imgs.get(i).getType());
 				File destFile = new File(destFolder, prefix + "_" + i + ".bmp");
 				ImageIO.write(imgs.get(i), "bmp", destFile);
 			}
-		} finally {
-			pdfReader.close();
 		}
 	}
 }

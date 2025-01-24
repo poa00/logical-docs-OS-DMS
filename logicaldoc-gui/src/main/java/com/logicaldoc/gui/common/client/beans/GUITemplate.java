@@ -2,10 +2,7 @@ package com.logicaldoc.gui.common.client.beans;
 
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-
-import com.logicaldoc.gui.common.client.Constants;
 
 /**
  * This user interface bean to model a document template
@@ -23,6 +20,8 @@ public class GUITemplate implements Serializable {
 
 	private String name;
 
+	private String label;
+
 	private String description;
 
 	private boolean readonly = false;
@@ -31,11 +30,11 @@ public class GUITemplate implements Serializable {
 
 	private String validation;
 
-	private GUIAttribute[] attributes;
+	private List<GUIAttribute> attributes = new ArrayList<>();
 
-	private GUIRight[] rights = new GUIRight[] {};
+	private List<String> permissions = new ArrayList<>();
 
-	private String[] permissions = new String[] {};
+	private List<GUIAccessControlEntry> accessControlList = new ArrayList<>();
 
 	public long getId() {
 		return id;
@@ -70,12 +69,10 @@ public class GUITemplate implements Serializable {
 		return null;
 	}
 
-	public void appendAttribute(GUIAttribute a) {
-		List<GUIAttribute> newAttrs = new ArrayList<>();
-		if (getAttributes() != null)
-			newAttrs.addAll(Arrays.asList(getAttributes()));
-		newAttrs.add(a);
-		attributes = newAttrs.toArray(new GUIAttribute[0]);
+	public void appendAttribute(GUIAttribute attribute) {
+		int maxPosition = attributes.stream().mapToInt(a -> a.getPosition()).max().orElse(0);
+		attribute.setPosition(++maxPosition);
+		attributes.add(attribute);
 	}
 
 	public void removeAttribute(String name) {
@@ -87,7 +84,7 @@ public class GUITemplate implements Serializable {
 			if (!att.getName().equals(name))
 				newAttrs.add(att);
 
-		attributes = newAttrs.toArray(new GUIAttribute[0]);
+		attributes = newAttrs;
 	}
 
 	public void reorderAttributes(List<String> names) {
@@ -98,23 +95,19 @@ public class GUITemplate implements Serializable {
 			att.setPosition(i++);
 			newAttrs.add(att);
 		}
-		attributes = newAttrs.toArray(new GUIAttribute[0]);
+		attributes = newAttrs;
 	}
 
-	public GUIAttribute[] getAttributes() {
+	public List<GUIAttribute> getAttributes() {
 		return attributes;
 	}
 
-	public GUIAttribute[] getAttributesOrderedByPosition() {
-		if (attributes == null)
-			return new GUIAttribute[0];
-
-		Arrays.sort(attributes,
-				(guiAttr1, guiAttr2) -> Integer.compare(guiAttr1.getPosition(), guiAttr2.getPosition()));
+	public List<GUIAttribute> getAttributesOrderedByPosition() {
+		attributes.sort((guiAttr1, guiAttr2) -> Integer.compare(guiAttr1.getPosition(), guiAttr2.getPosition()));
 		return attributes;
 	}
 
-	public void setAttributes(GUIAttribute[] attributes) {
+	public void setAttributes(List<GUIAttribute> attributes) {
 		this.attributes = attributes;
 	}
 
@@ -134,33 +127,55 @@ public class GUITemplate implements Serializable {
 		this.type = type;
 	}
 
-	public GUIRight[] getRights() {
-		return rights;
-	}
-
-	public void setRights(GUIRight[] rights) {
-		this.rights = rights;
-	}
-
-	public String[] getPermissions() {
+	public List<String> getPermissions() {
 		return permissions;
 	}
 
-	public void setPermissions(String[] permissions) {
+	public void setPermissions(List<String> permissions) {
 		this.permissions = permissions;
 	}
 
+	public GUIAccessControlEntry getAce(long entityId) {
+		for (GUIAccessControlEntry acl : accessControlList) {
+			if (acl.getEntityId() == entityId)
+				return acl;
+		}
+		return null;
+	}
+
+	public void removeAce(long entityId) {
+		List<GUIAccessControlEntry> newAce = new ArrayList<>();
+		for (GUIAccessControlEntry ace : accessControlList) {
+			if (ace.getEntityId() != entityId)
+				newAce.add(ace);
+		}
+		accessControlList = newAce;
+	}
+	
+	public void addAce(GUIAccessControlEntry ace) {
+		GUIAccessControlEntry existingAce = getAce(ace.getEntityId());
+		if(existingAce==null) {
+			accessControlList.add(ace);
+		} else {
+			existingAce.setRead(ace.isRead());
+			existingAce.setWrite(ace.isWrite());
+		}
+	}
+
+	public List<GUIAccessControlEntry> getAccessControlList() {
+		return accessControlList;
+	}
+
+	public void setAccessControlList(List<GUIAccessControlEntry> accessControlList) {
+		this.accessControlList = accessControlList;
+	}
+
 	public boolean isWrite() {
-		return hasPermission(Constants.PERMISSION_WRITE);
+		return hasPermission(GUIAccessControlEntry.PERMISSION_WRITE);
 	}
 
 	public boolean hasPermission(String permission) {
-		if (permissions == null)
-			return false;
-		for (String p : permissions)
-			if (p.equals(permission))
-				return true;
-		return false;
+		return permissions.contains(permission);
 	}
 
 	public String getValidation() {
@@ -169,5 +184,13 @@ public class GUITemplate implements Serializable {
 
 	public void setValidation(String validation) {
 		this.validation = validation;
+	}
+
+	public String getLabel() {
+		return label;
+	}
+
+	public void setLabel(String label) {
+		this.label = label;
 	}
 }

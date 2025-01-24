@@ -1,13 +1,16 @@
 package com.logicaldoc.core.security.authentication;
 
+import java.security.NoSuchAlgorithmException;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
 
 import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.security.Client;
-import com.logicaldoc.core.security.User;
-import com.logicaldoc.core.security.dao.HibernateUserDAO;
-import com.logicaldoc.core.security.dao.UserDAO;
+import com.logicaldoc.core.security.user.User;
+import com.logicaldoc.core.security.user.UserDAO;
 import com.logicaldoc.util.crypt.CryptUtil;
 
 /**
@@ -17,13 +20,16 @@ import com.logicaldoc.util.crypt.CryptUtil;
  * @author Sebastian Wenzky
  * @since 4.5
  */
+@Component("defaultAuthenticator")
 public class DefaultAuthenticator extends AbstractAuthenticator {
 
 	protected static Logger log = LoggerFactory.getLogger(DefaultAuthenticator.class);
 
 	protected UserDAO userDAO;
 
-	public void setUserDAO(UserDAO userDAO) {
+	@Autowired
+	public DefaultAuthenticator(UserDAO userDAO) {
+		super();
 		this.userDAO = userDAO;
 	}
 
@@ -45,30 +51,22 @@ public class DefaultAuthenticator extends AbstractAuthenticator {
 		validateUser(user);
 
 		// Check the password match with one of the current or legacy algorithm
-		String test = CryptUtil.cryptString(password);
-		String testLegacy = CryptUtil.cryptStringLegacy(password);
-		if (user.getPassword() == null || (!user.getPassword().equals(test) && !user.getPassword().equals(testLegacy)))
-			throw new WrongPasswordException(this);
-
+		String test = null;
 		try {
-			// Make sure the password in the DB follows the current scheme
-			if (user.getPassword().equals(testLegacy))
-				userDAO.jdbcUpdate("update ld_user set ld_password='" + test + "' where ld_id " + user.getId());
-		} catch (PersistenceException e) {
-			log.warn(e.getMessage());
+			test = CryptUtil.encryptSHA256(password);
+		} catch (NoSuchAlgorithmException e) {
+			log.error(e.getMessage(), e);
 		}
+
+		if (user.getPassword() == null || !user.getPassword().equals(test))
+			throw new WrongPasswordException(this);
 
 		return user;
 	}
 
 	@Override
 	public User pickUser(String username) throws PersistenceException {
-		User user = null;
-		if (HibernateUserDAO.ignoreCaseLogin())
-			user = userDAO.findByUsernameIgnoreCase(username);
-		else
-			user = userDAO.findByUsername(username);
-		return user;
+		return userDAO.getUser(username);
 	}
 
 	/**
@@ -80,18 +78,18 @@ public class DefaultAuthenticator extends AbstractAuthenticator {
 	 * @throws AuthenticationException I something did not pass
 	 */
 	public void validateUser(User user) throws AuthenticationException {
-		if (user == null) {
+		if (user == null)
 			throw new AccountNotFoundException(this);
-		}
 
 		// Check the type
-		if ((user.getType() != User.TYPE_DEFAULT && user.getType() != User.TYPE_READONLY))
+		if (user.getType() != User.TYPE_DEFAULT && user.getType() != User.TYPE_READONLY)
 			throw new AccountTypeNotAllowedException();
 
-		if (userDAO.isPasswordExpired(user.getUsername()))
-			throw new PasswordExpiredException(this);
-
-		userDAO.initialize(user);
+		try {
+			userDAO.initialize(user);
+		} catch (PersistenceException e) {
+			log.error(e.getMessage(), e);
+		}
 
 		if (user.getEnabled() == 0)
 			throw new AccountDisabledException(this);
@@ -102,8 +100,12 @@ public class DefaultAuthenticator extends AbstractAuthenticator {
 		if (user.isExpired())
 			throw new AccountExpiredException(user.getExpire());
 
-		if (userDAO.isInactive(user.getUsername()))
-			throw new AccountInactiveException(this);
+		try {
+			if (userDAO.isInactive(user.getUsername()))
+				throw new AccountInactiveException(this);
+		} catch (PersistenceException e) {
+			log.error(e.getMessage(), e);
+		}
 
 		if (user.getEnforceWorkingTime() == 1 && !user.isInWorkingTime())
 			throw new OutsideWorkingTimeException(this);

@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.StringTokenizer;
+import java.util.stream.Collectors;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -25,14 +26,14 @@ import com.logicaldoc.core.document.AbstractDocument;
 import com.logicaldoc.core.document.Bookmark;
 import com.logicaldoc.core.document.Document;
 import com.logicaldoc.core.document.DocumentComparator;
-import com.logicaldoc.core.document.dao.DocumentDAO;
+import com.logicaldoc.core.document.DocumentDAO;
 import com.logicaldoc.core.folder.Folder;
 import com.logicaldoc.core.folder.FolderDAO;
 import com.logicaldoc.core.metadata.Attribute;
-import com.logicaldoc.core.security.Group;
 import com.logicaldoc.core.security.Session;
-import com.logicaldoc.core.security.User;
-import com.logicaldoc.core.security.dao.UserDAO;
+import com.logicaldoc.core.security.user.Group;
+import com.logicaldoc.core.security.user.User;
+import com.logicaldoc.core.security.user.UserDAO;
 import com.logicaldoc.i18n.I18N;
 import com.logicaldoc.util.Context;
 import com.logicaldoc.util.io.FileUtil;
@@ -76,7 +77,8 @@ public class DocumentsDataServlet extends AbstractDataServlet {
 				extAttributesValues.put(key, rs.getDouble(6));
 			} else if (type == Attribute.TYPE_DATE) {
 				extAttributesValues.put(key, rs.getTimestamp(7));
-			} else if (type == Attribute.TYPE_USER || type == Attribute.TYPE_FOLDER) {
+			} else if (type == Attribute.TYPE_USER || type == Attribute.TYPE_FOLDER
+					|| type == Attribute.TYPE_DOCUMENT) {
 				extAttributesValues.put(key, rs.getString(4));
 			} else if (type == Attribute.TYPE_BOOLEAN) {
 				extAttributesValues.put(key,
@@ -98,12 +100,7 @@ public class DocumentsDataServlet extends AbstractDataServlet {
 		response.setContentType("text/xml");
 		response.setCharacterEncoding("UTF-8");
 
-		// Avoid resource caching
-		response.setHeader("Pragma", "no-cache");
-		response.setHeader("Cache-Control", "no-store");
-		response.setDateHeader("Expires", 0);
-
-		DocumentDAO dao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO dao = Context.get(DocumentDAO.class);
 
 		int page = getPage(request);
 
@@ -114,7 +111,6 @@ public class DocumentsDataServlet extends AbstractDataServlet {
 
 		String sql = "select ld_docid from ld_bookmark where ld_type=" + Bookmark.TYPE_DOCUMENT
 				+ " and ld_deleted = 0 and ld_userid = " + session.getUserId();
-		@SuppressWarnings("unchecked")
 		List<Long> bookmarks = dao.queryForList(sql, Long.class);
 
 		// The list of documents to be returned
@@ -149,14 +145,15 @@ public class DocumentsDataServlet extends AbstractDataServlet {
 		 * Iterate over the documents printing the output
 		 */
 		for (Document document : documentsInCurrentPage) {
-			printDocument(writer, document, hiliteDoc, bookmarks, extendedAttributes, extendedAttributesValues);
+			printDocument(writer, document, hiliteDoc, bookmarks, extendedAttributes, extendedAttributesValues,
+					session.getTenantName());
 		}
 
 		writer.write("</list>");
 	}
 
 	private void printDocument(PrintWriter writer, Document document, Document hiliteDoc, List<Long> bookmarks,
-			List<String> extendedAttributes, final Map<String, Object> extendedAttributesValues) {
+			List<String> extendedAttributes, final Map<String, Object> extendedAttributesValues, String tenant) {
 
 		writer.print("<document>");
 		writer.print("<id>" + document.getId() + "</id>");
@@ -182,7 +179,11 @@ public class DocumentsDataServlet extends AbstractDataServlet {
 		writer.print("<bookmarked>" + (bookmarks.contains(document.getId()) || bookmarks.contains(document.getDocRef()))
 				+ "</bookmarked>");
 		writer.print("<language>" + document.getLanguage() + "</language>");
-		writer.print("<links>" + document.getLinks() + "</links>");
+		writer.print("<links>" + (document.getLinks()
+				+ (Context.get().getProperties().getBoolean(tenant + ".gui.showdocattrsaslinks", false)
+						? document.getDocAttrs()
+						: 0))
+				+ "</links>");
 		writer.print("<publisherId>" + document.getPublisherId() + "</publisherId>");
 		writer.print("<creatorId>" + document.getCreatorId() + "</creatorId>");
 		writer.print("<tenantId>" + document.getTenantId() + "</tenantId>");
@@ -194,13 +195,18 @@ public class DocumentsDataServlet extends AbstractDataServlet {
 
 		writer.print("<rating>" + (document.getRating() != null ? document.getRating() : "0") + "</rating>");
 		writer.print("<fileVersion><![CDATA[" + document.getFileVersion() + "]]></fileVersion>");
-		writer.print(
-				"<comment><![CDATA[" + (document.getComment() != null ? document.getComment() : "") + "]]></comment>");
-		writer.print("<workflowStatus><![CDATA["
-				+ (document.getWorkflowStatus() != null ? document.getWorkflowStatus() : "") + "]]></workflowStatus>");
-		writer.print("<workflowStatusDisplay><![CDATA["
-				+ (document.getWorkflowStatusDisplay() != null ? document.getWorkflowStatusDisplay() : "")
-				+ "]]></workflowStatusDisplay>");
+		
+		if (StringUtils.isNotEmpty(document.getComment()))
+			writer.print("<comment><![CDATA[" + document.getComment() + "]]></comment>");
+		
+		if (StringUtils.isNotEmpty(document.getLastNote()))
+			writer.print("<lastNote><![CDATA[" + document.getLastNote() + "]]></lastNote>");
+		
+		if (StringUtils.isNotEmpty(document.getWorkflowStatus()))
+			writer.print("<workflowStatus><![CDATA[" + document.getWorkflowStatus() + "]]></workflowStatus>");
+		if (StringUtils.isNotEmpty(document.getWorkflowStatusDisplay()))
+			writer.print("<workflowStatusDisplay><![CDATA[" + document.getWorkflowStatusDisplay()
+					+ "]]></workflowStatusDisplay>");
 
 		if (StringUtils.isNotEmpty(document.getColor()))
 			writer.print("<color><![CDATA[" + document.getColor() + "]]></color>");
@@ -233,16 +239,15 @@ public class DocumentsDataServlet extends AbstractDataServlet {
 				Object val = document.getValue(name);
 				if (val != null) {
 					writer.print("<ext_" + name + ">");
-					if (val instanceof Date)
-						writer.print(df.format((Date) val));
-					else if (val instanceof Integer)
-						writer.print(Integer.toString((Integer) val));
-					else if (val instanceof Long)
-						writer.print(Long.toString((Long) val));
-					else if (val instanceof Double)
-						writer.print(Double.toString((Double) val));
-					else
-						writer.print("<![CDATA[" + val + "]]>");
+
+					switch (val) {
+					case Date date -> writer.print(df.format(date));
+					case Integer intVal -> writer.print(Integer.toString(intVal));
+					case Long longVal -> writer.print(Long.toString(longVal));
+					case Double doubleVal -> writer.print(Double.toString(doubleVal));
+					default -> writer.print("<![CDATA[" + val + "]]>");
+					}
+
 					writer.print("</ext_" + name + ">");
 				}
 			}
@@ -290,8 +295,7 @@ public class DocumentsDataServlet extends AbstractDataServlet {
 
 	private void findDocumentsByIds(HttpServletRequest request, Session session, List<Document> documentsInCurrentPage)
 			throws PersistenceException {
-		FolderDAO fDao = (FolderDAO) Context.get().getBean(FolderDAO.class);
-		DocumentDAO dao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO dao = Context.get(DocumentDAO.class);
 
 		String[] idsArray = request.getParameter("docIds").split(",");
 		for (String id : idsArray) {
@@ -301,8 +305,7 @@ public class DocumentsDataServlet extends AbstractDataServlet {
 			} catch (Exception t) {
 				// Nothing to do
 			}
-			if ((doc == null || doc.getDeleted() == 1)
-					|| (!fDao.isReadEnabled(doc.getFolder().getId(), session.getUserId())))
+			if (doc == null || doc.getDeleted() == 1 || !dao.isReadAllowed(Long.parseLong(id), session.getUserId()))
 				continue;
 			documentsInCurrentPage.add(doc);
 		}
@@ -310,15 +313,14 @@ public class DocumentsDataServlet extends AbstractDataServlet {
 
 	private void findDocumentsByStatus(Session session, int maxRecords, int page, Integer status,
 			List<Document> documentsInCurrentPage) throws PersistenceException {
-		FolderDAO fDao = (FolderDAO) Context.get().getBean(FolderDAO.class);
-		DocumentDAO dao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO dao = Context.get(DocumentDAO.class);
 
 		List<Document> docs = dao.findByLockUserAndStatus(session.getUserId(), status);
 		int begin = (page - 1) * maxRecords;
 		int end = Math.min(begin + maxRecords - 1, docs.size() - 1);
 		for (int i = begin; i <= end; i++) {
 			Document doc = docs.get(i);
-			if (!fDao.isReadEnabled(doc.getFolder().getId(), session.getUserId()))
+			if (!dao.isReadAllowed(doc.getId(), session.getUserId()))
 				continue;
 			documentsInCurrentPage.add(doc);
 		}
@@ -329,10 +331,9 @@ public class DocumentsDataServlet extends AbstractDataServlet {
 			String extendedAttributesSpec, final Map<String, Object> extendedAttributesValues)
 			throws PersistenceException, IOException {
 
-		Context context = Context.get();
-		UserDAO udao = (UserDAO) context.getBean(UserDAO.class);
-		User user = udao.findById(session.getUserId());
-		udao.initialize(user);
+		UserDAO udao = Context.get(UserDAO.class);
+		User sessionUser = udao.findById(session.getUserId());
+		udao.initialize(sessionUser);
 
 		String sort = request.getParameter("sort");
 
@@ -354,8 +355,8 @@ public class DocumentsDataServlet extends AbstractDataServlet {
 		/*
 		 * Execute the Query
 		 */
-		List<Document> documents = exeucuteQuey(request, extendedAttributes, extendedAttributesValues, user, folderId,
-				formId, filename);
+		List<Document> documents = exeucuteQuey(request, extendedAttributes, extendedAttributesValues, sessionUser,
+				folderId, formId, filename);
 
 		// If a sorting is specified sort the collection of documents
 		sortDocuments(documents, sort);
@@ -370,16 +371,29 @@ public class DocumentsDataServlet extends AbstractDataServlet {
 	private List<Document> exeucuteQuey(HttpServletRequest request, List<String> extendedAttributes,
 			final Map<String, Object> extendedAttributesValues, User user, Long folderId, Long formId, String filename)
 			throws PersistenceException {
-		StringBuilder query = new StringBuilder(
-				"select A.id, A.customId, A.docRef, A.type, A.version, A.lastModified, A.date, A.publisher,"
-						+ " A.creation, A.creator, A.fileSize, A.immutable, A.indexed, A.lockUserId, A.fileName, A.status,"
-						+ " A.signed, A.type, A.rating, A.fileVersion, A.comment, A.workflowStatus,"
-						+ " A.startPublishing, A.stopPublishing, A.published, A.extResId,"
-						+ " B.name, A.docRefType, A.stamped, A.lockUser, A.password, A.pages, "
-						+ " A.workflowStatusDisplay, A.language, A.links, A.tgs, A.creatorId, A.publisherId, A.color, A.folder.id, A.tenantId from Document as A left outer join A.template as B ");
-		query.append(" where A.deleted = 0 and not A.status=" + AbstractDocument.DOC_ARCHIVED);
-		if (folderId != null)
+
+		DocumentDAO dao = Context.get(DocumentDAO.class);
+		StringBuilder query = new StringBuilder("""
+select A.id, A.customId, A.docRef, A.type, A.version, A.lastModified, A.date, A.publisher, A.creation, A.creator, A.fileSize, A.immutable, A.indexed, A.lockUserId, A.fileName, A.status,
+       A.signed, A.type, A.rating, A.fileVersion, A.comment, A.workflowStatus, A.startPublishing, A.stopPublishing, A.published, A.extResId, B.name, A.docRefType, A.stamped, A.lockUser,
+       A.password, A.pages, A.workflowStatusDisplay, A.language, A.links+A.docAttrs, A.tgs, A.creatorId, A.publisherId, A.color, A.folder.id, A.tenantId, A.lastNote
+  from Document as A
+  left outer join A.template as B
+ where A.deleted = 0
+   and not A.status=""");
+		query.append(AbstractDocument.DOC_ARCHIVED);
+
+		if (folderId != null) {
 			query.append(" and A.folder.id=" + folderId);
+
+			List<Long> forbiddenDocIds = getForbiddenDocumentIds(user, folderId);
+			if (!forbiddenDocIds.isEmpty()) {
+				query.append(" and A.id not in(");
+				query.append(forbiddenDocIds.stream().map(id -> Long.toString(id)).collect(Collectors.joining(",")));
+				query.append(") ");
+			}
+		}
+
 		if (formId != null)
 			query.append(" and A.formId=" + Long.toString(formId));
 		if (StringUtils.isNotEmpty(request.getParameter(INDEXED)))
@@ -391,19 +405,50 @@ public class DocumentsDataServlet extends AbstractDataServlet {
 			params.put("fileName", "%" + filename.toLowerCase() + "%");
 		}
 
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
-		List<Object> records = new ArrayList<>();
+		List<?> records = new ArrayList<>();
 		if (folderId != null || filename != null || formId != null
 				|| StringUtils.isNotEmpty(request.getParameter(INDEXED)))
-			records = docDao.findByQuery(query.toString(), params, null);
+			records = dao.findByQuery(query.toString(), params, null);
 
 		return enrichRecords(records, extendedAttributes, extendedAttributesValues, user);
 	}
 
-	private List<Document> enrichRecords(List<Object> records, List<String> extendedAttributes,
+	/**
+	 * Identifies those documents in the current folder where there is at least
+	 * one read revocation in regards to one of the user's groups
+	 * 
+	 * @param user the current user
+	 * @param folderId identifier of the folder
+	 * @return the list of forbidden Ids
+	 * 
+	 * @throws PersistenceException Error in the data layer
+	 */
+	private List<Long> getForbiddenDocumentIds(User user, long folderId) throws PersistenceException {
+		if (user.isAdmin())
+			return new ArrayList<>();
+
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
+		String groupIdsString = user.getGroups().stream().map(g -> Long.toString(g.getId()))
+				.collect(Collectors.joining(","));
+
+		StringBuilder forbiddenDocsQuery = new StringBuilder("""
+select ld_docid
+  from ld_document_acl, ld_document
+ where ld_docid=ld_id
+   and ld_deleted = 0
+   and ld_read = 0
+   and ld_groupId in(""");
+		forbiddenDocsQuery.append(groupIdsString);
+		forbiddenDocsQuery.append(") and ld_folderid = ");
+		forbiddenDocsQuery.append(Long.toString(folderId));
+
+		return docDao.queryForList(forbiddenDocsQuery.toString(), Long.class);
+	}
+
+	private List<Document> enrichRecords(List<?> records, List<String> extendedAttributes,
 			final Map<String, Object> extendedAttributesValues, User user) throws PersistenceException {
 
-		DocumentDAO dao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO dao = Context.get(DocumentDAO.class);
 
 		/*
 		 * Iterate over records enriching the data
@@ -421,6 +466,7 @@ public class DocumentsDataServlet extends AbstractDataServlet {
 			doc.setColor((String) cols[38]);
 			doc.setTenantId((Long) cols[40]);
 			doc.setIndexed((Integer) cols[12]);
+			
 
 			Folder f = new Folder();
 			f.setId((Long) cols[39]);
@@ -482,6 +528,7 @@ public class DocumentsDataServlet extends AbstractDataServlet {
 			doc.setRating((Integer) cols[18]);
 			doc.setFileVersion((String) cols[19]);
 			doc.setComment((String) cols[20]);
+			doc.setLastNote((String) cols[41]);
 			doc.setWorkflowStatus((String) cols[21]);
 			doc.setExtResId((String) cols[25]);
 			doc.setTemplateName((String) cols[26]);
@@ -514,7 +561,8 @@ public class DocumentsDataServlet extends AbstractDataServlet {
 			String key = aliasId + "-" + name;
 			if (!extendedAttributesValues.containsKey(key) && doc.getValue(name) != null) {
 				Attribute att = doc.getAttribute(name);
-				if (att != null && (att.getType() == Attribute.TYPE_FOLDER || att.getType() == Attribute.TYPE_USER)) {
+				if (att != null && (att.getType() == Attribute.TYPE_FOLDER || att.getType() == Attribute.TYPE_USER
+						|| att.getType() == Attribute.TYPE_DOCUMENT)) {
 					extendedAttributesValues.put(key, att.getStringValue());
 					doc.setValue(name, att.getStringValue());
 				} else
@@ -531,7 +579,7 @@ public class DocumentsDataServlet extends AbstractDataServlet {
 	private Document retrieveHiliteDoc(List<Document> documentRecords, Long folderId, Long hiliteDocId)
 			throws PersistenceException {
 
-		DocumentDAO dao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO dao = Context.get(DocumentDAO.class);
 		Document hiliteDoc = null;
 
 		// Always add the hilight doc as first element of the collection
@@ -582,7 +630,7 @@ public class DocumentsDataServlet extends AbstractDataServlet {
 	private void retrieveExtendedAttributesValues(Locale locale, List<String> extendedAttributes,
 			String extendedAttributesSpec, final Map<String, Object> extAttributesValues, Long folderId, Long formId)
 			throws PersistenceException {
-		DocumentDAO dao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO dao = Context.get(DocumentDAO.class);
 		if (extendedAttributes.isEmpty())
 			return;
 
@@ -618,7 +666,7 @@ public class DocumentsDataServlet extends AbstractDataServlet {
 	}
 
 	private Long getFolder(Long folderId) throws PersistenceException {
-		FolderDAO fDao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+		FolderDAO fDao = Context.get(FolderDAO.class);
 		Folder folder = fDao.findById(folderId);
 		if (folder.getFoldRef() != null)
 			folderId = folder.getFoldRef();
@@ -626,12 +674,12 @@ public class DocumentsDataServlet extends AbstractDataServlet {
 	}
 
 	private Long getFolderId(HttpServletRequest request, Session session) throws PersistenceException, IOException {
-		FolderDAO fDao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+		FolderDAO fDao = Context.get(FolderDAO.class);
 		Long folderId = null;
 		if (StringUtils.isNotEmpty(request.getParameter("folderId")))
 			folderId = Long.parseLong(request.getParameter("folderId"));
 
-		if (folderId != null && session != null && !fDao.isReadEnabled(folderId, session.getUserId()))
+		if (folderId != null && session != null && !fDao.isReadAllowed(folderId, session.getUserId()))
 			throw new IOException(
 					String.format("Folder %s is not accessible by user %s", folderId, session.getUsername()));
 		return folderId;

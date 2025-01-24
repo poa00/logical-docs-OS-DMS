@@ -17,8 +17,8 @@ import org.springframework.jdbc.core.RowMapper;
 import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.searchengine.IndexerTask;
 import com.logicaldoc.core.security.Session;
-import com.logicaldoc.core.security.User;
-import com.logicaldoc.core.security.dao.UserDAO;
+import com.logicaldoc.core.security.user.User;
+import com.logicaldoc.core.security.user.UserDAO;
 import com.logicaldoc.core.util.IconSelector;
 import com.logicaldoc.gui.common.client.Constants;
 import com.logicaldoc.util.Context;
@@ -39,7 +39,7 @@ public class IndexingQueueDataServlet extends AbstractDataServlet {
 	protected void service(HttpServletRequest request, HttpServletResponse response, Session session, Integer max,
 			Locale locale) throws PersistenceException, IOException {
 
-		UserDAO dao = (UserDAO) Context.get().getBean(UserDAO.class);
+		UserDAO dao = Context.get(UserDAO.class);
 		User user = dao.findById(session.getUserId());
 		dao.initialize(user);
 
@@ -50,10 +50,12 @@ public class IndexingQueueDataServlet extends AbstractDataServlet {
 						+ " ld_creation, ld_creator, ld_filesize, ld_immutable, ld_indexed, ld_lockuserid, ld_filename, ld_status,"
 						+ " ld_signed, ld_type, ld_fileversion, ld_color from ld_document where " + where);
 
+		if (log.isDebugEnabled())
+			log.debug("Running filter query {}", query);
+
 		/*
-		 * Execute the Query
+		 * Execute the Query.
 		 */
-		@SuppressWarnings("unchecked")
 		List<Object[]> records = dao.query(query.toString(), new RowMapper<Object[]>() {
 
 			@Override
@@ -89,6 +91,9 @@ public class IndexingQueueDataServlet extends AbstractDataServlet {
 				return rec;
 			}
 		}, max != null ? max : 100);
+
+		if (log.isDebugEnabled())
+			log.debug("Retrieved {} records", records.size());
 
 		printDocuments(response, session, records);
 	}

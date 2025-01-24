@@ -2,10 +2,10 @@ package com.logicaldoc.gui.frontend.client.search;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
-import com.logicaldoc.gui.common.client.beans.GUIDocument;
 import com.logicaldoc.gui.common.client.beans.GUISearchOptions;
 import com.logicaldoc.gui.common.client.data.TagsDS;
 import com.logicaldoc.gui.common.client.i18n.I18N;
@@ -19,7 +19,7 @@ import com.smartgwt.client.types.Overflow;
 import com.smartgwt.client.types.SelectionStyle;
 import com.smartgwt.client.widgets.form.DynamicForm;
 import com.smartgwt.client.widgets.form.fields.FormItem;
-import com.smartgwt.client.widgets.form.fields.PickerIcon;
+import com.smartgwt.client.widgets.form.fields.FormItemIcon;
 import com.smartgwt.client.widgets.form.fields.StaticTextItem;
 import com.smartgwt.client.widgets.form.fields.TextItem;
 import com.smartgwt.client.widgets.grid.ListGrid;
@@ -91,7 +91,10 @@ public class TagsForm extends VLayout {
 		otherCharForm = new DynamicForm();
 		otherCharForm.setWidth(1);
 
-		PickerIcon searchPicker = new PickerIcon(PickerIcon.SEARCH, event -> {
+		FormItemIcon search = new FormItemIcon();
+		search.setPrompt(I18N.message("clear"));
+		search.setSrc("[SKIN]/magnifying-glass.svg");
+		search.addFormItemClickHandler(click -> {
 			if (!otherCharForm.validate())
 				return;
 			onLetterSelect(otherCharForm.getValueAsString("otherchar"));
@@ -100,7 +103,7 @@ public class TagsForm extends VLayout {
 		TextItem otherChar = ItemFactory.newTextItem("otherchar", null);
 		otherChar.setRequired(true);
 		otherChar.setWrapTitle(false);
-		otherChar.setIcons(searchPicker);
+		otherChar.setIcons(search);
 		otherChar.setLength(1);
 		otherChar.setWidth(50);
 
@@ -166,12 +169,7 @@ public class TagsForm extends VLayout {
 
 						ListGridRecord selection = tags.getSelectedRecord();
 						TagService.Instance.get().rename(selection.getAttribute("word"), value,
-								new AsyncCallback<Void>() {
-									@Override
-									public void onFailure(Throwable caught) {
-										GuiLog.serverError(caught);
-									}
-
+								new DefaultAsyncCallback<>() {
 									@Override
 									public void onSuccess(Void arg) {
 										GuiLog.info(I18N.message("procinexecution"), I18N.message("taginexecution"));
@@ -188,12 +186,7 @@ public class TagsForm extends VLayout {
 			delete.addClickHandler(event -> LD.ask(I18N.message("question"), I18N.message("confirmdelete"), confirm -> {
 				if (Boolean.TRUE.equals(confirm)) {
 					ListGridRecord selection = tags.getSelectedRecord();
-					TagService.Instance.get().delete(selection.getAttribute("word"), new AsyncCallback<Void>() {
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
-						}
-
+					TagService.Instance.get().delete(selection.getAttribute("word"), new DefaultAsyncCallback<>() {
 						@Override
 						public void onSuccess(Void arg) {
 							GuiLog.info(I18N.message("procinexecution"), I18N.message("taginexecution"));
@@ -229,19 +222,23 @@ public class TagsForm extends VLayout {
 		options.setExpression(word);
 		options.setMaxHits(Search.get().getMaxHits());
 
-		if (searchInHits) {
-			GUIDocument[] records = Search.get().getLastResult();
-			Long[] ids = new Long[records.length];
-			int i = 0;
-			for (GUIDocument rec : records) {
-				ids[i] = rec.getId();
-				i++;
-			}
-			options.setFilterIds(ids);
-		} else
-			options.setFilterIds(null);
+		if (searchInHits)
+			options.setFilterIds(
+					Search.get().getLastResult().stream().map(doc -> doc.getId()).collect(Collectors.toList()));
+		else
+			options.setFilterIds(new ArrayList<>());
 
 		Search.get().setOptions(options);
 		Search.get().search();
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

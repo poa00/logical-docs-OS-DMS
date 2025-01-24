@@ -1,7 +1,7 @@
 package com.logicaldoc.web.service;
 
+import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -29,8 +29,8 @@ import com.logicaldoc.core.metadata.AttributeSetDAO;
 import com.logicaldoc.core.security.Session;
 import com.logicaldoc.core.security.SessionManager;
 import com.logicaldoc.core.security.Tenant;
-import com.logicaldoc.core.security.dao.TenantDAO;
-import com.logicaldoc.core.security.dao.UserDAO;
+import com.logicaldoc.core.security.TenantDAO;
+import com.logicaldoc.core.security.user.UserDAO;
 import com.logicaldoc.gui.common.client.InvalidSessionServerException;
 import com.logicaldoc.gui.common.client.ServerException;
 import com.logicaldoc.gui.common.client.beans.GUIAttribute;
@@ -45,6 +45,7 @@ import com.logicaldoc.i18n.I18N;
 import com.logicaldoc.util.Context;
 import com.logicaldoc.util.LocaleUtil;
 import com.logicaldoc.util.config.ContextProperties;
+import com.logicaldoc.util.io.IOUtil;
 import com.logicaldoc.web.listener.ApplicationListener;
 
 /**
@@ -73,11 +74,11 @@ public class InfoServiceImpl extends AbstractRemoteService implements InfoServic
 
 			Locale withLocale = LocaleUtil.toLocale(locale);
 
-			ArrayList<GUIValue> supportedLanguages = setSupportedLocales(tenantName, info, withLocale);
+			setSupportedGUILanguages(tenantName, info, withLocale);
 
 			LanguageManager manager = LanguageManager.getInstance();
-			Collection<Language> languages = manager.getActiveLanguages(tenantName);
-			supportedLanguages.clear();
+			List<Language> languages = manager.getActiveLanguages(tenantName);
+			List<GUIValue> supportedLanguages = new ArrayList<>();
 			for (Language language : languages) {
 				Locale lc = language.getLocale();
 				GUIValue l = new GUIValue();
@@ -85,7 +86,7 @@ public class InfoServiceImpl extends AbstractRemoteService implements InfoServic
 				l.setValue(lc.getDisplayName(withLocale));
 				supportedLanguages.add(l);
 			}
-			info.setSupportedLanguages(supportedLanguages.toArray(new GUIValue[0]));
+			info.setSupportedLanguages(supportedLanguages);
 
 			List<GUIMessage> alerts = new ArrayList<>();
 
@@ -110,7 +111,7 @@ public class InfoServiceImpl extends AbstractRemoteService implements InfoServic
 				checkRestrartRequired(info, locale, alerts);
 			}
 
-			info.setAlerts(alerts.toArray(new GUIMessage[0]));
+			info.setAlerts(alerts);
 
 			setAttributes(info, tenantName);
 
@@ -120,11 +121,26 @@ public class InfoServiceImpl extends AbstractRemoteService implements InfoServic
 		}
 	}
 
+	private static String loadChangelog() {
+		try (InputStream is = IOUtil.getLimitedStream(InfoServiceImpl.class.getResourceAsStream("/CHANGELOG.txt"),
+				5000)) {
+			String changelog = IOUtil.readStream(is);
+			return changelog.replace("logicaldoc", "").replace("LogicalDOC", "");
+		} catch (Exception e) {
+			return "";
+		}
+	}
+
 	private void setAttributes(GUIInfo info, String tenantName) {
-		TenantDAO tDAO = (TenantDAO) Context.get().getBean(TenantDAO.class);
-		AttributeSetDAO aDAO = (AttributeSetDAO) Context.get().getBean(AttributeSetDAO.class);
+		TenantDAO tDAO = Context.get(TenantDAO.class);
+		AttributeSetDAO aDAO = Context.get(AttributeSetDAO.class);
 		try {
-			Map<String, Attribute> attributes = aDAO.findAttributes(tDAO.findByName(tenantName).getId(), null);
+			Tenant tenant = tDAO.findByName(tenantName);
+			if (tenant == null) {
+				log.debug("Tenant with name {} not found, fallback to the default", tenantName);
+				tenant = tDAO.findById(Tenant.DEFAULT_ID);
+			}
+			Map<String, Attribute> attributes = aDAO.findAttributes(tenant.getId(), null);
 			List<GUIAttribute> guiAttributes = new ArrayList<>();
 
 			for (Map.Entry<String, Attribute> entry : attributes.entrySet()) {
@@ -146,7 +162,7 @@ public class InfoServiceImpl extends AbstractRemoteService implements InfoServic
 				guiAtt.setType(att.getType());
 				guiAttributes.add(guiAtt);
 			}
-			info.setAttributeDefinitions(guiAttributes.toArray(new GUIAttribute[0]));
+			info.setAttributeDefinitions(guiAttributes);
 		} catch (Exception t) {
 			log.error(t.getMessage(), t);
 		}
@@ -159,7 +175,7 @@ public class InfoServiceImpl extends AbstractRemoteService implements InfoServic
 			alerts.add(restartReminder);
 		} else {
 			// Check if the database is connected
-			UserDAO dao = (UserDAO) Context.get().getBean(UserDAO.class);
+			UserDAO dao = Context.get(UserDAO.class);
 			int test = -1;
 			try {
 				test = dao.queryForInt("select count(*) from ld_user");
@@ -175,7 +191,7 @@ public class InfoServiceImpl extends AbstractRemoteService implements InfoServic
 		}
 	}
 
-	private ArrayList<GUIValue> setSupportedLocales(String tenantName, GUIInfo info, Locale withLocale) {
+	private void setSupportedGUILanguages(String tenantName, GUIInfo info, Locale withLocale) {
 		ArrayList<GUIValue> supportedLanguages = new ArrayList<>();
 		List<String> installedLocales = I18N.getLocales();
 		for (String loc : installedLocales) {
@@ -187,14 +203,12 @@ public class InfoServiceImpl extends AbstractRemoteService implements InfoServic
 				supportedLanguages.add(l);
 			}
 		}
-
-		info.setSupportedGUILanguages(supportedLanguages.toArray(new GUIValue[0]));
-		return supportedLanguages;
+		info.setSupportedGUILanguages(supportedLanguages);
 	}
 
 	/**
-	 * Retrieves the informations but not localization issues like messages and
-	 * installed languages
+	 * Retrieves the informations but not localization resources like messages
+	 * and installed languages
 	 * 
 	 * @param tenantName name of the tenant
 	 * 
@@ -225,45 +239,47 @@ public class InfoServiceImpl extends AbstractRemoteService implements InfoServic
 		/*
 		 * Populate the infos from the SystemInfo
 		 */
-		GUIInfo info = new GUIInfo();
-		info.setTenant(tenant);
-		info.setSessionHeartbeat(config.getInt(tname + ".session.heartbeat", 60));
+		GUIInfo guiInfo = new GUIInfo();
+		guiInfo.setTenant(tenant);
+		guiInfo.setSessionHeartbeat(config.getInt(tname + ".session.heartbeat", 60));
 
-		SystemInfo inf = SystemInfo.get(tenant.getId());
-		info.setLicensee(inf.getLicensee());
-		info.setRelease(inf.getRelease());
-		info.setRunLevel(inf.getRunLevel());
-		info.setYear(inf.getYear());
-		info.setHostName(inf.getHostName());
-		info.setDate(inf.getDate());
-		info.setInstallationId(inf.getInstallationId());
-		info.setFeatures(inf.getFeatures());
+		SystemInfo info = SystemInfo.get(tenant.getId());
+		guiInfo.setLicensee(info.getLicensee());
+		guiInfo.setRelease(info.getRelease());
+		guiInfo.setRunLevel(info.getRunLevel());
+		guiInfo.setYear(info.getYear());
+		guiInfo.setHostName(info.getHostName());
+		guiInfo.setDate(info.getDate());
+		guiInfo.setInstallationId(info.getInstallationId());
+		guiInfo.getFeatures().addAll(info.getFeatures());
 
-		info.getBranding().setBugs(inf.getBugs());
-		info.getBranding().setForum(inf.getForum());
-		info.getBranding().setHelp(inf.getHelp());
-		info.getBranding().setProduct(inf.getProduct());
-		info.getBranding().setProductName(inf.getProductName());
-		info.getBranding().setSupport(inf.getSupport());
-		info.getBranding().setUrl(inf.getUrl());
-		info.getBranding().setVendor(inf.getVendor());
-		info.getBranding().setVendorAddress(inf.getVendorAddress());
-		info.getBranding().setVendorCap(inf.getVendorCap());
-		info.getBranding().setVendorCity(inf.getVendorCity());
-		info.getBranding().setVendorCountry(inf.getVendorCountry());
+		guiInfo.getBranding().setBugs(info.getBugs());
+		guiInfo.getBranding().setForum(info.getForum());
+		guiInfo.getBranding().setEvaluation(info.getEvaluation());
+		guiInfo.getBranding().setHelp(info.getHelp());
+		guiInfo.getBranding().setProduct(info.getProduct());
+		guiInfo.getBranding().setProductName(info.getProductName());
+		guiInfo.getBranding().setSupport(info.getSupport());
+		guiInfo.getBranding().setUrl(info.getUrl());
+		guiInfo.getBranding().setVendor(info.getVendor());
+		guiInfo.getBranding().setVendorAddress(info.getVendorAddress());
+		guiInfo.getBranding().setVendorCap(info.getVendorCap());
+		guiInfo.getBranding().setVendorCity(info.getVendorCity());
+		guiInfo.getBranding().setVendorCountry(info.getVendorCountry());
 
 		try {
-			ArrayList<GUIValue> values = new ArrayList<>();
+			List<GUIValue> values = new ArrayList<>();
 			for (Object key : config.keySet()) {
 				GUIValue pair = new GUIValue();
-				pair.setCode((String) key);
-				pair.setValue(config.getProperty((String) key));
+				String keyString = (String) key;
+				pair.setCode(keyString);
+				pair.setValue(config.getProperty(keyString));
 				values.add(pair);
 			}
 
 			loadGUISettingsFromDB(tenant, values);
 
-			info.setConfig(values.toArray(new GUIValue[0]));
+			guiInfo.setConfig(values);
 		} catch (Exception t) {
 			log.warn("cannot load GUI settings", t);
 		}
@@ -273,17 +289,19 @@ public class InfoServiceImpl extends AbstractRemoteService implements InfoServic
 		 */
 		try {
 			GUIAttributeSet defaultSet = new AttributeSetServiceImpl().getAttributeSet("default");
-			info.setDefaultAttributeSet(defaultSet);
+			guiInfo.setDefaultAttributeSet(defaultSet);
 		} catch (Exception t) {
-			// Nothing to dox
+			// Nothing to do
 		}
 
-		return info;
+		guiInfo.setChangelog(loadChangelog());
+
+		return guiInfo;
 	}
 
-	private static void loadGUISettingsFromDB(GUITenant tenant, ArrayList<GUIValue> values) {
+	private static void loadGUISettingsFromDB(GUITenant tenant, List<GUIValue> values) {
 		try {
-			GenericDAO dao = (GenericDAO) Context.get().getBean(GenericDAO.class);
+			GenericDAO dao = Context.get(GenericDAO.class);
 			List<Generic> dbSettings = dao.findByTypeAndSubtype("guisetting", null, 0L, tenant.getId());
 			for (Generic generic : dbSettings)
 				values.add(new GUIValue(generic.getSubtype(), generic.getString1()));
@@ -292,18 +310,16 @@ public class InfoServiceImpl extends AbstractRemoteService implements InfoServic
 		}
 	}
 
-	protected static GUIValue[] getBundle(String locale, String tenantName) {
-
+	protected static List<GUIValue> getBundle(String locale, String tenantName) {
 		Locale l = getLocaleForBundle(tenantName, LocaleUtil.toLocale(locale));
 
 		ResourceBundle rb = ResourceBundle.getBundle("i18n.messages", l);
-		GUIValue[] buf = new GUIValue[rb.keySet().size()];
-		int i = 0;
+		List<GUIValue> buf = new ArrayList<>();
 		for (String key : rb.keySet()) {
 			GUIValue entry = new GUIValue();
 			entry.setCode(key);
 			entry.setValue(rb.getString(key));
-			buf[i++] = entry;
+			buf.add(entry);
 		}
 		return buf;
 	}
@@ -353,12 +369,12 @@ public class InfoServiceImpl extends AbstractRemoteService implements InfoServic
 	}
 
 	@Override
-	public GUIParameter[] getSessionInfo() throws InvalidSessionServerException {
-		Session session = validateSession(getThreadLocalRequest());
+	public List<GUIParameter> getSessionInfo() throws InvalidSessionServerException {
+		Session session = validateSession();
 		log.debug("Requested info for session {}", session.getSid());
 
 		try {
-			SystemMessageDAO messageDao = (SystemMessageDAO) Context.get().getBean(SystemMessageDAO.class);
+			SystemMessageDAO messageDao = Context.get(SystemMessageDAO.class);
 			List<GUIParameter> parameters = new ArrayList<>();
 
 			GUIParameter messages = new GUIParameter("messages",
@@ -366,7 +382,7 @@ public class InfoServiceImpl extends AbstractRemoteService implements InfoServic
 			parameters.add(messages);
 			parameters.add(new GUIParameter("valid", "" + SessionManager.get().isOpen(session.getSid())));
 
-			return parameters.toArray(new GUIParameter[0]);
+			return parameters;
 		} catch (Exception t) {
 			throw new InvalidSessionServerException(t.getMessage());
 		}
@@ -375,7 +391,7 @@ public class InfoServiceImpl extends AbstractRemoteService implements InfoServic
 	@Override
 	public boolean ping() throws InvalidSessionServerException {
 		try {
-			Session session = validateSession(getThreadLocalRequest());
+			Session session = validateSession();
 			if (session == null)
 				return false;
 		} catch (Exception t) {
@@ -386,7 +402,7 @@ public class InfoServiceImpl extends AbstractRemoteService implements InfoServic
 
 	@Override
 	public String getCronDescription(String expression, String locale) throws ServerException {
-		Session session = validateSession(getThreadLocalRequest());
+		Session session = validateSession();
 
 		try {
 			CronDefinition cronDefinition = CronDefinitionBuilder.instanceDefinitionFor(CronType.QUARTZ);
@@ -396,7 +412,7 @@ public class InfoServiceImpl extends AbstractRemoteService implements InfoServic
 			CronDescriptor descriptor = CronDescriptor.instance(LocaleUtil.toLocale(locale));
 			return descriptor.describe(parser.parse(expression));
 		} catch (Exception e) {
-			return (String) throwServerException(session, log, e);
+			return throwServerException(session, log, e);
 		}
 	}
 }

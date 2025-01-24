@@ -5,20 +5,21 @@ import java.util.Date;
 import java.util.List;
 
 import org.apache.commons.beanutils.BeanUtils;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.logicaldoc.core.PersistenceException;
-import com.logicaldoc.core.security.Group;
-import com.logicaldoc.core.security.User;
-import com.logicaldoc.core.security.UserEvent;
-import com.logicaldoc.core.security.UserHistory;
-import com.logicaldoc.core.security.WorkingTime;
 import com.logicaldoc.core.security.authentication.AuthenticationException;
 import com.logicaldoc.core.security.authorization.PermissionException;
-import com.logicaldoc.core.security.dao.GroupDAO;
-import com.logicaldoc.core.security.dao.UserDAO;
+import com.logicaldoc.core.security.user.Group;
+import com.logicaldoc.core.security.user.GroupDAO;
+import com.logicaldoc.core.security.user.User;
+import com.logicaldoc.core.security.user.UserDAO;
+import com.logicaldoc.core.security.user.UserEvent;
+import com.logicaldoc.core.security.user.UserHistory;
+import com.logicaldoc.core.security.user.WorkingTime;
 import com.logicaldoc.util.Context;
 import com.logicaldoc.util.crypt.CryptUtil;
 import com.logicaldoc.webservice.AbstractService;
@@ -39,7 +40,7 @@ public class SoapSecurityService extends AbstractService implements SecurityServ
 	protected static Logger log = LoggerFactory.getLogger(SoapSecurityService.class);
 
 	@Override
-	public WSUser[] listUsers(String sid, String group)
+	public List<WSUser> listUsers(String sid, String group)
 			throws AuthenticationException, WebserviceException, PersistenceException {
 		User user = validateSession(sid);
 
@@ -61,15 +62,15 @@ public class SoapSecurityService extends AbstractService implements SecurityServ
 				}
 			}
 
-			return users.toArray(new WSUser[0]);
+			return users;
 		} catch (Exception t) {
 			throw new PersistenceException(t.getMessage());
 		}
 	}
 
-	private List<WSUser> collectUsers(String group, User user) {
+	private List<WSUser> collectUsers(String group, User user) throws PersistenceException {
 		List<WSUser> users = new ArrayList<>();
-		UserDAO dao = (UserDAO) Context.get().getBean(UserDAO.class);
+		UserDAO dao = Context.get(UserDAO.class);
 		if (StringUtils.isEmpty(group)) {
 			for (User usr : dao.findAll(user.getTenantId())) {
 				dao.initialize(user);
@@ -77,7 +78,7 @@ public class SoapSecurityService extends AbstractService implements SecurityServ
 					users.add(WSUser.fromUser(usr));
 			}
 		} else {
-			GroupDAO gDao = (GroupDAO) Context.get().getBean(GroupDAO.class);
+			GroupDAO gDao = Context.get(GroupDAO.class);
 			Group grp = gDao.findByName(group, user.getTenantId());
 			gDao.initialize(grp);
 			for (User usr : grp.getUsers()) {
@@ -90,90 +91,94 @@ public class SoapSecurityService extends AbstractService implements SecurityServ
 	}
 
 	@Override
-	public WSGroup[] listGroups(String sid) throws WebserviceException, PersistenceException {
+	public List<WSGroup> listGroups(String sid) throws WebserviceException, PersistenceException {
 		checkAdministrator(sid);
 		User user = validateSession(sid);
 
 		try {
 			List<WSGroup> groups = new ArrayList<>();
-			GroupDAO dao = (GroupDAO) Context.get().getBean(GroupDAO.class);
+			GroupDAO dao = Context.get(GroupDAO.class);
 			for (Group grp : dao.findAll(user.getTenantId())) {
 				if (grp.getType() == Group.TYPE_DEFAULT) {
 					dao.initialize(grp);
 					groups.add(WSGroup.fromGroup(grp));
 				}
 			}
-			return groups.toArray(new WSGroup[0]);
+			return groups;
 		} catch (Exception t) {
 			throw new PersistenceException(t.getMessage());
 		}
 	}
 
 	@Override
-	public long storeUser(String sid, WSUser user) throws WebserviceException, PersistenceException {
+	public long storeUser(String sid, WSUser wsUser) throws WebserviceException, PersistenceException {
 		checkAdministrator(sid);
 		User sessionUser = validateSession(sid);
 
 		try {
-			GroupDAO gDao = (GroupDAO) Context.get().getBean(GroupDAO.class);
-			UserDAO dao = (UserDAO) Context.get().getBean(UserDAO.class);
-			User usr = user.toUser();
+			GroupDAO gDao = Context.get(GroupDAO.class);
+			UserDAO dao = Context.get(UserDAO.class);
+			User usr = wsUser.toUser();
 			usr.setTenantId(sessionUser.getTenantId());
 
-			if (user.getId() != 0) {
-				usr = dao.findById(user.getId());
+			if (wsUser.getId() != 0) {
+				usr = dao.findById(wsUser.getId());
 				if (usr.getType() == User.TYPE_SYSTEM)
 					throw new PermissionException(
 							"You cannot edit user with id " + usr.getId() + " because it is a system user");
 				dao.initialize(usr);
 
-				usr.setCity(user.getCity());
-				usr.setCountry(user.getCountry());
-				usr.setEmail(user.getEmail());
-				usr.setEmailSignature(user.getEmailSignature());
-				usr.setEmail2(user.getEmail2());
-				usr.setEmailSignature2(user.getEmailSignature2());
-				usr.setFirstName(user.getFirstName());
-				usr.setName(user.getName());
-				usr.setLanguage(user.getLanguage());
-				usr.setPostalcode(user.getPostalcode());
-				usr.setState(user.getState());
-				usr.setStreet(user.getStreet());
-				usr.setTelephone(user.getTelephone());
-				usr.setTelephone2(user.getTelephone2());
-				usr.setUsername(user.getUsername());
-				usr.setEnabled(user.getEnabled());
-				usr.setPasswordExpires(user.getPasswordExpires());
-				usr.setQuota(user.getQuota());
-				usr.setType(user.getType());
-				usr.setSource(user.getSource());
-				usr.setDateFormat(user.getDateFormat());
-				usr.setDateFormatShort(user.getDateFormatShort());
-				usr.setDateFormatLong(user.getDateFormatLong());
-				usr.setKey(user.getKey());
-				usr.setSecondFactor(user.getSecondFactor());
-				usr.setTimeZone(user.getTimeZone());
-				usr.setExpire(WSUtil.convertStringToDate(user.getExpire()));
-				usr.setEnforceWorkingTime(user.getEnforceWorkingTime());
-				usr.setMaxInactivity(user.getMaxInactivity());
+				usr.setCity(wsUser.getCity());
+				usr.setCountry(wsUser.getCountry());
+				usr.setEmail(wsUser.getEmail());
+				usr.setEmailSignature(wsUser.getEmailSignature());
+				usr.setEmail2(wsUser.getEmail2());
+				usr.setEmailSignature2(wsUser.getEmailSignature2());
+				usr.setFirstName(wsUser.getFirstName());
+				usr.setName(wsUser.getName());
+				usr.setLanguage(wsUser.getLanguage());
+				usr.setPostalcode(wsUser.getPostalcode());
+				usr.setState(wsUser.getState());
+				usr.setStreet(wsUser.getStreet());
+				usr.setTelephone(wsUser.getTelephone());
+				usr.setTelephone2(wsUser.getTelephone2());
+				usr.setCompany(wsUser.getCompany());
+				usr.setDepartment(wsUser.getDepartment());
+				usr.setOrganizationalUnit(wsUser.getOrganizationalUnit());
+				usr.setBuilding(wsUser.getBuilding());
+				usr.setUsername(wsUser.getUsername());
+				usr.setEnabled(wsUser.getEnabled());
+				usr.setPasswordExpires(wsUser.getPasswordExpires());
+				usr.setQuota(wsUser.getQuota());
+				usr.setType(wsUser.getType());
+				usr.setSource(wsUser.getSource());
+				usr.setDateFormat(wsUser.getDateFormat());
+				usr.setDateFormatShort(wsUser.getDateFormatShort());
+				usr.setDateFormatLong(wsUser.getDateFormatLong());
+				usr.setKey(wsUser.getKey());
+				usr.setSecondFactor(wsUser.getSecondFactor());
+				usr.setTimeZone(wsUser.getTimeZone());
+				usr.setExpire(WSUtil.convertStringToDate(wsUser.getExpire()));
+				usr.setEnforceWorkingTime(wsUser.getEnforceWorkingTime());
+				usr.setMaxInactivity(wsUser.getMaxInactivity());
 
-				if (user.getWorkingTimes() != null && user.getWorkingTimes().length > 0)
-					for (WSWorkingTime wswt : user.getWorkingTimes()) {
+				if (CollectionUtils.isNotEmpty(wsUser.getWorkingTimes()))
+					for (WSWorkingTime wswt : wsUser.getWorkingTimes()) {
 						WorkingTime wt = new WorkingTime();
 						BeanUtils.copyProperties(wt, wswt);
 						usr.getWorkingTimes().add(wt);
 					}
 			} else {
-				usr.setDecodedPassword(user.getDecodedPassword());
+				usr.setDecodedPassword(wsUser.getDecodedPassword());
 			}
 
 			validateMandatoryFields(usr);
 
 			dao.store(usr);
 
-			if (user.getGroupIds() != null && user.getGroupIds().length > 0) {
+			if (CollectionUtils.isNotEmpty(wsUser.getGroupIds())) {
 				usr.removeGroupMemberships(null);
-				for (long groupId : user.getGroupIds())
+				for (long groupId : wsUser.getGroupIds())
 					usr.addGroup(gDao.findById(groupId));
 				dao.store(usr);
 			}
@@ -200,7 +205,7 @@ public class SoapSecurityService extends AbstractService implements SecurityServ
 		checkAdministrator(sid);
 
 		try {
-			GroupDAO dao = (GroupDAO) Context.get().getBean(GroupDAO.class);
+			GroupDAO dao = Context.get(GroupDAO.class);
 			Group grp = group.toGroup();
 			if (group.getId() != 0) {
 				grp = dao.findById(group.getId());
@@ -217,9 +222,9 @@ public class SoapSecurityService extends AbstractService implements SecurityServ
 			if (StringUtils.isEmpty(grp.getName()))
 				throw new PersistenceException("Missing mandatory value 'Name'");
 
-			if (group.getUserIds() != null && group.getUserIds().length > 0) {
+			if (CollectionUtils.isNotEmpty(group.getUserIds())) {
 
-				UserDAO userDao = (UserDAO) Context.get().getBean(UserDAO.class);
+				UserDAO userDao = Context.get(UserDAO.class);
 				for (User usr : grp.getUsers()) {
 					usr.removeGroup(grp.getId());
 					userDao.store(usr);
@@ -252,7 +257,7 @@ public class SoapSecurityService extends AbstractService implements SecurityServ
 			throw new PermissionException("You cannot delete the admin user");
 
 		try {
-			UserDAO dao = (UserDAO) Context.get().getBean(UserDAO.class);
+			UserDAO dao = Context.get(UserDAO.class);
 			User usr = dao.findById(userId);
 			if (usr.getType() == User.TYPE_SYSTEM) {
 				throw new PermissionException(
@@ -273,7 +278,7 @@ public class SoapSecurityService extends AbstractService implements SecurityServ
 			throw new PermissionException("You cannot delete the admin group");
 
 		try {
-			GroupDAO dao = (GroupDAO) Context.get().getBean(GroupDAO.class);
+			GroupDAO dao = Context.get(GroupDAO.class);
 			Group grp = dao.findById(groupId);
 			if (grp.getType() != Group.TYPE_DEFAULT) {
 				throw new PermissionException(
@@ -291,13 +296,12 @@ public class SoapSecurityService extends AbstractService implements SecurityServ
 		checkAdministrator(sid);
 
 		try {
-			UserDAO userDao = (UserDAO) Context.get().getBean(UserDAO.class);
+			UserDAO userDao = Context.get(UserDAO.class);
 			User user = userDao.findById(userId);
 			if (user == null)
 				throw new WebserviceException("User " + userId + " not found");
 
-			if (oldPassword != null && !CryptUtil.cryptString(oldPassword).equals(user.getPassword())
-					&& !CryptUtil.cryptStringLegacy(oldPassword).equals(user.getPassword())) {
+			if (oldPassword != null && !CryptUtil.encryptSHA256(oldPassword).equals(user.getPassword())) {
 				return 1;
 			}
 
@@ -312,7 +316,7 @@ public class SoapSecurityService extends AbstractService implements SecurityServ
 			history.setComment("");
 			user.setRepass("");
 
-			UserDAO dao = (UserDAO) Context.get().getBean(UserDAO.class);
+			UserDAO dao = Context.get(UserDAO.class);
 
 			dao.store(user, history);
 
@@ -327,7 +331,7 @@ public class SoapSecurityService extends AbstractService implements SecurityServ
 	public WSUser getUser(String sid, long userId) throws WebserviceException, PersistenceException {
 		checkAdministrator(sid);
 		try {
-			UserDAO userDao = (UserDAO) Context.get().getBean(UserDAO.class);
+			UserDAO userDao = Context.get(UserDAO.class);
 			User user = userDao.findById(userId);
 			if (user == null)
 				return null;
@@ -344,7 +348,7 @@ public class SoapSecurityService extends AbstractService implements SecurityServ
 	public WSUser getUserByUsername(String sid, String username) throws WebserviceException, PersistenceException {
 		checkAdministrator(sid);
 		try {
-			UserDAO userDao = (UserDAO) Context.get().getBean(UserDAO.class);
+			UserDAO userDao = Context.get(UserDAO.class);
 			User user = userDao.findByUsername(username);
 
 			if (user == null)
@@ -362,7 +366,7 @@ public class SoapSecurityService extends AbstractService implements SecurityServ
 	public WSGroup getGroup(String sid, long groupId) throws WebserviceException, PersistenceException {
 		checkAdministrator(sid);
 
-		GroupDAO groupDao = (GroupDAO) Context.get().getBean(GroupDAO.class);
+		GroupDAO groupDao = Context.get(GroupDAO.class);
 		Group group = groupDao.findById(groupId);
 		if (group == null)
 			return null;

@@ -1,7 +1,10 @@
 package com.logicaldoc.gui.common.client.beans;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Representation of a single document handled by the GUI
@@ -16,15 +19,13 @@ public class GUIDocument extends GUIExtensibleObject implements Serializable {
 
 	public static final int DOC_UNLOCKED = 0;
 
-	private long tenantId;
-
 	private Long docRef;
 
 	private String docRefType;
 
 	private String customId;
 
-	private String[] tags = null;
+	private List<String> tags = new ArrayList<>();
 
 	private String tagsString;
 
@@ -80,6 +81,8 @@ public class GUIDocument extends GUIExtensibleObject implements Serializable {
 
 	private String comment;
 
+	private String lastNote;
+
 	private String workflowStatus;
 
 	private String workflowStatusDisplay;
@@ -107,7 +110,7 @@ public class GUIDocument extends GUIExtensibleObject implements Serializable {
 	private Long formId = null;
 
 	// Users to be notified of the upload
-	private long[] notifyUsers;
+	private List<Long> notifyUsers = new ArrayList<>();
 
 	// Optional message to send to users
 	private String notifyMessage;
@@ -115,6 +118,11 @@ public class GUIDocument extends GUIExtensibleObject implements Serializable {
 	private boolean passwordProtected = false;
 
 	private int links = 0;
+
+	/**
+	 * Counter of extended attributes of type Document
+	 */
+	private int docAttrs = 0;
 
 	/**
 	 * Identifier of the Zonal OCR template to use to process this document
@@ -140,9 +148,16 @@ public class GUIDocument extends GUIExtensibleObject implements Serializable {
 
 	/**
 	 * Just to indicate if this document is being used for collecting the
-	 * metadata of a bulp update
+	 * metadata of a bulk update
 	 */
 	private boolean bulkUpdate = false;
+
+	private List<GUIAccessControlEntry> accessControlList = new ArrayList<>();
+
+	/**
+	 * Permissions granted to the current user on this document
+	 */
+	private GUIAccessControlEntry allowedPermissions = new GUIAccessControlEntry();
 
 	public String getCustomId() {
 		return customId;
@@ -168,74 +183,36 @@ public class GUIDocument extends GUIExtensibleObject implements Serializable {
 		this.version = version;
 	}
 
-	public String[] getTags() {
+	public List<String> getTags() {
 		return tags;
 	}
 
-	public void setTags(String[] tags) {
+	public void setTags(List<String> tags) {
 		this.tags = tags;
 	}
 
 	public void clearTags() {
-		this.tags = new String[] {};
+		tags.clear();
 	}
 
 	public void addTag(String tag) {
-		String[] tmp = null;
-		if (tags != null) {
-			tmp = new String[tags.length + 1];
-
-			int i = 0;
-			for (String tg : tags) {
-				// Skip if the tag already exists
-				if (tg.equals(tag))
-					return;
-				tmp[i++] = tg;
-			}
-			tmp[i] = tag;
-			tags = tmp;
-		} else
-			tags = new String[] { tag };
+		if (!tags.contains(tag))
+			tags.add(tag);
 	}
 
 	public void removeTag(String tag) {
-		if (tags == null || tags.length == 0)
-			return;
-
-		String[] tmp = new String[tags.length - 1];
-		int i = 0;
-		for (String tg : tags) {
-			if (!tg.equals(tag) && tmp.length > 0)
-				tmp[i++] = tg;
-		}
-		tags = tmp;
+		tags.remove(tag);
 	}
 
 	public String getTgs() {
-		if (getTags() == null || getTags().length < 1)
-			return "";
-		else {
-			StringBuilder buf = new StringBuilder();
-			for (String tag : getTags()) {
-				if (buf.length() > 0)
-					buf.append(",");
-				buf.append(tag);
-			}
-			return buf.toString();
-		}
+		return tags.stream().collect(Collectors.joining(","));
 	}
 
 	public String getTagsString() {
 		if (tagsString != null && !tagsString.isEmpty())
 			return tagsString;
-		else {
-			StringBuilder buf = new StringBuilder();
-			for (String tag : getTags()) {
-				buf.append(tag);
-				buf.append(" ");
-			}
-			return buf.toString();
-		}
+		else
+			return tags.stream().collect(Collectors.joining(" "));
 	}
 
 	public String getCreator() {
@@ -522,11 +499,11 @@ public class GUIDocument extends GUIExtensibleObject implements Serializable {
 		this.lockUser = lockUser;
 	}
 
-	public long[] getNotifyUsers() {
+	public List<Long> getNotifyUsers() {
 		return notifyUsers;
 	}
 
-	public void setNotifyUsers(long[] notifyUsers) {
+	public void setNotifyUsers(List<Long> notifyUsers) {
 		this.notifyUsers = notifyUsers;
 	}
 
@@ -626,11 +603,118 @@ public class GUIDocument extends GUIExtensibleObject implements Serializable {
 		this.bulkUpdate = bulkUpdate;
 	}
 
-	public long getTenantId() {
-		return tenantId;
+	public int getDocAttrs() {
+		if (docAttrs == 0 && getAttributes().isEmpty())
+			for (GUIAttribute att : getAttributes())
+				if (att.getType() == GUIAttribute.TYPE_DOCUMENT && att.getIntValue() != null)
+					docAttrs++;
+		return docAttrs;
 	}
 
-	public void setTenantId(long tenantId) {
-		this.tenantId = tenantId;
+	public void setDocAttrs(int docAttrs) {
+		this.docAttrs = docAttrs;
+	}
+
+	public GUIAccessControlEntry getAllowedPermissions() {
+		return allowedPermissions;
+	}
+
+	public void setAllowedPermissions(GUIAccessControlEntry permissions) {
+		this.allowedPermissions = permissions;
+	}
+
+	public boolean isCustomid() {
+		return allowedPermissions.isCustomid();
+	}
+
+	public boolean isRead() {
+		return allowedPermissions.isRead();
+	}
+
+	public boolean isWrite() {
+		return allowedPermissions.isWrite();
+	}
+
+	public boolean isPreview() {
+		return allowedPermissions.isPreview();
+	}
+
+	public boolean isDownload() {
+		return allowedPermissions.isDownload();
+	}
+
+	public boolean isMove() {
+		return allowedPermissions.isMove();
+	}
+
+	public boolean isDelete() {
+		return allowedPermissions.isDelete();
+	}
+
+	public boolean isRename() {
+		return allowedPermissions.isRename();
+	}
+
+	public String getLastNote() {
+		return lastNote;
+	}
+
+	public void setLastNote(String lastNote) {
+		this.lastNote = lastNote;
+	}
+
+	public boolean hasPermission(String permission) {
+		return allowedPermissions.isPermissionAllowed(permission);
+	}
+
+	public List<GUIAccessControlEntry> getAccessControlList() {
+		return accessControlList;
+	}
+
+	public void setAccessControlList(List<GUIAccessControlEntry> accessControlList) {
+		this.accessControlList = accessControlList;
+	}
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = super.hashCode();
+		result = prime * result + ((fileName == null) ? 0 : fileName.hashCode());
+		result = prime * result + ((fileVersion == null) ? 0 : fileVersion.hashCode());
+		result = prime * result + ((folder == null) ? 0 : folder.hashCode());
+		result = prime * result + ((version == null) ? 0 : version.hashCode());
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (!super.equals(obj))
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		GUIDocument other = (GUIDocument) obj;
+		if (fileName == null) {
+			if (other.fileName != null)
+				return false;
+		} else if (!fileName.equals(other.fileName))
+			return false;
+		if (fileVersion == null) {
+			if (other.fileVersion != null)
+				return false;
+		} else if (!fileVersion.equals(other.fileVersion))
+			return false;
+		if (folder == null) {
+			if (other.folder != null)
+				return false;
+		} else if (!folder.equals(other.folder))
+			return false;
+		if (version == null) {
+			if (other.version != null)
+				return false;
+		} else if (!version.equals(other.version))
+			return false;
+		return true;
 	}
 }

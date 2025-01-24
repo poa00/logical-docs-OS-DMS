@@ -1,12 +1,11 @@
 package com.logicaldoc.gui.frontend.client.settings.searchindex;
 
 import com.google.gwt.i18n.client.NumberFormat;
-import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.logicaldoc.gui.common.client.Constants;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIResult;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.frontend.client.document.DocumentsPanel;
@@ -105,14 +104,7 @@ public class SearchIndexEntriesPanel extends VLayout {
 		String q = query.getValueAsString();
 		LD.contactingServer();
 
-		SearchEngineService.Instance.get().query(q, pageNumber, size, new AsyncCallback<GUIResult>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				LD.clearPrompt();
-				GuiLog.serverError(caught);
-			}
-
+		SearchEngineService.Instance.get().query(q, pageNumber, size, new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(GUIResult result) {
 				long totalPages = (long) Math
@@ -127,8 +119,8 @@ public class SearchIndexEntriesPanel extends VLayout {
 				 * with search time and the list of hits
 				 */
 				NumberFormat format = NumberFormat.getFormat("#.###");
-				total.setValue(I18N.message("nresultsinseconds", new String[] { "" + result.getEstimatedHits(),
-						format.format((double) Search.get().getTime() / (double) 1000) }));
+				total.setValue(I18N.message("nresultsinseconds", Long.toString(result.getEstimatedHits()),
+						format.format((double) Search.get().getTime() / (double) 1000)));
 
 				entriesGrid.setDocuments(result.getHits());
 				LD.clearPrompt();
@@ -162,14 +154,7 @@ public class SearchIndexEntriesPanel extends VLayout {
 		deleteEntry.addClickHandler(event -> SC.ask(I18N.message("deleteindexentriesconfirm"), confirm -> {
 			if (confirm.booleanValue()) {
 				LD.contactingServer();
-				SearchEngineService.Instance.get().remove(entriesGrid.getSelectedIds(), new AsyncCallback<Void>() {
-
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-						LD.clearPrompt();
-					}
-
+				SearchEngineService.Instance.get().remove(entriesGrid.getSelectedIds(), new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Void arg) {
 						LD.clearPrompt();
@@ -183,5 +168,15 @@ public class SearchIndexEntriesPanel extends VLayout {
 
 		contextMenu.setItems(openInFolder, deleteEntry);
 		contextMenu.showContextMenu();
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

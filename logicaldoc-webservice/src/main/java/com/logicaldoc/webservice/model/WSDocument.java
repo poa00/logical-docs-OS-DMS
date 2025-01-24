@@ -3,7 +3,6 @@ package com.logicaldoc.webservice.model;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 
 import javax.xml.bind.annotation.XmlRootElement;
@@ -115,7 +114,7 @@ public class WSDocument implements Serializable {
 	private int stamped = 0;
 
 	@WSDoc(required = false, description = "tags applied to the document")
-	private String[] tags = new String[0];
+	private List<String> tags = new ArrayList<>();
 
 	@WSDoc(description = "parent folder")
 	private Long folderId;
@@ -148,7 +147,7 @@ public class WSDocument implements Serializable {
 	private Long deleteUserId;
 
 	@WSDoc(required = false, description = "array of attributes")
-	private WSAttribute[] attributes = new WSAttribute[0];
+	private List<WSAttribute> attributes = new ArrayList<>();
 
 	@WSDoc(required = false, description = "language of the document; <a href='/wiki/LanguageSpecification'>See specification</a>")
 	private String language;
@@ -164,6 +163,9 @@ public class WSDocument implements Serializable {
 
 	@WSDoc(required = false)
 	private String comment;
+	
+	@WSDoc(required = false)
+	private String lastNote;
 
 	@WSDoc(required = false)
 	private String lastModified;
@@ -341,11 +343,13 @@ public class WSDocument implements Serializable {
 		this.signed = signed;
 	}
 
-	public String[] getTags() {
+	public List<String> getTags() {
 		return tags;
 	}
 
-	public void setTags(String[] tags) {
+	public void setTags(List<String> tags) {
+		if (tags == null)
+			tags = new ArrayList<>();
 		this.tags = tags;
 	}
 
@@ -445,7 +449,7 @@ public class WSDocument implements Serializable {
 		this.creation = creation;
 	}
 
-	public WSAttribute[] getAttributes() {
+	public List<WSAttribute> getAttributes() {
 		return attributes;
 	}
 
@@ -459,8 +463,11 @@ public class WSDocument implements Serializable {
 		return null;
 	}
 
-	public void setAttributes(WSAttribute[] attributes) {
-		this.attributes = attributes;
+	public void setAttributes(List<WSAttribute> attributes) {
+		if (attributes == null)
+			this.attributes = new ArrayList<>();
+		else
+			this.attributes = attributes;
 	}
 
 	public String getLanguage() {
@@ -521,21 +528,15 @@ public class WSDocument implements Serializable {
 
 	public void addAttribute(WSAttribute att) {
 		if (attributes == null)
-			attributes = new WSAttribute[0];
-		List<WSAttribute> buf = new ArrayList<>();
-		Collections.addAll(buf, attributes);
-		buf.add(att);
-		setAttributes(buf.toArray(new WSAttribute[0]));
+			attributes = new ArrayList<>();
+		attributes.add(att);
 	}
 
 	public void addTag(String tag) {
 		if (tags == null)
-			tags = new String[0];
-		List<String> buf = new ArrayList<>();
-		Collections.addAll(buf, tags);
-		if (!buf.contains(tag))
-			buf.add(tag);
-		setTags(buf.toArray(new String[0]));
+			tags = new ArrayList<>();
+		if (!tags.contains(tag))
+			tags.add(tag);
 	}
 
 	public String getWorkflowStatus() {
@@ -664,5 +665,13 @@ public class WSDocument implements Serializable {
 
 	public void setColor(String color) {
 		this.color = color;
+	}
+
+	public String getLastNote() {
+		return lastNote;
+	}
+
+	public void setLastNote(String lastNote) {
+		this.lastNote = lastNote;
 	}
 }

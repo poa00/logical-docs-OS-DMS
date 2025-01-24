@@ -4,11 +4,12 @@ import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.document.Document;
 import com.logicaldoc.core.document.Version;
-import com.logicaldoc.core.document.dao.VersionDAO;
+import com.logicaldoc.core.document.VersionDAO;
 import com.logicaldoc.core.security.Tenant;
-import com.logicaldoc.core.security.dao.TenantDAO;
+import com.logicaldoc.core.security.TenantDAO;
 import com.logicaldoc.util.Context;
 
 /**
@@ -26,10 +27,14 @@ public class DocUtil {
 	public static String getFileName(Document document, String fileVersion) {
 		String fileName = document.getFileName();
 		if (StringUtils.isNotEmpty(fileVersion) && !fileVersion.equals(document.getFileVersion())) {
-			VersionDAO vDao = (VersionDAO) Context.get().getBean(VersionDAO.class);
-			Version ver = vDao.findByFileVersion(document.getId(), fileVersion);
-			if (ver != null)
-				fileName = ver.getFileName();
+			VersionDAO vDao = Context.get(VersionDAO.class);
+			try {
+				Version ver = vDao.findByFileVersion(document.getId(), fileVersion);
+				if (ver != null)
+					fileName = ver.getFileName();
+			} catch (PersistenceException e) {
+				log.error(e.getMessage(), e);
+			}
 		}
 		return fileName;
 	}
@@ -38,7 +43,7 @@ public class DocUtil {
 		String tenantName = "default";
 		if (document != null)
 			try {
-				TenantDAO tenantDao = (TenantDAO) Context.get().getBean(TenantDAO.class);
+				TenantDAO tenantDao = Context.get(TenantDAO.class);
 				Tenant tenant = tenantDao.findById(document.getTenantId());
 				tenantName = tenant.getName();
 			} catch (Exception t) {

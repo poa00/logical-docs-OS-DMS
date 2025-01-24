@@ -4,6 +4,8 @@ import static org.apache.commons.lang.builder.ToStringStyle.SHORT_PREFIX_STYLE;
 
 import org.apache.commons.lang.builder.ToStringBuilder;
 
+import com.logicaldoc.webservice.doc.DocException;
+
 /**
  * Imagine a Java Language Variable = a Field in a Java Class, or a Parameter in
  * a Java Method
@@ -34,6 +36,8 @@ public class JavaLanguageVariable {
 	}
 
 	public void setType(Class<?> type) {
+		if (type == null)
+			throw new DocException("null type");
 		this.type = type;
 	}
 

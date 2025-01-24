@@ -1,14 +1,16 @@
 package com.logicaldoc.gui.frontend.client.services;
 
+import java.util.List;
+
 import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIAutomationRoutine;
 import com.logicaldoc.gui.common.client.beans.GUIAutomationTrigger;
 
 public interface AutomationServiceAsync {
 
-	void deleteRoutines(long[] ids, AsyncCallback<Void> callback);
+	void deleteRoutines(List<Long> ids, AsyncCallback<Void> callback);
 
-	void deleteTriggers(long[] ids, AsyncCallback<Void> callback);
+	void deleteTriggers(List<Long> ids, AsyncCallback<Void> callback);
 
 	void saveTrigger(GUIAutomationTrigger trigger, AsyncCallback<GUIAutomationTrigger> callback);
 
@@ -20,5 +22,5 @@ public interface AutomationServiceAsync {
 
 	void applyTriggersToTree(long rootId, AsyncCallback<Void> callback);
 
-	void execute(GUIAutomationRoutine routine, Long[] docIds, Long folderId, AsyncCallback<Void> callback);
+	void execute(GUIAutomationRoutine routine, List<Long> docIds,  List<Long> folderIds, AsyncCallback<Void> callback);
 }

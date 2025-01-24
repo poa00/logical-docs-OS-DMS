@@ -1,11 +1,13 @@
 package com.logicaldoc.gui.frontend.client.document.stamp;
 
+import java.util.List;
+
+import com.logicaldoc.gui.common.client.beans.GUIDocument;
 import com.logicaldoc.gui.common.client.beans.GUIStamp;
 import com.logicaldoc.gui.common.client.i18n.I18N;
 import com.logicaldoc.gui.common.client.util.Util;
 import com.logicaldoc.gui.common.client.widgets.ExtendedPropertiesPanel;
 import com.logicaldoc.gui.common.client.widgets.StickyWindow;
-import com.logicaldoc.gui.frontend.client.document.grid.DocumentsGrid;
 import com.smartgwt.client.types.Overflow;
 import com.smartgwt.client.widgets.layout.VLayout;
 import com.smartgwt.client.widgets.toolbar.ToolStrip;
@@ -24,11 +26,11 @@ public class FillStamp extends StickyWindow {
 
 	private GUIStamp stamp;
 
-	protected DocumentsGrid sourceGrid;
+	protected List<GUIDocument> documents;
 
-	public FillStamp(DocumentsGrid sourceGrid, GUIStamp stamp, boolean visualPositioning) {
+	public FillStamp(List<GUIDocument> documents, GUIStamp stamp, boolean visualPositioning) {
 		super("applystamp");
-		this.sourceGrid = sourceGrid;
+		this.documents = documents;
 		this.visualPositioning = visualPositioning;
 		this.stamp = stamp;
 
@@ -52,7 +54,7 @@ public class FillStamp extends StickyWindow {
 		buttonsBar.setWidth100();
 		buttonsBar.addButton(save);
 
-		propertiesPanel = new ExtendedPropertiesPanel(stamp, null, true, true, false);
+		propertiesPanel = new ExtendedPropertiesPanel(stamp, null, true, true, false, true);
 
 		VLayout propertiesContainer = new VLayout();
 		propertiesContainer.setWidth100();
@@ -71,6 +73,16 @@ public class FillStamp extends StickyWindow {
 		if (!propertiesPanel.validate())
 			return;
 
-		StampDialog.applyStamp(stamp, visualPositioning, this, sourceGrid);
+		StampDialog.applyStamp(stamp, visualPositioning, this, documents);
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

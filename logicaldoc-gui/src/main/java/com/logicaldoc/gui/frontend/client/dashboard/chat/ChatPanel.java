@@ -1,8 +1,7 @@
 package com.logicaldoc.gui.frontend.client.dashboard.chat;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.frontend.client.services.ChatService;
 import com.smartgwt.client.types.Alignment;
@@ -61,8 +60,8 @@ public class ChatPanel extends VLayout {
 
 		setMembers(body, postForm);
 
-		postMessage.addKeyPressHandler(event -> {
-			if (event.getKeyName() != null && "enter".equalsIgnoreCase(event.getKeyName()))
+		postMessage.addKeyPressHandler(keyPress -> {
+			if (keyPress.getKeyName() != null && "enter".equalsIgnoreCase(keyPress.getKeyName()))
 				onPost(postForm.getValueAsString("post"));
 		});
 
@@ -72,16 +71,22 @@ public class ChatPanel extends VLayout {
 	protected void onPost(String message) {
 		if (message == null || message.trim().isEmpty())
 			return;
-		ChatService.Instance.get().post(message, new AsyncCallback<Void>() {
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
+		ChatService.Instance.get().post(message, new DefaultAsyncCallback<>() {
 
 			@Override
 			public void onSuccess(Void arg) {
 				postForm.clearValue("post");
 			}
 		});
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+	
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

@@ -2,17 +2,16 @@ package com.logicaldoc.webservice;
 
 import org.slf4j.LoggerFactory;
 
-import com.logicaldoc.core.HibernatePersistentObjectDAO;
 import com.logicaldoc.core.PersistenceException;
+import com.logicaldoc.core.history.HibernateHistoryDAO;
 
 /**
- * Hibernate implementation of <code>ChatMessageyDAO</code>
+ * Hibernate implementation of {@link WebserviceCallDAO}
  * 
  * @author Marco Meschieri - LogicalDOC
  * @since 8.7
  */
-public class HibernateWebserviceCallDAO extends HibernatePersistentObjectDAO<WebserviceCall>
-		implements WebserviceCallDAO {
+public class HibernateWebserviceCallDAO extends HibernateHistoryDAO<WebserviceCall> implements WebserviceCallDAO {
 
 	private HibernateWebserviceCallDAO() {
 		super(WebserviceCall.class);
@@ -20,11 +19,7 @@ public class HibernateWebserviceCallDAO extends HibernatePersistentObjectDAO<Web
 	}
 
 	@Override
-	public void cleanOldCalls(int ttl) {
-		try {
-			log.info("cleanOldCalls rows updated: {}", cleanOldRecords(ttl, "ld_webservicecall"));
-		} catch (PersistenceException e) {
-			log.error(e.getMessage(), e);
-		}
+	public void cleanOldCalls(int ttl) throws PersistenceException {
+		log.info("cleanOldCalls rows updated: {}", cleanOldRecords(ttl, "ld_webservicecall"));
 	}
 }

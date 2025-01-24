@@ -1,5 +1,8 @@
 package com.logicaldoc.webservice.model;
 
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 
 import javax.xml.bind.annotation.XmlRootElement;
@@ -39,7 +42,7 @@ public class WSSearchOptions implements Comparable<WSSearchOptions> {
 	 * Optional set of document ids. If specified only documents inside this set
 	 * will be returned.
 	 */
-	private Long[] filterIds = null;
+	private List<Long> filterIds = new ArrayList<>();
 
 	private Long folderId = null;
 
@@ -55,7 +58,7 @@ public class WSSearchOptions implements Comparable<WSSearchOptions> {
 
 	private String format = "";
 
-	private String[] fields = null;
+	private List<String> fields = new ArrayList<>();
 
 	private String language = null;
 
@@ -117,11 +120,11 @@ public class WSSearchOptions implements Comparable<WSSearchOptions> {
 		this.topOperator = topOperator;
 	}
 
-	public Long[] getFilterIds() {
+	public List<Long> getFilterIds() {
 		return filterIds;
 	}
 
-	public void setFilterIds(Long[] filterIds) {
+	public void setFilterIds(List<Long> filterIds) {
 		this.filterIds = filterIds;
 	}
 
@@ -189,11 +192,11 @@ public class WSSearchOptions implements Comparable<WSSearchOptions> {
 		this.format = format;
 	}
 
-	public String[] getFields() {
+	public List<String> getFields() {
 		return fields;
 	}
 
-	public void setFields(String[] fields) {
+	public void setFields(List<String> fields) {
 		this.fields = fields;
 	}
 
@@ -258,8 +261,7 @@ public class WSSearchOptions implements Comparable<WSSearchOptions> {
 		wopt.setRetrieveAliases(opt.isRetrieveAliases() ? 1 : 0);
 		wopt.setTemplate(opt.getTemplate());
 		wopt.setCaseSensitive(opt.isCaseSensitive() ? 1 : 0);
-		if (opt.getFilterIds() != null)
-			wopt.setFilterIds(opt.getFilterIds().toArray(new Long[0]));
+		wopt.setFilterIds(new ArrayList<>(opt.getFilterIds()));
 
 		if (opt.getType() == SearchOptions.TYPE_FULLTEXT) {
 			wopt.setCreationFrom(DateUtil.format(((FulltextSearchOptions) opt).getCreationFrom()));
@@ -268,7 +270,7 @@ public class WSSearchOptions implements Comparable<WSSearchOptions> {
 			wopt.setDateTo(DateUtil.format(((FulltextSearchOptions) opt).getDateTo()));
 			wopt.setExpressionLanguage(((FulltextSearchOptions) opt).getExpressionLanguage());
 			wopt.setLanguage(((FulltextSearchOptions) opt).getLanguage());
-			wopt.setFields(((FulltextSearchOptions) opt).getFields());
+			wopt.setFields(new ArrayList<>(((FulltextSearchOptions) opt).getFields()));
 			wopt.setFormat(((FulltextSearchOptions) opt).getFormat());
 			wopt.setSizeMax(((FulltextSearchOptions) opt).getSizeMax());
 			wopt.setSizeMin(((FulltextSearchOptions) opt).getSizeMin());
@@ -303,7 +305,7 @@ public class WSSearchOptions implements Comparable<WSSearchOptions> {
 			((FulltextSearchOptions) so).setDateFrom(WSUtil.convertStringToDate(dateFrom));
 			((FulltextSearchOptions) so).setDateTo(WSUtil.convertStringToDate(dateTo));
 			((FulltextSearchOptions) so).setExpressionLanguage(expressionLanguage);
-			((FulltextSearchOptions) so).setFields(fields);
+			((FulltextSearchOptions) so).setFields(new HashSet<>(fields));
 			((FulltextSearchOptions) so).setFormat(format);
 			((FulltextSearchOptions) so).setLanguage(language);
 			((FulltextSearchOptions) so).setSizeMax(sizeMax);

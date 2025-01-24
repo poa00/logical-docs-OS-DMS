@@ -6,6 +6,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
+import java.util.List;
 import java.util.Properties;
 
 import org.java.plugin.Plugin;
@@ -13,7 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.logicaldoc.util.config.ContextProperties;
-import com.logicaldoc.util.config.LoggingConfigurator;
+import com.logicaldoc.util.config.LogConfigurator;
 import com.logicaldoc.util.config.WebConfigurator;
 
 /**
@@ -106,21 +107,19 @@ public abstract class LogicalDOCPlugin extends Plugin {
 	}
 
 	/**
-	 * Retrieves the path where the plugins jar archives are stored
+	 * Retrieves the path where the plugin jar archive is stored
 	 * 
-	 * @return the path where the plugins jar archives are stored
+	 * @return the path where the plugin jar archive is stored
 	 */
 	public String getPluginPath() {
-		String path = getManager().getPathResolver().resolvePath(getDescriptor(), "/").toString();
-		if (path.startsWith("jar:file:"))
-			path = path.substring("jar:file:".length());
-		path = path.substring(0, path.lastIndexOf("!"));
+		String path = getClass().getProtectionDomain().getCodeSource().getLocation().getPath();
 		try {
 			// The path may contain URL-encoded sequences
 			path = URLDecoder.decode(path, "UTF-8");
 		} catch (UnsupportedEncodingException e) {
 			// Nothing to do
 		}
+
 		return path;
 	}
 
@@ -184,8 +183,10 @@ public abstract class LogicalDOCPlugin extends Plugin {
 	}
 
 	protected void setRestartRequired() {
-		if (getDescriptor() != null)
-			System.out.println("Plugin " + getDescriptor().getId() + " requires a restart");
+		if (getDescriptor() != null) {
+			Logger console = LoggerFactory.getLogger("console");
+			console.warn("Plugin {} requires a restart", getDescriptor().getId());
+		}
 		PluginRegistry.getInstance().setRestartRequired();
 	}
 
@@ -229,18 +230,47 @@ public abstract class LogicalDOCPlugin extends Plugin {
 			pbean.write();
 		} catch (IOException e) {
 			logger.warn("Cannot add task {} to the configuration", taskName);
+			logger.warn(e.getMessage(), e);
 		}
 	}
 
 	/**
 	 * Utility method to add a new appender into the log configuration
 	 * 
-	 * @param logger name of the logger
+	 * @param name name of the logger
+	 * @param additivity the additivity flag
+	 * @param level the log level
 	 * @param appender name of the appender
 	 */
-	protected void addLogger(String logger, String appender) {
+	protected void addLogger(String name, boolean additivity, String level, String appender) {
+		try {
+			// Add notifier log issues
+			LogConfigurator logging = new LogConfigurator();
+			logging.addTextAppender(appender);
+			logging.write();
+
+			String appenderWeb = appender + "_WEB";
+			logging.addHtmlAppender(appenderWeb);
+			logging.write();
+
+			logging.setLogger(name, additivity, level, List.of(appender, appenderWeb));
+			logging.write();
+		} catch (Exception e) {
+			logger.warn("Cannot add logger {}", name);
+			logger.warn(e.getMessage(), e);
+		}
+	}
+
+	/**
+	 * Utility method to add a new appender into the log configuration
+	 * 
+	 * @param name name of the logger
+	 * @param appender name of the appender
+	 */
+	protected void addLogger(String name, String appender) {
+		try {
 		// Add notifier log issues
-		LoggingConfigurator logging = new LoggingConfigurator();
+		LogConfigurator logging = new LogConfigurator();
 		logging.addTextAppender(appender);
 		logging.write();
 
@@ -248,8 +278,12 @@ public abstract class LogicalDOCPlugin extends Plugin {
 		logging.addHtmlAppender(appenderWeb);
 		logging.write();
 
-		logging.addLogger(logger, new String[] { appender, appenderWeb });
+		logging.addLogger(name, List.of(appender, appenderWeb));
 		logging.write();
+	} catch (Exception e) {
+		logger.warn("Cannot add logger {}", name);
+		logger.warn(e.getMessage(), e);
+	}
 	}
 
 	/**
@@ -272,9 +306,9 @@ public abstract class LogicalDOCPlugin extends Plugin {
 	 * @param optional index when loading the servlet on startup
 	 */
 	protected void addServlet(String name, String servletClass, String mapping, Integer loadOnStartup) {
+		try {
 		File dest = new File(getPluginPath());
 		dest = dest.getParentFile().getParentFile();
-
 		WebConfigurator config = new WebConfigurator(dest.getPath() + "/web.xml");
 		if (loadOnStartup != null)
 			config.addServlet(name, servletClass, loadOnStartup);
@@ -285,6 +319,10 @@ public abstract class LogicalDOCPlugin extends Plugin {
 		if (mapping != null) {
 			config.addServletMapping(name, mapping);
 			config.writeXMLDoc();
+		}
+		} catch (Exception e) {
+			logger.warn("Cannot add servlet {}", name);
+			logger.warn(e.getMessage(), e);
 		}
 	}
 }

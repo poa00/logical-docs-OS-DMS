@@ -2,7 +2,6 @@ package com.logicaldoc.web.websockets;
 
 import static org.junit.Assert.assertEquals;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.SQLException;
 
@@ -12,13 +11,14 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.logicaldoc.core.History;
 import com.logicaldoc.core.document.Document;
 import com.logicaldoc.core.document.DocumentEvent;
 import com.logicaldoc.core.document.DocumentHistory;
 import com.logicaldoc.core.folder.Folder;
-import com.logicaldoc.core.security.UserEvent;
-import com.logicaldoc.core.security.UserHistory;
+import com.logicaldoc.core.history.History;
+import com.logicaldoc.core.security.user.UserEvent;
+import com.logicaldoc.core.security.user.UserHistory;
+import com.logicaldoc.util.plugin.PluginException;
 import com.logicaldoc.web.AbstractWebappTestCase;
 
 public class EventEndpointTest extends AbstractWebappTestCase {
@@ -29,7 +29,7 @@ public class EventEndpointTest extends AbstractWebappTestCase {
 	private Session websocketSession = new MockWebsocketSession();
 
 	@Before
-	public void setUp() throws FileNotFoundException, IOException, SQLException {
+	public void setUp() throws IOException, SQLException, PluginException {
 		super.setUp();
 		endpoint.error(websocketSession, new Exception("test exception"));
 		endpoint.onOpen(websocketSession);

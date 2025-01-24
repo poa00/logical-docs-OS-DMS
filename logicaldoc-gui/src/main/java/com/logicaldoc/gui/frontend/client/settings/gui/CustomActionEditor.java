@@ -3,15 +3,15 @@ package com.logicaldoc.gui.frontend.client.settings.gui;
 import com.logicaldoc.gui.common.client.beans.GUIMenu;
 import com.logicaldoc.gui.common.client.i18n.I18N;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
-import com.logicaldoc.gui.frontend.client.security.MenuRightsPanel;
+import com.logicaldoc.gui.frontend.client.security.MenuSecurityPanel;
 import com.smartgwt.client.types.HeaderControls;
 import com.smartgwt.client.types.TitleOrientation;
 import com.smartgwt.client.widgets.Window;
 import com.smartgwt.client.widgets.form.DynamicForm;
-import com.smartgwt.client.widgets.form.fields.RadioGroupItem;
 import com.smartgwt.client.widgets.form.fields.SelectItem;
 import com.smartgwt.client.widgets.form.fields.TextAreaItem;
 import com.smartgwt.client.widgets.form.fields.TextItem;
+import com.smartgwt.client.widgets.form.fields.ToggleItem;
 import com.smartgwt.client.widgets.form.fields.events.ChangedHandler;
 import com.smartgwt.client.widgets.tab.Tab;
 import com.smartgwt.client.widgets.tab.TabSet;
@@ -36,7 +36,7 @@ public class CustomActionEditor extends Window {
 
 	private TabSet tabs = new TabSet();
 
-	private MenuRightsPanel rightsPanel = null;
+	private MenuSecurityPanel securityPanel = null;
 
 	public CustomActionEditor(GUIMenu action, CustomActionsPanel panel) {
 		this.action = action;
@@ -71,9 +71,8 @@ public class CustomActionEditor extends Window {
 
 		addItem(toolStrip);
 
-		RadioGroupItem enabled = ItemFactory.newBooleanSelector("enabled");
+		ToggleItem enabled = ItemFactory.newToggleItem("enabled", action.isEnabled());
 		enabled.setRequired(true);
-		enabled.setValue(action.isEnabled() ? "yes" : "no");
 
 		TextItem name = ItemFactory.newTextItem("name", action.getName());
 		name.setRequired(true);
@@ -110,8 +109,8 @@ public class CustomActionEditor extends Window {
 		details.setPane(form);
 
 		Tab security = new Tab(I18N.message("security"));
-		rightsPanel = new MenuRightsPanel(action, false);
-		security.setPane(rightsPanel);
+		securityPanel = new MenuSecurityPanel(action, false);
+		security.setPane(securityPanel);
 
 		tabs.setTabs(details, security);
 		addItem(tabs);
@@ -122,7 +121,7 @@ public class CustomActionEditor extends Window {
 			action.setName(form.getValueAsString("name").replace("/", ""));
 			action.setDescription(form.getValueAsString("description"));
 			action.setAutomation(form.getValueAsString("automation"));
-			action.setEnabled("yes".equals(form.getValueAsString("enabled")));
+			action.setEnabled(Boolean.valueOf(form.getValueAsString("enabled")));
 			action.setType(2);
 
 			Long routineId = null;
@@ -131,8 +130,8 @@ public class CustomActionEditor extends Window {
 			action.setRoutineId(routineId);
 
 			try {
-				if (rightsPanel != null)
-					action.setRights(rightsPanel.getRights());
+				if (securityPanel != null)
+					action.setAccessControlList(securityPanel.getACL());
 			} catch (Exception t) {
 				// Nothing to do
 			}
@@ -142,5 +141,15 @@ public class CustomActionEditor extends Window {
 		} else {
 			tabs.selectTab(0);
 		}
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

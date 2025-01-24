@@ -1,22 +1,22 @@
 package com.logicaldoc.gui.frontend.client.impex.email;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIEmailAccount;
 import com.logicaldoc.gui.common.client.data.EmailAccountsDS;
+import com.logicaldoc.gui.common.client.grid.EnabledListGridField;
+import com.logicaldoc.gui.common.client.grid.IdListGridField;
+import com.logicaldoc.gui.common.client.grid.IntegerListGridField;
+import com.logicaldoc.gui.common.client.grid.RefreshableListGrid;
 import com.logicaldoc.gui.common.client.i18n.I18N;
 import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.LD;
-import com.logicaldoc.gui.common.client.util.Util;
 import com.logicaldoc.gui.common.client.widgets.HTMLPanel;
 import com.logicaldoc.gui.common.client.widgets.InfoPanel;
-import com.logicaldoc.gui.common.client.widgets.grid.IntegerListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.RefreshableListGrid;
 import com.logicaldoc.gui.frontend.client.administration.AdminPanel;
 import com.logicaldoc.gui.frontend.client.services.EmailAccountService;
 import com.smartgwt.client.data.AdvancedCriteria;
 import com.smartgwt.client.data.Record;
 import com.smartgwt.client.types.Alignment;
-import com.smartgwt.client.types.ListGridFieldType;
 import com.smartgwt.client.types.OperatorId;
 import com.smartgwt.client.types.SelectionStyle;
 import com.smartgwt.client.util.SC;
@@ -46,7 +46,7 @@ public class EmailAccountsPanel extends AdminPanel {
 
 	private static final String QUESTION = "question";
 
-	private static final String EENABLED = "eenabled";
+	private static final String ENABLED = "eenabled";
 
 	private static final String EMAIL = "email";
 
@@ -72,20 +72,12 @@ public class EmailAccountsPanel extends AdminPanel {
 		listing.setHeight("60%");
 		listing.setShowResizeBar(true);
 
-		ListGridField id = new ListGridField("id", 50);
-		id.setHidden(true);
+		ListGridField id = new IdListGridField();
 
 		ListGridField email = new ListGridField(EMAIL, I18N.message(EMAIL), 300);
 		email.setCanFilter(true);
 
-		ListGridField enabled = new ListGridField(EENABLED, " ", 24);
-		enabled.setType(ListGridFieldType.IMAGE);
-		enabled.setCanSort(false);
-		enabled.setAlign(Alignment.CENTER);
-		enabled.setShowDefaultContextMenu(false);
-		enabled.setImageURLPrefix(Util.imagePrefix());
-		enabled.setImageURLSuffix(".gif");
-		enabled.setCanFilter(false);
+		ListGridField enabled = new EnabledListGridField();
 
 		IntegerListGridField emails = new IntegerListGridField("emails", I18N.message("importedemails"));
 		emails.setAutoFitWidth(true);
@@ -140,13 +132,7 @@ public class EmailAccountsPanel extends AdminPanel {
 			Record rec = list.getSelectedRecord();
 			if (rec != null)
 				EmailAccountService.Instance.get().get(Long.parseLong(rec.getAttributeAsString("id")),
-						new AsyncCallback<GUIEmailAccount>() {
-
-							@Override
-							public void onFailure(Throwable caught) {
-								GuiLog.serverError(caught);
-							}
-
+						new DefaultAsyncCallback<>() {
 							@Override
 							public void onSuccess(GUIEmailAccount account) {
 								showDetails(account);
@@ -174,12 +160,7 @@ public class EmailAccountsPanel extends AdminPanel {
 		delete.addClickHandler((MenuItemClickEvent event) -> LD.ask(I18N.message(QUESTION),
 				I18N.message("confirmdelete"), (Boolean value) -> {
 					if (Boolean.TRUE.equals(value)) {
-						EmailAccountService.Instance.get().delete(id, new AsyncCallback<Void>() {
-							@Override
-							public void onFailure(Throwable caught) {
-								GuiLog.serverError(caught);
-							}
-
+						EmailAccountService.Instance.get().delete(id, new DefaultAsyncCallback<>() {
 							@Override
 							public void onSuccess(Void result) {
 								list.removeSelectedData();
@@ -193,12 +174,7 @@ public class EmailAccountsPanel extends AdminPanel {
 		MenuItem test = new MenuItem();
 		test.setTitle(I18N.message("testconnection"));
 		test.addClickHandler((MenuItemClickEvent event) -> EmailAccountService.Instance.get()
-				.test(Long.parseLong(rec.getAttributeAsString("id")), new AsyncCallback<Boolean>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				.test(Long.parseLong(rec.getAttributeAsString("id")), new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Boolean result) {
 						if (result.booleanValue())
@@ -210,49 +186,34 @@ public class EmailAccountsPanel extends AdminPanel {
 
 		MenuItem enable = new MenuItem();
 		enable.setTitle(I18N.message("enable"));
-		enable.addClickHandler((MenuItemClickEvent event) -> EmailAccountService.Instance.get()
-				.changeStatus(Long.parseLong(rec.getAttributeAsString("id")), true, new AsyncCallback<Void>() {
-
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+		enable.setEnabled(Boolean.FALSE.equals(rec.getAttributeAsBoolean(ENABLED)));
+		enable.addClickHandler(click -> EmailAccountService.Instance.get()
+				.changeStatus(Long.parseLong(rec.getAttributeAsString("id")), true, new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Void result) {
-						rec.setAttribute(EENABLED, "0");
+						rec.setAttribute(ENABLED, true);
 						list.refreshRow(list.getRecordIndex(rec));
 					}
 				}));
 
 		MenuItem disable = new MenuItem();
 		disable.setTitle(I18N.message("disable"));
-		disable.addClickHandler((MenuItemClickEvent event) -> EmailAccountService.Instance.get()
-				.changeStatus(Long.parseLong(rec.getAttributeAsString("id")), false, new AsyncCallback<Void>() {
-
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+		disable.setEnabled(Boolean.TRUE.equals(rec.getAttributeAsBoolean(ENABLED)));
+		disable.addClickHandler(click -> EmailAccountService.Instance.get()
+				.changeStatus(Long.parseLong(rec.getAttributeAsString("id")), false, new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Void result) {
-						rec.setAttribute(EENABLED, "2");
+						rec.setAttribute(ENABLED, false);
 						list.refreshRow(list.getRecordIndex(rec));
 					}
 				}));
 
 		MenuItem resetCache = new MenuItem();
 		resetCache.setTitle(I18N.message("resetcache"));
-		resetCache.addClickHandler((MenuItemClickEvent event) -> LD.ask(I18N.message(QUESTION),
-				I18N.message("confirmresetcache"), (Boolean value) -> {
-					if (Boolean.TRUE.equals(value)) {
-						EmailAccountService.Instance.get().resetCache(id, new AsyncCallback<Void>() {
-							@Override
-							public void onFailure(Throwable caught) {
-								GuiLog.serverError(caught);
-							}
-
+		resetCache
+				.addClickHandler(click -> LD.ask(I18N.message(QUESTION), I18N.message("confirmresetcache"), choice -> {
+					if (Boolean.TRUE.equals(choice)) {
+						EmailAccountService.Instance.get().resetCache(id, new DefaultAsyncCallback<>() {
 							@Override
 							public void onSuccess(Void result) {
 								GuiLog.info(I18N.message("cachedeleted"), null);
@@ -264,14 +225,9 @@ public class EmailAccountsPanel extends AdminPanel {
 		MenuItem resetCounter = new MenuItem();
 		resetCounter.setTitle(I18N.message("resetcounter"));
 		resetCounter.addClickHandler((MenuItemClickEvent event) -> LD.ask(I18N.message(QUESTION),
-				I18N.message("confirmresetcounter"), (Boolean value) -> {
-					if (Boolean.TRUE.equals(value)) {
-						EmailAccountService.Instance.get().resetCounter(id, new AsyncCallback<Void>() {
-							@Override
-							public void onFailure(Throwable caught) {
-								GuiLog.serverError(caught);
-							}
-
+				I18N.message("confirmresetcounter"), choice -> {
+					if (Boolean.TRUE.equals(choice)) {
+						EmailAccountService.Instance.get().resetCounter(id, new DefaultAsyncCallback<>() {
 							@Override
 							public void onSuccess(Void result) {
 								GuiLog.info(I18N.message("counterreseted"), null);
@@ -282,10 +238,7 @@ public class EmailAccountsPanel extends AdminPanel {
 					}
 				}));
 
-		if ("0".equals(rec.getAttributeAsString(EENABLED)))
-			contextMenu.setItems(test, disable, delete, resetCache, resetCounter);
-		else
-			contextMenu.setItems(test, enable, delete, resetCache, resetCounter);
+		contextMenu.setItems(test, enable, disable, delete, resetCache, resetCounter);
 		contextMenu.showContextMenu();
 	}
 
@@ -318,7 +271,17 @@ public class EmailAccountsPanel extends AdminPanel {
 		}
 
 		rec.setAttribute(EMAIL, account.getMailAddress());
-		rec.setAttribute(EENABLED, account.getEnabled() == 1 ? "0" : "2");
+		rec.setAttribute(ENABLED, account.getEnabled() == 1 ? "0" : "2");
 		list.refreshRow(list.getRecordIndex(rec));
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

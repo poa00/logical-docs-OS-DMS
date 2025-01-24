@@ -1,21 +1,23 @@
 package com.logicaldoc.gui.frontend.client.security;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIParameter;
 import com.logicaldoc.gui.common.client.beans.GUISequence;
 import com.logicaldoc.gui.common.client.data.UsersDS;
+import com.logicaldoc.gui.common.client.grid.DateListGridField;
+import com.logicaldoc.gui.common.client.grid.IdListGridField;
 import com.logicaldoc.gui.common.client.i18n.I18N;
 import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.services.SecurityService;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.LD;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField;
 import com.logicaldoc.gui.frontend.client.administration.AdminPanel;
 import com.logicaldoc.gui.frontend.client.services.SettingService;
 import com.smartgwt.client.types.Alignment;
@@ -23,10 +25,9 @@ import com.smartgwt.client.types.SelectionStyle;
 import com.smartgwt.client.types.TitleOrientation;
 import com.smartgwt.client.widgets.IButton;
 import com.smartgwt.client.widgets.form.DynamicForm;
-import com.smartgwt.client.widgets.form.ValuesManager;
 import com.smartgwt.client.widgets.form.fields.MultiComboBoxItem;
-import com.smartgwt.client.widgets.form.fields.RadioGroupItem;
 import com.smartgwt.client.widgets.form.fields.SpinnerItem;
+import com.smartgwt.client.widgets.form.fields.ToggleItem;
 import com.smartgwt.client.widgets.grid.ListGrid;
 import com.smartgwt.client.widgets.grid.ListGridField;
 import com.smartgwt.client.widgets.grid.ListGridRecord;
@@ -41,6 +42,8 @@ import com.smartgwt.client.widgets.menu.MenuItem;
  */
 public class BruteForcePanel extends AdminPanel {
 
+	private static final String MINUTES = "minutes";
+
 	private static final String RECIPIENTS = "recipients";
 
 	private static final String ATTEMPTS = "attempts";
@@ -48,6 +51,10 @@ public class BruteForcePanel extends AdminPanel {
 	private static final String THROTTLE_IP_WAIT = "throttle.ip.wait";
 
 	private static final String THROTTLE_IP_MAX = "throttle.ip.max";
+
+	private static final String THROTTLE_APIKEY_WAIT = "throttle.apikey.wait";
+
+	private static final String THROTTLE_APIKEY_MAX = "throttle.apikey.max";
 
 	private static final String THROTTLE_ALERT_RECIPIENTS = "throttle.alert.recipients";
 
@@ -59,9 +66,9 @@ public class BruteForcePanel extends AdminPanel {
 
 	private static final String THROTTLE_ENABLED = "throttle.enabled";
 
-	private ValuesManager vm = new ValuesManager();
-
 	private ListGrid blockedEntities;
+
+	private DynamicForm form = new DynamicForm();
 
 	public BruteForcePanel() {
 		super("bruteforceprevention");
@@ -73,81 +80,76 @@ public class BruteForcePanel extends AdminPanel {
 
 		addMember(save);
 
-		SettingService.Instance.get()
-				.loadSettingsByNames(new String[] { THROTTLE_ENABLED, THROTTLE_USERNAME_MAX, THROTTLE_USERNAME_WAIT,
+		SettingService.Instance.get().loadSettingsByNames(
+				Arrays.asList(THROTTLE_ENABLED, THROTTLE_USERNAME_MAX, THROTTLE_USERNAME_WAIT,
 						THROTTLE_USERNAME_DISABLEUSER, THROTTLE_USERNAME_WAIT, THROTTLE_IP_MAX, THROTTLE_IP_WAIT,
-						THROTTLE_ALERT_RECIPIENTS }, new AsyncCallback<GUIParameter[]>() {
-							@Override
-							public void onFailure(Throwable caught) {
-								GuiLog.serverError(caught);
-							}
+						THROTTLE_APIKEY_MAX, THROTTLE_APIKEY_WAIT, THROTTLE_ALERT_RECIPIENTS),
+				new DefaultAsyncCallback<>() {
+					@Override
+					public void onSuccess(List<GUIParameter> params) {
+						Map<String, String> p = new HashMap<>();
+						for (GUIParameter par : params)
+							p.put(par.getName(), par.getValue());
+						initForm(p);
+					}
+				});
+	}
 
-							@Override
-							public void onSuccess(GUIParameter[] params) {
-								Map<String, String> p = new HashMap<>();
-								for (GUIParameter par : params)
-									p.put(par.getName(), par.getValue());
-								initForm(p);
-							}
-						});
+	private int intValue(String str) {
+		try {
+			return Integer.parseInt(str);
+		} catch (Exception t) {
+			return 0;
+		}
 	}
 
 	private void initForm(Map<String, String> params) {
-		DynamicForm form = new DynamicForm();
-		form.setValuesManager(vm);
 		form.setTitleOrientation(TitleOrientation.LEFT);
 
-		RadioGroupItem enabled = ItemFactory.newBooleanSelector("eenabled", "bruteforcepreventionenabled");
-		enabled.setValue("true".equals(params.get(THROTTLE_ENABLED)) ? "yes" : "no");
+		ToggleItem enabled = ItemFactory.newToggleItem("eenabled", "bruteforcepreventionenabled",
+				Boolean.valueOf(params.get(THROTTLE_ENABLED)));
 		enabled.setWrapTitle(false);
 		enabled.setTitleOrientation(TitleOrientation.LEFT);
 
 		SpinnerItem usernameMax = ItemFactory.newSpinnerItem("usernamemax", "maxsameusernamefailedattempts",
-				(Integer) null);
+				intValue(params.get(THROTTLE_USERNAME_MAX)));
 		usernameMax.setMin(0);
 		usernameMax.setWrapTitle(false);
-		try {
-			usernameMax.setValue(Integer.parseInt(params.get(THROTTLE_USERNAME_MAX)));
-		} catch (Exception t) {
-			// Nothing to do
-		}
 
-		SpinnerItem usernameWait = ItemFactory.newSpinnerItem("usernamewait", "sameusernamewait", (Integer) null);
+		SpinnerItem usernameWait = ItemFactory.newSpinnerItem("usernamewait", "sameusernamewait",
+				intValue(params.get(THROTTLE_USERNAME_WAIT)));
 		usernameWait.setMin(0);
-		usernameWait.setHint(I18N.message("minutes"));
+		usernameWait.setHint(I18N.message(MINUTES));
 		usernameWait.setWrapTitle(false);
-		try {
-			usernameWait.setValue(Integer.parseInt(params.get(THROTTLE_USERNAME_WAIT)));
-		} catch (Exception t) {
-			// Nothing to do
-		}
-		usernameWait.setDisabled("true".equals(params.get(THROTTLE_USERNAME_DISABLEUSER)));
 
-		RadioGroupItem usernameDisableUser = ItemFactory.newBooleanSelector("usernamedisableuser",
-				"disableuserafterfailedusername");
-		usernameDisableUser.setValue("true".equals(params.get(THROTTLE_USERNAME_DISABLEUSER)) ? "yes" : "no");
+		usernameWait.setDisabled(Boolean.valueOf(params.get(THROTTLE_USERNAME_DISABLEUSER)));
+
+		ToggleItem usernameDisableUser = ItemFactory.newToggleItem("usernamedisableuser",
+				"disableuserafterfailedusername", Boolean.valueOf(params.get(THROTTLE_USERNAME_DISABLEUSER)));
 		usernameDisableUser.setWrapTitle(false);
 		usernameDisableUser.setTitleOrientation(TitleOrientation.LEFT);
 		usernameDisableUser.addChangedHandler(event -> usernameWait.setDisabled("yes".equals(event.getValue())));
 
-		SpinnerItem ipMax = ItemFactory.newSpinnerItem("ipmax", "maxsameipfailedattempts", (Integer) null);
+		SpinnerItem ipMax = ItemFactory.newSpinnerItem("ipmax", "maxsameipfailedattempts",
+				intValue(params.get(THROTTLE_IP_MAX)));
 		ipMax.setMin(0);
 		ipMax.setWrapTitle(false);
-		try {
-			ipMax.setValue(Integer.parseInt(params.get(THROTTLE_IP_MAX)));
-		} catch (Exception t) {
-			// Nothing to do
-		}
 
-		SpinnerItem ipWait = ItemFactory.newSpinnerItem("ipwait", "sameipwait", (Integer) null);
+		SpinnerItem ipWait = ItemFactory.newSpinnerItem("ipwait", "sameipwait", intValue(params.get(THROTTLE_IP_WAIT)));
 		ipWait.setMin(0);
 		ipWait.setWrapTitle(false);
-		ipWait.setHint(I18N.message("minutes"));
-		try {
-			ipWait.setValue(Integer.parseInt(params.get(THROTTLE_IP_WAIT)));
-		} catch (Exception t) {
-			// Nothing to do
-		}
+		ipWait.setHint(I18N.message(MINUTES));
+
+		SpinnerItem apikeyMax = ItemFactory.newSpinnerItem("apikeymax", "maxsameapikeyfailedattempts",
+				intValue(params.get(THROTTLE_APIKEY_MAX)));
+		apikeyMax.setMin(0);
+		apikeyMax.setWrapTitle(false);
+
+		SpinnerItem apikeyWait = ItemFactory.newSpinnerItem("apikeywait", "sameapikeywait",
+				intValue(params.get(THROTTLE_APIKEY_WAIT)));
+		apikeyWait.setMin(0);
+		apikeyWait.setWrapTitle(false);
+		apikeyWait.setHint(I18N.message(MINUTES));
 
 		MultiComboBoxItem recipients = ItemFactory.newMultiComboBoxItem(RECIPIENTS, "alertrecipients",
 				new UsersDS(null, false, false),
@@ -157,28 +159,21 @@ public class BruteForcePanel extends AdminPanel {
 		recipients.setValueField("username");
 		recipients.setDisplayField("username");
 
-		form.setItems(enabled, usernameMax, usernameDisableUser, usernameWait, ipMax, ipWait, recipients);
+		form.setItems(enabled, usernameMax, usernameDisableUser, usernameWait, ipMax, ipWait, apikeyMax, apikeyWait,
+				recipients);
 
 		body.addMember(form);
 
-		SecurityService.Instance.get().loadBlockedEntities(new AsyncCallback<GUISequence[]>() {
-
+		SecurityService.Instance.get().loadBlockedEntities(new DefaultAsyncCallback<>() {
 			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
-			@Override
-			public void onSuccess(GUISequence[] seqs) {
+			public void onSuccess(List<GUISequence> seqs) {
 				prepareBlockedEntriesGrid(seqs);
 			}
 		});
 	}
 
-	private void prepareBlockedEntriesGrid(GUISequence[] data) {
-		ListGridField id = new ListGridField("id", I18N.message("id"));
-		id.setWidth(60);
-		id.setHidden(true);
+	private void prepareBlockedEntriesGrid(List<GUISequence> data) {
+		ListGridField id = new IdListGridField();
 
 		ListGridField entity = new ListGridField("entity", I18N.message("blockedusernameip"));
 		entity.setWidth(200);
@@ -199,15 +194,14 @@ public class BruteForcePanel extends AdminPanel {
 		blockedEntities.setSelectionType(SelectionStyle.MULTIPLE);
 
 		List<ListGridRecord> records = new ArrayList<>();
-		if (data != null)
-			for (GUISequence cid : data) {
-				ListGridRecord rec = new ListGridRecord();
-				rec.setAttribute("id", cid.getId());
-				rec.setAttribute("entity", cid.getName());
-				rec.setAttribute(ATTEMPTS, cid.getValue());
-				rec.setAttribute("lastmodified", cid.getLastModified());
-				records.add(rec);
-			}
+		for (GUISequence cid : data) {
+			ListGridRecord rec = new ListGridRecord();
+			rec.setAttribute("id", cid.getId());
+			rec.setAttribute("entity", cid.getName());
+			rec.setAttribute(ATTEMPTS, cid.getValue());
+			rec.setAttribute("lastmodified", cid.getLastModified());
+			records.add(rec);
+		}
 		blockedEntities.setData(records.toArray(new ListGridRecord[0]));
 
 		blockedEntities.setFields(id, entity, attempts, lastAttempt);
@@ -224,20 +218,15 @@ public class BruteForcePanel extends AdminPanel {
 		Menu contextMenu = new Menu();
 
 		final ListGridRecord[] records = blockedEntities.getSelectedRecords();
-		final long[] ids = new long[records.length];
+		final List<Long> ids = new ArrayList<>();
 		for (int i = 0; i < records.length; i++)
-			ids[i] = records[i].getAttributeAsLong("id");
+			ids.add(records[i].getAttributeAsLong("id"));
 
 		MenuItem delete = new MenuItem();
 		delete.setTitle(I18N.message("ddelete"));
 		delete.addClickHandler(event -> LD.ask(I18N.message("question"), I18N.message("confirmdelete"), confirm -> {
 			if (Boolean.TRUE.equals(confirm)) {
-				SecurityService.Instance.get().removeBlockedEntities(ids, new AsyncCallback<Void>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				SecurityService.Instance.get().removeBlockedEntities(ids, new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Void result) {
 						blockedEntities.removeSelectedData();
@@ -251,41 +240,43 @@ public class BruteForcePanel extends AdminPanel {
 	}
 
 	public void onSave() {
-		if (Boolean.FALSE.equals(vm.validate()))
+		if (!form.validate())
 			return;
 
-		@SuppressWarnings("unchecked")
-		Map<String, Object> values = vm.getValues();
-		GUIParameter[] params = new GUIParameter[7];
-		params[0] = new GUIParameter(THROTTLE_ENABLED,
-				"yes".equals(values.get("eenabled").toString()) ? "true" : "false");
-		params[1] = new GUIParameter(THROTTLE_USERNAME_MAX, values.get("usernamemax").toString());
-		params[2] = new GUIParameter(THROTTLE_USERNAME_WAIT, values.get("usernamewait").toString());
-		params[3] = new GUIParameter(THROTTLE_IP_MAX, values.get("ipmax").toString());
-		params[4] = new GUIParameter(THROTTLE_IP_WAIT, values.get("ipwait").toString());
-		params[5] = new GUIParameter(THROTTLE_USERNAME_DISABLEUSER,
-				"yes".equals(values.get("usernamedisableuser").toString()) ? "true" : "false");
+		List<GUIParameter> params = new ArrayList<>();
+		params.add(new GUIParameter(THROTTLE_ENABLED, form.getValueAsString("eenabled")));
+		params.add(new GUIParameter(THROTTLE_USERNAME_MAX, form.getValueAsString("usernamemax")));
+		params.add(new GUIParameter(THROTTLE_USERNAME_WAIT, form.getValueAsString("usernamewait")));
+		params.add(new GUIParameter(THROTTLE_IP_MAX, form.getValueAsString("ipmax")));
+		params.add(new GUIParameter(THROTTLE_IP_WAIT, form.getValueAsString("ipwait")));
+		params.add(new GUIParameter(THROTTLE_APIKEY_MAX, form.getValueAsString("apikeymax")));
+		params.add(new GUIParameter(THROTTLE_APIKEY_WAIT, form.getValueAsString("apikeywait")));
+		params.add(new GUIParameter(THROTTLE_USERNAME_DISABLEUSER, form.getValueAsString("usernamedisableuser")));
 
-		if (values.get(RECIPIENTS) != null) {
+		if (form.getValueAsString(RECIPIENTS) != null) {
 			@SuppressWarnings("unchecked")
-			ArrayList<String> usernames = (ArrayList<String>) values.get(RECIPIENTS);
-			params[6] = new GUIParameter(THROTTLE_ALERT_RECIPIENTS,
-					usernames.stream().collect(Collectors.joining(",")));
+			ArrayList<String> usernames = (ArrayList<String>) form.getValue(RECIPIENTS);
+			params.add(
+					new GUIParameter(THROTTLE_ALERT_RECIPIENTS, usernames.stream().collect(Collectors.joining(","))));
 		} else {
-			params[6] = new GUIParameter(THROTTLE_ALERT_RECIPIENTS, "");
+			params.add(new GUIParameter(THROTTLE_ALERT_RECIPIENTS, ""));
 		}
 
-		SettingService.Instance.get().saveSettings(params, new AsyncCallback<Void>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
+		SettingService.Instance.get().saveSettings(params, new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(Void arg) {
 				GuiLog.info(I18N.message("settingssaved"), null);
 			}
 		});
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

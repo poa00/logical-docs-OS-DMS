@@ -2,7 +2,6 @@ package com.logicaldoc.gui.common.client.beans;
 
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 import com.logicaldoc.gui.common.client.Session;
@@ -39,7 +38,7 @@ public class GUIOCRTemplate implements Serializable {
 	/**
 	 * The zones
 	 */
-	private GUIZone[] zones = new GUIZone[0];
+	protected ArrayList<GUIZone> zones = new ArrayList<>();
 
 	private int batch = 200;
 
@@ -54,9 +53,6 @@ public class GUIOCRTemplate implements Serializable {
 	}
 
 	public GUIZone getZone(String name) {
-		if (zones == null || zones.length < 1)
-			return null;
-
 		for (GUIZone att : getZones()) {
 			if (att.getName().equals(name))
 				return att;
@@ -64,32 +60,29 @@ public class GUIOCRTemplate implements Serializable {
 		return null;
 	}
 
-	public void appendZone(GUIZone a) {
-		List<GUIZone> newZones = new ArrayList<>();
-		if (getZones() != null)
-			newZones.addAll(Arrays.asList(getZones()));
-		newZones.add(a);
-		zones = newZones.toArray(new GUIZone[0]);
+	public void appendZone(GUIZone zone) {
+		zones.add(zone);
 	}
 
 	public void removeZone(String name) {
-		if (getZone(name) == null || zones == null || zones.length < 1)
+		if (getZone(name) == null)
 			return;
 
-		List<GUIZone> newAttrs = new ArrayList<>();
-		for (GUIZone att : getZones())
+		ArrayList<GUIZone> newAttrs = new ArrayList<>();
+		for (GUIZone att : zones)
 			if (!att.getName().equals(name))
 				newAttrs.add(att);
 
-		zones = newAttrs.toArray(new GUIZone[0]);
+		zones = newAttrs;
 	}
 
-	public GUIZone[] getZones() {
+	public List<GUIZone> getZones() {
 		return zones;
 	}
 
-	public void setZones(GUIZone[] zones) {
-		this.zones = zones;
+	public void setZones(List<GUIZone> zones) {
+		this.zones.clear();
+		this.zones.addAll(zones);
 	}
 
 	public String getName() {

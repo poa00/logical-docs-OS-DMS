@@ -3,9 +3,10 @@ package com.logicaldoc.gui.frontend.client.account;
 import com.logicaldoc.gui.common.client.Feature;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.data.UserHistoryDS;
+import com.logicaldoc.gui.common.client.grid.DateListGridField;
+import com.logicaldoc.gui.common.client.grid.IdListGridField;
 import com.logicaldoc.gui.common.client.i18n.I18N;
 import com.logicaldoc.gui.common.client.util.GridUtil;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField;
 import com.smartgwt.client.types.HeaderControls;
 import com.smartgwt.client.types.SelectionStyle;
 import com.smartgwt.client.widgets.grid.ListGrid;
@@ -69,8 +70,7 @@ public class LastLogins extends com.smartgwt.client.widgets.Window {
 	}
 
 	private void prepareGrid() {
-		ListGridField id = new ListGridField("id", 50);
-		id.setHidden(true);
+		ListGridField id = new IdListGridField();
 
 		ListGridField date = new DateListGridField("date", "date");
 
@@ -100,5 +100,15 @@ public class LastLogins extends com.smartgwt.client.widgets.Window {
 	public void refresh() {
 		list.setDataSource(new UserHistoryDS(Session.get().getUser().getId(), "event.user.login", 300));
 		list.fetchData();
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+	
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

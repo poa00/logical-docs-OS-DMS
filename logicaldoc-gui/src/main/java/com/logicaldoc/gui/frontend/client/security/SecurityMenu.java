@@ -1,16 +1,16 @@
 package com.logicaldoc.gui.frontend.client.security;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.logicaldoc.gui.common.client.Feature;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Menu;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUISecuritySettings;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.services.SecurityService;
 import com.logicaldoc.gui.frontend.client.administration.AdminScreen;
 import com.logicaldoc.gui.frontend.client.security.group.GroupsPanel;
 import com.logicaldoc.gui.frontend.client.security.ldap.LDAPServersPanel;
+import com.logicaldoc.gui.frontend.client.security.saml.SamlPanel;
 import com.logicaldoc.gui.frontend.client.security.twofactorsauth.TwoFactorsAuthenticationSettings;
 import com.logicaldoc.gui.frontend.client.security.user.UsersPanel;
 import com.smartgwt.client.types.Overflow;
@@ -47,7 +47,7 @@ public class SecurityMenu extends VLayout {
 
 		addExtAuthButton();
 
-		addSingleSignonButton();
+		addSamlButton();
 	}
 
 	private void addSecurityButton() {
@@ -55,13 +55,7 @@ public class SecurityMenu extends VLayout {
 		security.setWidth100();
 		security.setHeight(25);
 		security.addClickHandler(
-				event -> SecurityService.Instance.get().loadSettings(new AsyncCallback<GUISecuritySettings>() {
-
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				event -> SecurityService.Instance.get().loadSettings(new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(GUISecuritySettings settings) {
 						AdminScreen.get().setContent(new SecuritySettingsPanel(settings));
@@ -87,16 +81,15 @@ public class SecurityMenu extends VLayout {
 		addMember(users);
 	}
 
-	private void addSingleSignonButton() {
-		Button singleSingon = new Button(I18N.message("singlesignon"));
-		singleSingon.setWidth100();
-		singleSingon.setHeight(25);
-		singleSingon.addClickHandler(event -> AdminScreen.get().setContent(new SingleSignonPanel()));
-		if (Feature.visible(Feature.SINGLE_SIGNON) && Session.get().isDefaultTenant()
-				&& Menu.enabled(Menu.SINGLE_SIGNON)) {
-			addMember(singleSingon);
+	private void addSamlButton() {
+		Button saml = new Button(I18N.message("singlesignonsaml"));
+		saml.setWidth100();
+		saml.setHeight(25);
+		saml.addClickHandler(event -> AdminScreen.get().setContent(new SamlPanel()));
+		if (Feature.visible(Feature.SINGLE_SIGNON) && Session.get().isDefaultTenant() && Menu.enabled(Menu.SAML)) {
+			addMember(saml);
 			if (!Feature.enabled(Feature.SINGLE_SIGNON) || Session.get().isDemo())
-				setFeatureDisabled(singleSingon);
+				setFeatureDisabled(saml);
 		}
 	}
 

@@ -3,11 +3,13 @@ package com.logicaldoc.core.document;
 import java.util.List;
 import java.util.Locale;
 
+import javax.annotation.Resource;
+
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
 
 import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.PersistentObjectDAO;
-import com.logicaldoc.core.document.dao.DocumentDAO;
 import com.logicaldoc.core.task.Task;
 import com.logicaldoc.core.task.TaskException;
 import com.logicaldoc.i18n.I18N;
@@ -18,9 +20,11 @@ import com.logicaldoc.i18n.I18N;
  * @author Marco Meschieri - LogicalDOC
  * @since 6.4
  */
+@Component("digestProcessor")
 public class DigestProcessor extends Task {
 	public static final String NAME = "DigestProcessor";
 
+	@Resource(name = "DocumentDAO")
 	private DocumentDAO documentDao;
 
 	private long processed = 0;
@@ -30,10 +34,6 @@ public class DigestProcessor extends Task {
 	public DigestProcessor() {
 		super(NAME);
 		log = LoggerFactory.getLogger(DigestProcessor.class);
-	}
-
-	public void setDocumentDao(DocumentDAO documentDao) {
-		this.documentDao = documentDao;
 	}
 
 	@Override
@@ -66,7 +66,7 @@ public class DigestProcessor extends Task {
 			if (max != null && max.intValue() < 1)
 				max = null;
 
-			log.info("Found a total of {} documents to be processed", size);
+			log.info("Found a total of {} documents to process", size);
 
 			List<Long> ids = documentDao.findIdsByWhere(PersistentObjectDAO.ENTITY + ".docRef is null and "
 					+ PersistentObjectDAO.ENTITY + ".digest is null and deleted = 0", null, max);

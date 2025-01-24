@@ -39,7 +39,7 @@ public class SampleClient {
 
 	private static final String TEST_DOCUMENT_NAME_1 = "migrazione_adam01.txt";
 
-	public static void main(String[] args) throws IOException {
+	public static void main(String[] args) {
 
 		Folder root = connect();
 		root.getName();
@@ -127,7 +127,6 @@ public class SampleClient {
 										// exception
 				System.out.println("checkout status canceled");
 			} catch (Exception e1) {
-				// TODO Auto-generated catch block
 				e1.printStackTrace();
 			}
 		}

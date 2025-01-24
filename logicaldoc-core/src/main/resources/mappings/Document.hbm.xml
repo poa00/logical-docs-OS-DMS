@@ -11,16 +11,17 @@
 			</generator>
 		</id>
         <version name="recordVersion" column="ld_recordversion"  type="long" />  
-        <property name="lastModified" type="timestamp" column="ld_lastmodified" />
+        <property name="lastModified" type="timestamp" column="ld_lastmodified" not-null="true"/>
+        <property name="creation" type="timestamp" column="ld_creation" not-null="true"/>
 		<property name="deleted" type="int" column="ld_deleted" not-null="true" />
         <property name="tenantId" type="long" column="ld_tenantid" not-null="true" />
 		<property name="immutable" type="int" column="ld_immutable" not-null="true" />
-		<property name="customId" type="string" column="ld_customid" length="700" />
-		<property name="comment" type="string" column="ld_comment" length="1000" />
+		<property name="customId" type="string" column="ld_customid" />
+		<property name="comment" type="string" column="ld_comment"  />
+		<property name="lastNote" type="string" column="ld_lastnote" />
 		<property name="version" type="string" column="ld_version" length="10" />
 		<property name="fileVersion" type="string" column="ld_fileversion" length="10" />
 		<property name="date" type="timestamp" column="ld_date" />
-		<property name="creation" type="timestamp" column="ld_creation" not-null="true"/>
 		<property name="publisher" type="string" column="ld_publisher" length="255" />
 		<property name="publisherId" type="long" column="ld_publisherid" not-null="true"/>
 		<property name="creator" type="string" column="ld_creator" length="255" />
@@ -38,6 +39,7 @@
 		<property name="signed" type="int" column="ld_signed" not-null="true"/>
         <property name="stamped" type="int" column="ld_stamped" not-null="true"/>
         <property name="links" type="int" column="ld_links" not-null="true"/>
+        <property name="docAttrs" type="int" column="ld_docattrs" not-null="true"/>
 		<property name="digest" type="string" column="ld_digest" length="255" />
 		<property name="exportStatus" type="int" column="ld_exportstatus" not-null="true"/>
 		<property name="exportId" type="long" column="ld_exportid" />
@@ -99,5 +101,33 @@
                <property name="dateValue" type="timestamp" column="ld_datevalue"/>
 		   </composite-element>
 		</map>
+		
+		<set name="accessControlList" table="ld_document_acl" cascade="all" lazy="true">
+			<key column="ld_docid" />
+			
+			<composite-element class="com.logicaldoc.core.security.AccessControlEntry">
+				<property name="groupId" type="long" column="ld_groupid" not-null="true" />
+				<property name="read" type="int" column="ld_read" not-null="true" />
+				<property name="preview" type="int" column="ld_preview" not-null="true" />
+				<property name="customid" type="int" column="ld_customid" not-null="true" />
+				<property name="write" type="int" column="ld_write" not-null="true" />
+				<property name="security" type="int" column="ld_security" not-null="true" />
+				<property name="immutable" type="int" column="ld_immutable" not-null="true" />
+				<property name="delete" type="int" column="ld_delete" not-null="true" />
+				<property name="rename" type="int" column="ld_rename" not-null="true" />
+				<property name="sign" type="int" column="ld_sign" not-null="true" />
+				<property name="archive" type="int" column="ld_archive" not-null="true" />
+				<property name="workflow" type="int" column="ld_workflow" not-null="true" />
+				<property name="download" type="int" column="ld_download" not-null="true" />
+				<property name="calendar" type="int" column="ld_calendar" not-null="true" />
+				<property name="subscription" type="int" column="ld_subscription" not-null="true" />
+				<property name="print" type="int" column="ld_print" not-null="true" />
+				<property name="password" type="int" column="ld_password" not-null="true" />
+				<property name="move" type="int" column="ld_move" not-null="true" />
+				<property name="email" type="int" column="ld_email" not-null="true" />
+				<property name="automation" type="int" column="ld_automation" not-null="true" />
+				<property name="readingreq" type="int" column="ld_readingreq" not-null="true" />
+			</composite-element>
+		</set>		
 	</class>
 </hibernate-mapping>

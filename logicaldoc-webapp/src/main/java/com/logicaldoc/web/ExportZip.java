@@ -17,9 +17,9 @@ import org.slf4j.LoggerFactory;
 
 import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.document.Document;
+import com.logicaldoc.core.document.DocumentDAO;
 import com.logicaldoc.core.document.DocumentEvent;
 import com.logicaldoc.core.document.DocumentHistory;
-import com.logicaldoc.core.document.dao.DocumentDAO;
 import com.logicaldoc.core.folder.Folder;
 import com.logicaldoc.core.folder.FolderDAO;
 import com.logicaldoc.core.folder.FolderHistory;
@@ -53,7 +53,7 @@ public class ExportZip extends HttpServlet {
 		try {
 			Session session = ServletUtil.validateSession(request);
 
-			FolderDAO folderDao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+			FolderDAO folderDao = Context.get(FolderDAO.class);
 
 			String folderId = request.getParameter("folderId");
 			if (folderId != null) {
@@ -117,7 +117,7 @@ public class ExportZip extends HttpServlet {
 	}
 
 	private String getExportName(String folderId) throws PersistenceException {
-		FolderDAO folderDao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+		FolderDAO folderDao = Context.get(FolderDAO.class);
 		String exportName = "export";
 		if (folderId != null) {
 			Folder folder = folderDao.findById(Long.parseLong(folderId));
@@ -130,8 +130,8 @@ public class ExportZip extends HttpServlet {
 	}
 
 	private ArrayList<Long> getDocIds(HttpServletRequest request, Long userId) throws PersistenceException {
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
-		FolderDAO folderDao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
+		FolderDAO folderDao = Context.get(FolderDAO.class);
 
 		ArrayList<Long> docIds = new ArrayList<>();
 		if (request.getParameterValues(DOC_ID) != null && request.getParameterValues(DOC_ID).length > 0) {
@@ -139,7 +139,7 @@ public class ExportZip extends HttpServlet {
 			for (int i = 0; i < ids.length; i++) {
 				Document doc = docDao.findDocument(Long.parseLong(ids[i]));
 				Long docId = Long.parseLong(ids[i]);
-				if (doc != null && folderDao.isDownloadEnabled(doc.getFolder().getId(), userId)
+				if (doc != null && folderDao.isDownloadllowed(doc.getFolder().getId(), userId)
 						&& !docIds.contains(docId))
 					docIds.add(docId);
 			}

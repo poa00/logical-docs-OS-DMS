@@ -1,5 +1,7 @@
 package com.logicaldoc.gui.frontend.client.services;
 
+import java.util.List;
+
 import com.google.gwt.core.client.GWT;
 import com.google.gwt.user.client.rpc.RemoteService;
 import com.google.gwt.user.client.rpc.RemoteServiceRelativePath;
@@ -40,9 +42,10 @@ public interface LDAPService extends RemoteService {
 	/**
 	 * Loads external authentication settings
 	 * 
-	 * @param serverId identifier of the external authentication server 
+	 * @param serverId identifier of the external authentication server
 	 * 
-	 * @return the external authentication settings retrieved by the server application
+	 * @return the external authentication settings retrieved by the server
+	 *         application
 	 * 
 	 * @throws ServerException an error happened in the server application
 	 */
@@ -57,8 +60,8 @@ public interface LDAPService extends RemoteService {
 	 */
 	public void delete(long serverId) throws ServerException;
 
-	public void reorder(Long[] serverIds) throws ServerException;
-	
+	public void reorder(List<Long> serverIds) throws ServerException;
+
 	/**
 	 * Search for users in the LDAP repository
 	 * 
@@ -69,7 +72,7 @@ public interface LDAPService extends RemoteService {
 	 * 
 	 * @throws ServerException an error happened in the server application
 	 */
-	public GUIUser[] listUsers(String login, long serverId) throws ServerException;
+	public List<GUIUser> listUsers(String login, long serverId) throws ServerException;
 
 	/**
 	 * Imports a selection of users
@@ -81,14 +84,14 @@ public interface LDAPService extends RemoteService {
 	 * 
 	 * @throws ServerException an error happened in the server application
 	 */
-	public GUIValue[] importUsers(String[] usernames, long serverId) throws ServerException;
+	public List<GUIValue> importUsers(List<String> usernames, long serverId) throws ServerException;
 
 	public static class Instance {
 		private static LDAPServiceAsync inst;
 
 		private Instance() {
 		}
-		
+
 		public static LDAPServiceAsync get() {
 			if (inst == null) {
 				inst = GWT.create(LDAPService.class);

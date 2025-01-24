@@ -1,8 +1,11 @@
 package com.logicaldoc.gui.common.client.i18n;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import com.google.gwt.i18n.client.DateTimeFormat;
@@ -26,9 +29,9 @@ public class I18N {
 
 	private static String locale = "en";
 
-	private static GUIValue[] languages;
+	private static List<GUIValue> languages = new ArrayList<>();
 
-	private static GUIValue[] guiLanguages;
+	private static List<GUIValue> guiLanguages = new ArrayList<>();
 
 	private static HashMap<String, String> bundle = new HashMap<>();
 
@@ -41,15 +44,14 @@ public class I18N {
 	public static String messageWithDefault(String key, String def) {
 		if (bundle.containsKey(key))
 			return bundle.get(key);
+		else if (key != null && bundle.containsKey(key.toLowerCase()))
+			return bundle.get(key.toLowerCase());
 		else
 			return def;
 	}
 
 	public static String message(String key) {
-		if (bundle.containsKey(key))
-			return bundle.get(key);
-		else
-			return key;
+		return messageWithDefault(key, key != null ? key : "");
 	}
 
 	public static String message(String key, String val) {
@@ -61,14 +63,14 @@ public class I18N {
 	}
 
 	public static String message(String key, String val1, String val2, String val3) {
-		return message(key, new String[] { val1, val2, val3 });
+		return message(key, Arrays.asList(val1, val2, val3));
 	}
 
-	public static String message(String key, String[] vals) {
+	public static String message(String key, List<String> vals) {
 		String tmp = message(key);
 		try {
-			for (int i = 0; i < vals.length; i++) {
-				tmp = tmp.replace("{" + i + "}", vals[i]);
+			for (int i = 0; i < vals.size(); i++) {
+				tmp = tmp.replace("{" + i + "}", vals.get(i));
 			}
 		} catch (Exception t) {
 			// Nothing to do
@@ -99,7 +101,7 @@ public class I18N {
 				return l.getCode();
 		}
 
-		return languages[0].getCode();
+		return languages.get(0).getCode();
 	}
 
 	public static char groupingSepator() {
@@ -136,19 +138,18 @@ public class I18N {
 		return map;
 	}
 
-	public GUIValue[] getLanguages() {
+	public List<GUIValue> getLanguages() {
 		return languages;
 	}
 
-	public static void setLanguages(GUIValue[] languages) {
+	public static void setLanguages(List<GUIValue> languages) {
 		I18N.languages = languages;
 	}
 
-	private static void initBundle(GUIValue[] messages) {
+	private static void initBundle(List<GUIValue> messages) {
 		bundle.clear();
-		for (GUIValue val : messages) {
+		for (GUIValue val : messages)
 			bundle.put(val.getCode(), val.getValue());
-		}
 
 		String[] dayNames = new String[7];
 		for (int i = 0; i < 7; i++)
@@ -192,11 +193,11 @@ public class I18N {
 			dateFormatLong = DateTimeFormat.getFormat(message(FORMAT_DATELONG));
 	}
 
-	public static GUIValue[] getGuiLanguages() {
+	public static List<GUIValue> getGuiLanguages() {
 		return guiLanguages;
 	}
 
-	public static void setGuiLanguages(GUIValue[] guiLanguages) {
+	public static void setGuiLanguages(List<GUIValue> guiLanguages) {
 		I18N.guiLanguages = guiLanguages;
 	}
 

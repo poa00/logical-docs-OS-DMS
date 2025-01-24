@@ -21,14 +21,14 @@ import com.logicaldoc.core.communication.EMail;
 import com.logicaldoc.core.communication.EMailSender;
 import com.logicaldoc.core.communication.Recipient;
 import com.logicaldoc.core.security.Device;
+import com.logicaldoc.core.security.DeviceDAO;
 import com.logicaldoc.core.security.Tenant;
-import com.logicaldoc.core.security.User;
-import com.logicaldoc.core.security.UserEvent;
-import com.logicaldoc.core.security.UserHistory;
-import com.logicaldoc.core.security.dao.DeviceDAO;
-import com.logicaldoc.core.security.dao.TenantDAO;
-import com.logicaldoc.core.security.dao.UserDAO;
-import com.logicaldoc.core.security.dao.UserHistoryDAO;
+import com.logicaldoc.core.security.TenantDAO;
+import com.logicaldoc.core.security.user.User;
+import com.logicaldoc.core.security.user.UserDAO;
+import com.logicaldoc.core.security.user.UserEvent;
+import com.logicaldoc.core.security.user.UserHistory;
+import com.logicaldoc.core.security.user.UserHistoryDAO;
 import com.logicaldoc.core.ticket.Ticket;
 import com.logicaldoc.core.ticket.TicketDAO;
 import com.logicaldoc.gui.common.client.ServerException;
@@ -60,13 +60,11 @@ public class LoginServiceImpl extends RemoteServiceServlet implements LoginServi
 	@Override
 	public GUIUser getUser(String username) {
 		try {
-			UserDAO userDao = (UserDAO) Context.get().getBean(UserDAO.class);
-			UserHistoryDAO userHistoryDao = (UserHistoryDAO) Context.get().getBean(UserHistoryDAO.class);
-			TenantDAO tenantDao = (TenantDAO) Context.get().getBean(TenantDAO.class);
+			UserDAO userDao = Context.get(UserDAO.class);
+			UserHistoryDAO userHistoryDao = Context.get(UserHistoryDAO.class);
+			TenantDAO tenantDao = Context.get(TenantDAO.class);
 
-			User user = userDao.findByUsername(username);
-			if (user == null)
-				return null;
+			User user = pickUser(username);
 
 			// Get just a few informations needed by the login
 			GUIUser usr = new GUIUser();
@@ -120,7 +118,7 @@ public class LoginServiceImpl extends RemoteServiceServlet implements LoginServi
 			ticket.setExpired(cal.getTime());
 
 			// Store the ticket
-			TicketDAO ticketDao = (TicketDAO) Context.get().getBean(TicketDAO.class);
+			TicketDAO ticketDao = Context.get(TicketDAO.class);
 			ticketDao.store(ticket);
 
 			// Try to clean the DB from old tickets
@@ -163,10 +161,10 @@ public class LoginServiceImpl extends RemoteServiceServlet implements LoginServi
 	}
 
 	private User pickUser(String username) throws ServerException {
-		UserDAO userDao = (UserDAO) Context.get().getBean(UserDAO.class);
+		UserDAO userDao = Context.get(UserDAO.class);
 		User user;
 		try {
-			user = userDao.findByUsername(username);
+			user = userDao.getUser(username);
 		} catch (PersistenceException e) {
 			throw new ServerException(String.format("Error in the data layer for user %s", username));
 		}
@@ -177,21 +175,27 @@ public class LoginServiceImpl extends RemoteServiceServlet implements LoginServi
 
 	@Override
 	public boolean isSecretKeyRequired(String username, String deviceId) throws ServerException {
-		UserDAO userDao = (UserDAO) Context.get().getBean(UserDAO.class);
+		UserDAO userDao = Context.get(UserDAO.class);
 		User user;
 		try {
 			user = pickUser(username);
-		} catch (ServerException e) {
+			userDao.initialize(user);
+		} catch (PersistenceException | ServerException e) {
+			log.warn(e.getMessage(), e);
 			return false;
 		}
-
-		userDao.initialize(user);
 
 		if (StringUtils.isEmpty(user.getSecondFactor()))
 			return false;
 
-		TenantDAO tDao = (TenantDAO) Context.get().getBean(TenantDAO.class);
-		String tenant = tDao.getTenantName(user.getTenantId());
+		TenantDAO tDao = Context.get(TenantDAO.class);
+		String tenant = Tenant.SYSTEM_NAME;
+		try {
+			tenant = tDao.getTenantName(user.getTenantId());
+		} catch (PersistenceException e) {
+			log.warn("Cannot retrieve tenant name of user {}", user.getUsername());
+		}
+
 		ContextProperties config = Context.get().getProperties();
 		if (!config.getBoolean(tenant + ".2fa.enabled", false)
 				|| !config.getBoolean(tenant + ".2fa." + user.getSecondFactor().toLowerCase() + ".enabled", false))
@@ -201,9 +205,9 @@ public class LoginServiceImpl extends RemoteServiceServlet implements LoginServi
 			HttpServletRequest request = getThreadLocalRequest();
 			request.setAttribute(Device.PARAM_DEVICE, deviceId);
 
-			DeviceDAO deviceDao = (DeviceDAO) Context.get().getBean(DeviceDAO.class);
+			DeviceDAO deviceDao = Context.get(DeviceDAO.class);
 			try {
-				return !deviceDao.isTrustedDevice(username, request);
+				return !deviceDao.isTrustedDevice(user.getUsername(), request);
 			} catch (PersistenceException e) {
 				log.warn(e.getMessage(), e);
 				return false;
@@ -222,8 +226,13 @@ public class LoginServiceImpl extends RemoteServiceServlet implements LoginServi
 			return "";
 		}
 
-		TenantDAO tDao = (TenantDAO) Context.get().getBean(TenantDAO.class);
-		String tenant = tDao.getTenantName(user.getTenantId());
+		TenantDAO tDao = Context.get(TenantDAO.class);
+		String tenant = Tenant.DEFAULT_NAME;
+		try {
+			tenant = tDao.getTenantName(user.getTenantId());
+		} catch (PersistenceException e) {
+			log.warn("Cannot retrieve tenant name of user {}", user.getUsername());
+		}
 
 		// Generate an initial password(that must be changed)
 		ContextProperties config = Context.get().getProperties();

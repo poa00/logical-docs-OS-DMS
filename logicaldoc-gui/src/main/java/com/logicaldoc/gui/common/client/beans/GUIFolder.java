@@ -1,7 +1,10 @@
 package com.logicaldoc.gui.common.client.beans;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import com.logicaldoc.gui.common.client.Constants;
 
@@ -21,19 +24,20 @@ public class GUIFolder extends GUIExtensibleObject implements Serializable {
 
 	private static final long serialVersionUID = 1L;
 
-	private long id;
-
 	private long parentId;
 
 	private String description;
 
 	private String name;
 
-	private String[] permissions = new String[] {};
+	/**
+	 * Permissions allowed to the current user on this folder
+	 */
+	private GUIAccessControlEntry allowedPermissions = new GUIAccessControlEntry();
 
-	private GUIRight[] rights = new GUIRight[] {};
+	private List<GUIAccessControlEntry> accessControlList = new ArrayList<>();
 
-	private GUIFolder[] path = null;
+	private List<GUIFolder> path = new ArrayList<>();
 
 	private GUIFolder securityRef = null;
 
@@ -64,7 +68,7 @@ public class GUIFolder extends GUIExtensibleObject implements Serializable {
 
 	private Integer quotaThreshold = null;
 
-	private String[] quotaAlertRecipients = new String[0];
+	private List<String> quotaAlertRecipients = new ArrayList<>();
 
 	// Total number of documents inside the folder's tree
 	private long documentsTotal = 0L;
@@ -74,13 +78,13 @@ public class GUIFolder extends GUIExtensibleObject implements Serializable {
 
 	private Long foldRef = null;
 
-	private Integer storage = null;
+	private Integer store = null;
 
 	private Integer maxVersions = null;
 
 	private String color;
 
-	private String[] tags = null;
+	private List<String> tags = new ArrayList<>();
 
 	private String tagsString;
 
@@ -112,54 +116,43 @@ public class GUIFolder extends GUIExtensibleObject implements Serializable {
 	}
 
 	public GUIFolder(long id) {
-		this.id = id;
+		setId(id);
 	}
 
-	@Override
-	public long getId() {
-		return id;
+	public GUIAccessControlEntry getAllowedPermissions() {
+		return allowedPermissions;
 	}
 
-	@Override
-	public void setId(long id) {
-		this.id = id;
+	public void setAllowedPermissions(GUIAccessControlEntry permissions) {
+		this.allowedPermissions = permissions;
 	}
 
-	public String[] getPermissions() {
-		return permissions;
-	}
-
-	public void setPermissions(String[] permissions) {
-		this.permissions = permissions;
+	public boolean isCustomid() {
+		return allowedPermissions.isCustomid();
 	}
 
 	public boolean isWrite() {
-		return hasPermission(Constants.PERMISSION_WRITE);
+		return allowedPermissions.isWrite();
 	}
 
 	public boolean isDownload() {
-		return hasPermission(Constants.PERMISSION_DOWNLOAD);
+		return allowedPermissions.isDownload();
 	}
 
 	public boolean isMove() {
-		return hasPermission(Constants.PERMISSION_MOVE);
+		return allowedPermissions.isMove();
 	}
 
 	public boolean isDelete() {
-		return hasPermission(Constants.PERMISSION_DELETE);
+		return allowedPermissions.isDelete();
 	}
 
 	public boolean isRename() {
-		return hasPermission(Constants.PERMISSION_RENAME);
+		return allowedPermissions.isRename();
 	}
 
 	public boolean hasPermission(String permission) {
-		if (permissions == null)
-			return false;
-		for (String p : permissions)
-			if (p.equals(permission))
-				return true;
-		return false;
+		return allowedPermissions.isPermissionAllowed(permission);
 	}
 
 	public String getDescription() {
@@ -186,12 +179,12 @@ public class GUIFolder extends GUIExtensibleObject implements Serializable {
 		this.pathExtended = pathExtended;
 	}
 
-	public GUIRight[] getRights() {
-		return rights;
+	public List<GUIAccessControlEntry> getAccessControlList() {
+		return accessControlList;
 	}
 
-	public void setRights(GUIRight[] rights) {
-		this.rights = rights;
+	public void setAccessControlList(List<GUIAccessControlEntry> accessControlList) {
+		this.accessControlList = accessControlList;
 	}
 
 	public long getParentId() {
@@ -202,11 +195,11 @@ public class GUIFolder extends GUIExtensibleObject implements Serializable {
 		this.parentId = parentId;
 	}
 
-	public GUIFolder[] getPath() {
+	public List<GUIFolder> getPath() {
 		return path;
 	}
 
-	public void setPath(GUIFolder[] path) {
+	public void setPath(List<GUIFolder> path) {
 		this.path = path;
 		this.pathExtended = "";
 
@@ -222,13 +215,6 @@ public class GUIFolder extends GUIExtensibleObject implements Serializable {
 		sb.append(getName());
 
 		this.pathExtended = sb.toString();
-	}
-
-	public GUIFolder getParent() {
-		if (getPath() != null && getPath().length > 0)
-			return getPath()[getPath().length - 1];
-		else
-			return null;
 	}
 
 	public String getCreator() {
@@ -343,12 +329,12 @@ public class GUIFolder extends GUIExtensibleObject implements Serializable {
 		this.foldRef = foldRef;
 	}
 
-	public Integer getStorage() {
-		return storage;
+	public Integer getStore() {
+		return store;
 	}
 
-	public void setStorage(Integer storage) {
-		this.storage = storage;
+	public void setStore(Integer store) {
+		this.store = store;
 	}
 
 	public Integer getMaxVersions() {
@@ -367,57 +353,28 @@ public class GUIFolder extends GUIExtensibleObject implements Serializable {
 		this.color = color;
 	}
 
-	public String[] getTags() {
+	public List<String> getTags() {
 		return tags;
 	}
 
-	public void setTags(String[] tags) {
+	public void setTags(List<String> tags) {
 		this.tags = tags;
 	}
 
 	public void addTag(String tag) {
-		String[] tmp = null;
-		if (tags != null) {
-			tmp = new String[tags.length + 1];
-
-			int i = 0;
-			for (String tg : tags) {
-				// Skip if the tag already exists
-				if (tg.equals(tag))
-					return;
-				tmp[i++] = tg;
-			}
-			tmp[i] = tag;
-			tags = tmp;
-		} else
-			tags = new String[] { tag };
+		if (!tags.contains(tag))
+			tags.add(tag);
 	}
 
 	public void removeTag(String tag) {
-		if (tags == null || tags.length == 0)
-			return;
-
-		String[] tmp = new String[tags.length - 1];
-		int i = 0;
-		for (String tg : tags) {
-			if (!tg.equals(tag) && tmp.length > 0)
-				tmp[i++] = tg;
-		}
-		tags = tmp;
+		tags.remove(tag);
 	}
 
 	public String getTagsString() {
 		if (tagsString != null && !tagsString.isEmpty())
 			return tagsString;
-		else {
-			StringBuilder buf = new StringBuilder("");
-			if (getTags() != null)
-				for (String tag : getTags()) {
-					buf.append(tag);
-					buf.append(" ");
-				}
-			return buf.toString();
-		}
+		else
+			return tags.stream().collect(Collectors.joining(" "));
 	}
 
 	public void setTagsString(String tagsString) {
@@ -432,59 +389,29 @@ public class GUIFolder extends GUIExtensibleObject implements Serializable {
 		this.quotaThreshold = quotaThreshold;
 	}
 
-	public String[] getQuotaAlertRecipients() {
+	public List<String> getQuotaAlertRecipients() {
 		return quotaAlertRecipients;
 	}
 
 	public String getQuotaAlertRecipientsAsString() {
-		if (quotaAlertRecipients == null || quotaAlertRecipients.length == 0)
-			return null;
-		StringBuilder str = new StringBuilder();
-		for (String rec : quotaAlertRecipients) {
-			if (!str.toString().isEmpty())
-				str.append(",");
-			str.append(rec.trim());
-		}
-		return str.toString();
+		return quotaAlertRecipients.stream().collect(Collectors.joining(","));
 	}
 
-	public void setQuotaAlertRecipients(String[] quotaAlertRecipients) {
+	public void setQuotaAlertRecipients(List<String> quotaAlertRecipients) {
 		this.quotaAlertRecipients = quotaAlertRecipients;
 	}
 
 	public void clearQuotaAlertRecipients() {
-		this.quotaAlertRecipients = new String[] {};
+		quotaAlertRecipients.clear();
 	}
 
 	public void addQuotaAlertRecipient(String recipient) {
-		String[] tmp = null;
-		if (quotaAlertRecipients != null) {
-			tmp = new String[quotaAlertRecipients.length + 1];
-
-			int i = 0;
-			for (String tg : quotaAlertRecipients) {
-				// Skip if the tag already exists
-				if (tg.equals(recipient))
-					return;
-				tmp[i++] = tg;
-			}
-			tmp[i] = recipient;
-			quotaAlertRecipients = tmp;
-		} else
-			quotaAlertRecipients = new String[] { recipient };
+		if (!quotaAlertRecipients.contains(recipient))
+			quotaAlertRecipients.add(recipient);
 	}
 
 	public void removeQuotaAlertRecipient(String recipient) {
-		if (quotaAlertRecipients == null || quotaAlertRecipients.length == 0)
-			return;
-
-		String[] tmp = new String[quotaAlertRecipients.length - 1];
-		int i = 0;
-		for (String tg : quotaAlertRecipients) {
-			if (!tg.equals(recipient) && tmp.length > 0)
-				tmp[i++] = tg;
-		}
-		quotaAlertRecipients = tmp;
+		quotaAlertRecipients.remove(recipient);
 	}
 
 	public GUIDocument newDocument() {
@@ -549,5 +476,31 @@ public class GUIFolder extends GUIExtensibleObject implements Serializable {
 
 	public void setSize(long size) {
 		this.size = size;
+	}
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = super.hashCode();
+		result = prime * result + ((name == null) ? 0 : name.hashCode());
+		result = prime * result + (int) (parentId ^ (parentId >>> 32));
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (!super.equals(obj))
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		GUIFolder other = (GUIFolder) obj;
+		if (name == null) {
+			if (other.name != null)
+				return false;
+		} else if (!name.equals(other.name))
+			return false;
+		return parentId == other.parentId;
 	}
 }

@@ -3,7 +3,8 @@ package com.logicaldoc.gui.frontend.client.account;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
+import com.logicaldoc.gui.common.client.Menu;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIUser;
 import com.logicaldoc.gui.common.client.i18n.I18N;
@@ -13,6 +14,7 @@ import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.common.client.util.Util;
 import com.logicaldoc.gui.common.client.widgets.Avatar;
+import com.logicaldoc.gui.frontend.client.menu.MainMenu;
 import com.smartgwt.client.types.HeaderControls;
 import com.smartgwt.client.types.SelectionStyle;
 import com.smartgwt.client.types.TitleOrientation;
@@ -20,6 +22,7 @@ import com.smartgwt.client.widgets.Window;
 import com.smartgwt.client.widgets.events.ClickEvent;
 import com.smartgwt.client.widgets.form.DynamicForm;
 import com.smartgwt.client.widgets.form.ValuesManager;
+import com.smartgwt.client.widgets.form.fields.CheckboxItem;
 import com.smartgwt.client.widgets.form.fields.ComboBoxItem;
 import com.smartgwt.client.widgets.form.fields.FormItemIcon;
 import com.smartgwt.client.widgets.form.fields.PickerIcon;
@@ -72,8 +75,8 @@ public class Profile extends Window {
 
 		setHeaderControls(HeaderControls.HEADER_LABEL, HeaderControls.CLOSE_BUTTON);
 		setTitle(I18N.message("profile"));
-		setWidth(600);
-		setHeight(400);
+		setWidth(640);
+		setHeight(430);
 		setIsModal(true);
 		setShowModalMask(true);
 		centerInPage();
@@ -102,6 +105,11 @@ public class Profile extends Window {
 		TextItem state = ItemFactory.newTextItem("state", user.getState());
 		TextItem phone = ItemFactory.newTextItem("phone", user.getPhone());
 		TextItem cell = ItemFactory.newTextItem("cell", user.getCell());
+		TextItem company = ItemFactory.newTextItem("company", user.getCompany());
+		TextItem department = ItemFactory.newTextItem("department", user.getDepartment());
+		TextItem organizationalUnit = ItemFactory.newTextItem("organizationalunit", user.getOrganizationalUnit());
+		TextItem building = ItemFactory.newTextItem("building", user.getBuilding());
+
 		ComboBoxItem timeZone = ItemFactory.newTimeZoneSelector(TIMEZONE, user.getTimeZone());
 		timeZone.setEndRow(true);
 
@@ -113,7 +121,7 @@ public class Profile extends Window {
 		quotaCount.setWrap(false);
 
 		detailsForm.setFields(firstName, lastName, language, address, postalCode, city, country, state, phone, cell,
-				timeZone, quotaCount, quota);
+				company, department, organizationalUnit, building, timeZone, quotaCount, quota);
 
 		HLayout detailsPanel = new HLayout();
 		detailsPanel.setMembers(detailsForm, new Avatar(user.getId()));
@@ -225,6 +233,10 @@ public class Profile extends Window {
 		TextItem dateFormatLong = ItemFactory.newTextItem(DATEFORMATLONG, user.getDateFormatLong());
 		dateFormatLong.setWidth(180);
 
+		CheckboxItem evalForm = ItemFactory.newCheckbox("evalformenabled");
+		evalForm.setValue(user.isEvalFormEnabled());
+		evalForm.setVisible(Menu.enabled(Menu.PRODUCT_EVALUATION));
+
 		final DynamicForm guiForm = new DynamicForm();
 		guiForm.setHeight100();
 		guiForm.setValuesManager(vm);
@@ -232,7 +244,7 @@ public class Profile extends Window {
 		guiForm.setTitleOrientation(TitleOrientation.TOP);
 
 		guiForm.setFields(welcomeScreen, defaultWorkspace, docsGrid, hitsGrid, dateFormat, dateFormatShort,
-				dateFormatLong);
+				dateFormatLong, evalForm);
 
 		ArrayList<ListGridRecord> records = new ArrayList<>();
 		for (String search : user.orderedSearches()) {
@@ -307,6 +319,12 @@ public class Profile extends Window {
 		u.setState(vm.getValueAsString("state"));
 		u.setPhone(vm.getValueAsString("phone"));
 		u.setCell(vm.getValueAsString("cell"));
+		u.setCompany(vm.getValueAsString("company"));
+		u.setDepartment(vm.getValueAsString("department"));
+		u.setBuilding(vm.getValueAsString("building"));
+		u.setOrganizationalUnit(vm.getValueAsString("organizationalunit"));
+		u.setEvalFormEnabled(Boolean.parseBoolean(vm.getValueAsString("evalformenabled")));
+
 		u.setWelcomeScreen(Integer.parseInt(vm.getValueAsString("welcomescreen")));
 		String str = vm.getValueAsString("workspace");
 		if (str != null && !str.isEmpty())
@@ -338,11 +356,7 @@ public class Profile extends Window {
 			searches.add(rec.getAttributeAsString("search"));
 		u.setSearchPref(searches.toString().replace("[", "").replace("]", "").replace(" ", ""));
 
-		SecurityService.Instance.get().saveProfile(u, new AsyncCallback<GUIUser>() {
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
+		SecurityService.Instance.get().saveProfile(u, new DefaultAsyncCallback<>() {
 
 			@Override
 			public void onSuccess(GUIUser ret) {
@@ -361,6 +375,10 @@ public class Profile extends Window {
 				user.setState(ret.getState());
 				user.setPhone(ret.getPhone());
 				user.setCell(ret.getCell());
+				user.setCompany(ret.getCompany());
+				user.setBuilding(ret.getBuilding());
+				user.setDepartment(ret.getDepartment());
+				user.setOrganizationalUnit(ret.getOrganizationalUnit());
 				user.setWelcomeScreen(ret.getWelcomeScreen());
 				user.setDefaultWorkspace(ret.getDefaultWorkspace());
 				user.setDocsGrid(ret.getDocsGrid());
@@ -370,12 +388,15 @@ public class Profile extends Window {
 				user.setDateFormatLong(ret.getDateFormatLong());
 				user.setSearchPref(ret.getSearchPref());
 				user.setTimeZone(ret.getTimeZone());
+				user.setEvalFormEnabled(ret.isEvalFormEnabled());
 
 				Session.get().setUser(user);
 
 				Profile.this.destroy();
 
 				GuiLog.info(I18N.message("settingssaved"), null);
+
+				MainMenu.get().refreshProductEvaluationButton();
 			}
 		});
 	}
@@ -394,5 +415,15 @@ public class Profile extends Window {
 			tabs.selectTab(3);
 
 		return !vm.hasErrors();
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

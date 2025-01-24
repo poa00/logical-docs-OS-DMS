@@ -4,22 +4,20 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import com.google.gwt.core.client.GWT;
-import com.google.gwt.user.client.rpc.AsyncCallback;
-import com.logicaldoc.gui.common.client.Constants;
 import com.logicaldoc.gui.common.client.Feature;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
+import com.logicaldoc.gui.common.client.beans.GUIAccessControlEntry;
 import com.logicaldoc.gui.common.client.beans.GUIFolder;
 import com.logicaldoc.gui.common.client.data.TagsDS;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.common.client.util.Util;
+import com.logicaldoc.gui.common.client.widgets.QRFormItemIcon;
 import com.logicaldoc.gui.frontend.client.services.DocumentService;
 import com.logicaldoc.gui.frontend.client.services.FolderService;
 import com.smartgwt.client.data.Record;
-import com.smartgwt.client.types.PickerIconName;
 import com.smartgwt.client.types.TitleOrientation;
 import com.smartgwt.client.util.SC;
 import com.smartgwt.client.widgets.form.DynamicForm;
@@ -29,13 +27,11 @@ import com.smartgwt.client.widgets.form.fields.FormItem;
 import com.smartgwt.client.widgets.form.fields.FormItemIcon;
 import com.smartgwt.client.widgets.form.fields.LinkItem;
 import com.smartgwt.client.widgets.form.fields.MultiComboBoxItem;
-import com.smartgwt.client.widgets.form.fields.PickerIcon;
 import com.smartgwt.client.widgets.form.fields.SelectItem;
 import com.smartgwt.client.widgets.form.fields.SpinnerItem;
 import com.smartgwt.client.widgets.form.fields.StaticTextItem;
 import com.smartgwt.client.widgets.form.fields.TextItem;
 import com.smartgwt.client.widgets.form.fields.events.ChangedHandler;
-import com.smartgwt.client.widgets.form.fields.events.FormItemIconClickEvent;
 import com.smartgwt.client.widgets.form.validator.DoesntContainValidator;
 import com.smartgwt.client.widgets.layout.HLayout;
 
@@ -76,30 +72,28 @@ public class FolderStandardPropertiesPanel extends FolderDetailTab {
 
 		prepareForm1();
 
-		StaticTextItem idItem = ItemFactory.newStaticTextItem("id", Long.toString(folder.getId()));
-		if (folder.getFoldRef() != null)
-			idItem.setTooltip(I18N.message("thisisalias") + ": " + folder.getFoldRef());
+		StaticTextItem idItem = prepareIdItem();
 
 		TextItem name = prepareNameItem();
 
-		FormItemIcon applyStorageToSubfolders = prepareApplyStorageToSubfoldersItem();
+		FormItemIcon applyStoreToSubfolders = prepareApplyStoreToSubfoldersItem();
 
-		FormItemIcon enforceStorage = prepareEnforceStorage();
+		FormItemIcon enforceStore = prepareEnforceStore();
 
-		SelectItem storage = ItemFactory.newStorageSelector("storage", folder.getStorage());
-		storage.setDisabled(!folder.hasPermission(Constants.PERMISSION_STORAGE));
-		boolean storageVisible = folder.getFoldRef() == null && Feature.enabled(Feature.MULTI_STORAGE);
-		storage.setVisible(storageVisible);
-		if (folder.hasPermission(Constants.PERMISSION_STORAGE) && storageVisible) {
-			storage.addChangedHandler(changedHandler);
-			storage.setIcons(applyStorageToSubfolders, enforceStorage);
+		SelectItem store = ItemFactory.newStoreSelector("store", folder.getStore());
+		store.setDisabled(!folder.hasPermission(GUIAccessControlEntry.PERMISSION_STORE));
+		boolean storeVisible = folder.getFoldRef() == null && Feature.enabled(Feature.MULTI_STORE);
+		store.setVisible(storeVisible);
+		if (folder.hasPermission(GUIAccessControlEntry.PERMISSION_STORE) && storeVisible) {
+			store.addChangedHandler(changedHandler);
+			store.setIcons(applyStoreToSubfolders, enforceStore);
 		}
 
 		SpinnerItem maxVersions = prepareMaxVersionsItem();
 
 		TextItem description = ItemFactory.newTextItem("description", folder.getDescription());
 		description.setWidth(250);
-		if (folder.hasPermission(Constants.PERMISSION_RENAME))
+		if (folder.hasPermission(GUIAccessControlEntry.PERMISSION_RENAME))
 			description.addChangedHandler(changedHandler);
 		else
 			description.setDisabled(true);
@@ -114,42 +108,28 @@ public class FolderStandardPropertiesPanel extends FolderDetailTab {
 
 		LinkItem pathItem = preparePathItem();
 
-		LinkItem barcode = ItemFactory.newLinkItem("barcode", I18N.message("generatebarcode"));
-		barcode.setTarget("_blank");
-		barcode.setTitle(I18N.message("barcode"));
-		barcode.setValue(GWT.getHostPageBaseURL() + "barcode?code=" + folder.getId() + "&width=400&height=150");
-
 		final StaticTextItem documents = ItemFactory.newStaticTextItem("documents",
 				folder.getDocumentCount() > 0 ? Util.formatLong(folder.getDocumentCount()) : "-");
 		documents.setIconHSpace(2);
-		documents.setIconWidth(16);
-		documents.setIconHeight(16);
 		documents.setWidth("1%");
 
 		final StaticTextItem subfolders = ItemFactory.newStaticTextItem("folders",
 				folder.getSubfolderCount() > 0 ? Util.formatLong(folder.getSubfolderCount()) : "-");
 		subfolders.setIconHSpace(2);
-		subfolders.setIconWidth(16);
-		subfolders.setIconHeight(16);
 		subfolders.setWidth("1%");
 
 		final StaticTextItem size = ItemFactory.newStaticTextItem("size",
 				folder.getSize() > 0 ? Util.formatSize(folder.getSize()) : "-");
 		size.setIconHSpace(2);
-		size.setIconWidth(16);
-		size.setIconHeight(16);
 		size.setWidth("1%");
 
 		addComputeStatsIcons(documents, subfolders, size);
 
 		List<FormItem> items = new ArrayList<>();
-		items.addAll(Arrays.asList(idItem, pathItem, name, description, storage, maxVersions, creation, documents,
-				subfolders, size, barcode));
-
-		if (!Feature.enabled(Feature.BARCODES))
-			items.remove(barcode);
-		if (!Feature.enabled(Feature.MULTI_STORAGE))
-			items.remove(storage);
+		items.addAll(Arrays.asList(idItem, pathItem, name, description, store, maxVersions, creation, documents,
+				subfolders, size));
+		if (!Feature.enabled(Feature.MULTI_STORE))
+			items.remove(store);
 		if (folder.isDefaultWorkspace())
 			items.remove(name);
 
@@ -163,6 +143,25 @@ public class FolderStandardPropertiesPanel extends FolderDetailTab {
 		prepareRightForm();
 
 		columns.addMember(new FolderTile(folder, changedHandler));
+	}
+
+	private StaticTextItem prepareIdItem() {
+		StaticTextItem id = ItemFactory.newStaticTextItem("id", Long.toString(folder.getId()));
+
+		StringBuilder sb = new StringBuilder("id: ");
+		sb.append(folder.getId());
+		sb.append("_CR_name: ");
+		sb.append(folder.getName());
+		sb.append("_CR_path: ");
+		sb.append(folder.getPathExtended());
+
+		if (Util.isCommercial())
+			id.setIcons(new QRFormItemIcon(sb.toString()));
+
+		if (folder.getFoldRef() != null)
+			id.setTooltip(I18N.message("thisisalias") + ": " + folder.getFoldRef());
+
+		return id;
 	}
 
 	private SpinnerItem prepareMaxVersionsItem() {
@@ -188,28 +187,23 @@ public class FolderStandardPropertiesPanel extends FolderDetailTab {
 	}
 
 	private void addComputeStatsIcons(StaticTextItem documents, StaticTextItem subfolders, StaticTextItem size) {
-		PickerIcon computeStats = new PickerIcon(PickerIconName.REFRESH,
-				(final FormItemIconClickEvent computeStatsClick) -> {
-					computeStatsClick.getItem().setValue(I18N.message("computing") + "...");
-					FolderService.Instance.get().computeStats(folder.getId(), new AsyncCallback<long[]>() {
-
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
-						}
-
-						@Override
-						public void onSuccess(long[] stats) {
-							folder.setDocumentCount(stats[0]);
-							documents.setValue(Util.formatLong(stats[0]));
-							folder.setSubfolderCount(stats[1]);
-							subfolders.setValue(Util.formatLong(stats[1]));
-							folder.setSize(stats[2]);
-							size.setValue(Util.formatSize(stats[2]));
-						}
-					});
-				});
+		FormItemIcon computeStats = new FormItemIcon();
 		computeStats.setPrompt(I18N.message("calculatestats"));
+		computeStats.setSrc("[SKIN]/arrows-rotate.svg");
+		computeStats.addFormItemClickHandler(click -> {
+			click.getItem().setValue(I18N.message("computing") + "...");
+			FolderService.Instance.get().computeStats(folder.getId(), new DefaultAsyncCallback<>() {
+				@Override
+				public void onSuccess(List<Long> stats) {
+					folder.setDocumentCount(stats.get(0));
+					documents.setValue(Util.formatLong(stats.get(0)));
+					folder.setSubfolderCount(stats.get(1));
+					subfolders.setValue(Util.formatLong(stats.get(1)));
+					folder.setSize(stats.get(2));
+					size.setValue(Util.formatSize(stats.get(2)));
+				}
+			});
+		});
 
 		documents.setIcons(computeStats);
 		subfolders.setIcons(computeStats);
@@ -219,49 +213,28 @@ public class FolderStandardPropertiesPanel extends FolderDetailTab {
 	private LinkItem preparePathItem() {
 		String path = folder.getPathExtended() != null ? folder.getPathExtended()
 				: FolderNavigator.get().getPath(folder.getId());
+		LinkItem pathItem = ItemFactory.newLinkItem("path", "path", Util.padLeft(path, 40),
+				Util.displayURL(null, folder.getId()), path);
 
-		FormItemIcon copyPath = new FormItemIcon();
-		copyPath.setPrompt(I18N.message("copypath"));
-		copyPath.setSrc("[SKIN]/page_white_paste.png");
-		copyPath.setWidth(16);
-		copyPath.setHeight(16);
-		copyPath.addFormItemClickHandler(copyPathClick -> {
-			LD.askForValue(I18N.message("path"), I18N.message("path"), path, value -> {
-				// Nothing to do
-			});
-			copyPathClick.cancel();
-		});
-
-		LinkItem pathItem = ItemFactory.newLinkItem("path", Util.padLeft(path, 150));
 		pathItem.setTooltip(path);
-		pathItem.setTitle(I18N.message("path"));
-		pathItem.setValue(Util.displayURL(null, folder.getId()));
-		pathItem.setWidth(400);
-		pathItem.setIcons(copyPath);
+		pathItem.setWrap(false);
 		return pathItem;
 	}
 
-	private FormItemIcon prepareEnforceStorage() {
-		FormItemIcon enforceStorage = new FormItemIcon();
-		enforceStorage.setPrompt(I18N.message("enforcefilesintofolderstorage"));
-		enforceStorage.setSrc("[SKIN]/data_into.png");
-		enforceStorage.setWidth(16);
-		enforceStorage.setHeight(16);
-		enforceStorage.addFormItemClickHandler(event -> {
+	private FormItemIcon prepareEnforceStore() {
+		FormItemIcon enforceStore = new FormItemIcon();
+		enforceStore.setPrompt(I18N.message("enforcefilesintofolderstorage"));
+		enforceStore.setSrc("[SKIN]/boxes-stacked.svg");
+		enforceStore.addFormItemClickHandler(event -> {
 			LD.ask(I18N.message("enforcementofstorage"),
 					I18N.message("enforcefilesintofolderstorage") + ".\n" + I18N.message("doyouwanttoproceed"), yes -> {
 						if (Boolean.TRUE.equals(yes)) {
-							DocumentService.Instance.get().enforceFilesIntoFolderStorage(folder.getId(),
-									new AsyncCallback<Void>() {
-
-										@Override
-										public void onFailure(Throwable caught) {
-											GuiLog.serverError(caught);
-										}
-
+							LD.contactingServer();
+							DocumentService.Instance.get().enforceFilesIntoFolderStore(folder.getId(),
+									new DefaultAsyncCallback<>() {
 										@Override
 										public void onSuccess(Void v) {
-											GuiLog.info(I18N.message("processstartedwillbenotified"));
+											LD.clearPrompt();
 										}
 									});
 						}
@@ -269,33 +242,24 @@ public class FolderStandardPropertiesPanel extends FolderDetailTab {
 
 			event.cancel();
 		});
-		return enforceStorage;
+		return enforceStore;
 	}
 
-	private FormItemIcon prepareApplyStorageToSubfoldersItem() {
-		FormItemIcon applyStorageToSubfolders = new FormItemIcon();
-		applyStorageToSubfolders.setPrompt(I18N.message("applytosubfolders"));
-		applyStorageToSubfolders.setSrc("[SKIN]/page_save.png");
-		applyStorageToSubfolders.setWidth(16);
-		applyStorageToSubfolders.setHeight(16);
-		applyStorageToSubfolders.addFormItemClickHandler(applyStorageToSubfoldersClick -> {
+	private FormItemIcon prepareApplyStoreToSubfoldersItem() {
+		FormItemIcon applyStoreToSubfolders = new FormItemIcon();
+		applyStoreToSubfolders.setPrompt(I18N.message("applytosubfolders"));
+		applyStoreToSubfolders.setSrc("[SKIN]/clone.svg");
+		applyStoreToSubfolders.addFormItemClickHandler(applyStoreToSubfoldersClick -> {
 			LD.contactingServer();
-			FolderService.Instance.get().applyStorage(folder.getId(), new AsyncCallback<Void>() {
-
-				@Override
-				public void onFailure(Throwable caught) {
-					LD.clearPrompt();
-					GuiLog.serverError(caught);
-				}
-
+			FolderService.Instance.get().applyStore(folder.getId(), new DefaultAsyncCallback<>() {
 				@Override
 				public void onSuccess(Void v) {
 					LD.clearPrompt();
 				}
 			});
-			applyStorageToSubfoldersClick.cancel();
+			applyStoreToSubfoldersClick.cancel();
 		});
-		return applyStorageToSubfolders;
+		return applyStoreToSubfolders;
 	}
 
 	private TextItem prepareNameItem() {
@@ -306,7 +270,7 @@ public class FolderStandardPropertiesPanel extends FolderDetailTab {
 		validator.setSubstring("/");
 		validator.setErrorMessage(I18N.message("invalidchar"));
 		name.setValidators(validator);
-		if (folder.hasPermission(Constants.PERMISSION_RENAME) && folder.isWrite())
+		if (folder.hasPermission(GUIAccessControlEntry.PERMISSION_RENAME) && folder.isWrite())
 			name.addChangedHandler(changedHandler);
 		else
 			name.setDisabled(true);
@@ -347,9 +311,7 @@ public class FolderStandardPropertiesPanel extends FolderDetailTab {
 		tagsString.setEndRow(true);
 		FormItemIcon editTags = new FormItemIcon();
 		editTags.setPrompt(I18N.message("edittags"));
-		editTags.setSrc("[SKIN]/actions/edit.png");
-		editTags.setWidth(16);
-		editTags.setHeight(16);
+		editTags.setSrc("[SKIN]/pen-to-square.svg");
 		editTags.addFormItemClickHandler(editTagClick -> {
 			tagsString.setVisible(false);
 			tagItem.setVisible(true);
@@ -401,8 +363,8 @@ public class FolderStandardPropertiesPanel extends FolderDetailTab {
 
 		String[] tokens = input.split("\\,");
 
-		int min = Integer.parseInt(Session.get().getConfig("tag.minsize"));
-		int max = Integer.parseInt(Session.get().getConfig("tag.maxsize"));
+		int min = Session.get().getConfigAsInt("tag.minsize");
+		int max = Session.get().getConfigAsInt("tag.maxsize");
 		boolean containsInvalid = false;
 		List<String> tags = new ArrayList<>();
 		for (String token : tokens) {
@@ -447,14 +409,7 @@ public class FolderStandardPropertiesPanel extends FolderDetailTab {
 		applyTags.setDisabled(!folder.isWrite());
 		applyTags.addClickHandler(event -> {
 			LD.contactingServer();
-			FolderService.Instance.get().applyTags(folder.getId(), new AsyncCallback<Void>() {
-
-				@Override
-				public void onFailure(Throwable caught) {
-					LD.clearPrompt();
-					GuiLog.serverError(caught);
-				}
-
+			FolderService.Instance.get().applyTags(folder.getId(), new DefaultAsyncCallback<>() {
 				@Override
 				public void onSuccess(Void v) {
 					LD.clearPrompt();
@@ -470,16 +425,16 @@ public class FolderStandardPropertiesPanel extends FolderDetailTab {
 		if (Boolean.TRUE.equals(vm.hasErrors()))
 			return false;
 
-		folder.setTags(tagItem.getValues());
+		folder.setTags(Arrays.asList(tagItem.getValues()));
 		folder.setDescription(vm.getValueAsString("description"));
 		if (vm.getValueAsString("name") != null)
 			folder.setName(vm.getValueAsString("name").replace("/", ""));
 
-		if (folder.hasPermission(Constants.PERMISSION_STORAGE))
+		if (folder.hasPermission(GUIAccessControlEntry.PERMISSION_STORE))
 			try {
-				folder.setStorage(Integer.parseInt(vm.getValueAsString("storage")));
+				folder.setStore(Integer.parseInt(vm.getValueAsString("store")));
 			} catch (Exception t) {
-				folder.setStorage(null);
+				folder.setStore(null);
 			}
 
 		if (folder.isWorkspace())
@@ -492,5 +447,15 @@ public class FolderStandardPropertiesPanel extends FolderDetailTab {
 			}
 
 		return !vm.hasErrors();
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

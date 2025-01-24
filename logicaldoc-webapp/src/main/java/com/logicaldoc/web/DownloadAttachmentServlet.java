@@ -18,11 +18,11 @@ import com.logicaldoc.core.communication.EMail;
 import com.logicaldoc.core.communication.EMailAttachment;
 import com.logicaldoc.core.communication.MailUtil;
 import com.logicaldoc.core.document.Document;
-import com.logicaldoc.core.document.dao.DocumentDAO;
+import com.logicaldoc.core.document.DocumentDAO;
 import com.logicaldoc.core.folder.FolderDAO;
 import com.logicaldoc.core.security.Permission;
 import com.logicaldoc.core.security.Session;
-import com.logicaldoc.core.store.Storer;
+import com.logicaldoc.core.store.Store;
 import com.logicaldoc.util.Context;
 import com.logicaldoc.util.io.FileUtil;
 import com.logicaldoc.web.util.ServletUtil;
@@ -52,15 +52,15 @@ public class DownloadAttachmentServlet extends HttpServlet {
 		try {
 			Session session = ServletUtil.validateSession(request);
 
-			DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
-			FolderDAO folderDao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+			DocumentDAO docDao = Context.get(DocumentDAO.class);
+			FolderDAO folderDao = Context.get(FolderDAO.class);
 
 			long docId = Long.parseLong(request.getParameter("docId"));
 			String fileVersion = request.getParameter("fileVersion");
 			String filename = request.getParameter("attachmentFileName");
 
 			Document doc = docDao.findById(docId);
-			if (session.getUser() != null && !folderDao.isPermissionEnabled(Permission.DOWNLOAD,
+			if (session.getUser() != null && !folderDao.isPermissionAllowed(Permission.DOWNLOAD,
 					doc.getFolder().getId(), session.getUserId()))
 				throw new IOException("You don't have the DOWNLOAD permission");
 
@@ -82,10 +82,10 @@ public class DownloadAttachmentServlet extends HttpServlet {
 
 	private void download(HttpServletRequest request, HttpServletResponse response, long docId, String fileVersion,
 			String filename, Document doc) throws MessagingException, IOException, CMSException {
-		Storer storer = (Storer) Context.get().getBean(Storer.class);
-		String resource = storer.getResourceName(docId, fileVersion, null);
+		Store store = Context.get(Store.class);
+		String resource = store.getResourceName(docId, fileVersion, null);
 
-		try (InputStream is = storer.getStream(docId, resource)) {
+		try (InputStream is = store.getStream(docId, resource)) {
 			EMail email = null;
 
 			if (doc != null && doc.getFileName().toLowerCase().endsWith(".eml"))
@@ -110,7 +110,7 @@ public class DownloadAttachmentServlet extends HttpServlet {
 				FileUtils.writeByteArrayToFile(tmp, attachment.getData());
 				ServletUtil.downloadFile(request, response, tmp, filename);
 			} finally {
-				FileUtil.strongDelete(tmp);
+				FileUtil.delete(tmp);
 			}
 		}
 	}

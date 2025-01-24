@@ -22,7 +22,7 @@ public class WorkflowUploader extends Window {
 
 	private Upload uploader;
 
-	private IButton sendButton;
+	private IButton submitButton;
 
 	private VLayout layout = new VLayout();
 
@@ -42,22 +42,22 @@ public class WorkflowUploader extends Window {
 		layout.setMembersMargin(2);
 		layout.setMargin(2);
 
-		sendButton = new IButton(I18N.message("send"));
-		sendButton.addClickHandler(event -> onSend());
+		submitButton = new IButton(I18N.message("submit"));
+		submitButton.addClickHandler(event -> onSubmit());
 
-		uploader = new Upload(sendButton);
+		uploader = new Upload(submitButton);
 		layout.addMember(uploader);
-		layout.addMember(sendButton);
+		layout.addMember(submitButton);
 		addItem(layout);
 	}
 
-	public void onSend() {
+	public void onSubmit() {
 		if (uploader.getUploadedFile() == null) {
 			SC.warn(I18N.message("filerequired"));
 			return;
 		}
 
-		WorkflowService.Instance.get().importSchema(new AsyncCallback<GUIWorkflow>() {
+		WorkflowService.Instance.get().importSchema(new AsyncCallback<>() {
 
 			@Override
 			public void onFailure(Throwable caught) {
@@ -74,7 +74,7 @@ public class WorkflowUploader extends Window {
 					designer.saveModel();
 
 					// Cleanup the upload folder
-					DocumentService.Instance.get().cleanUploadedFileFolder(new AsyncCallback<Void>() {
+					DocumentService.Instance.get().cleanUploadedFileFolder(new AsyncCallback<>() {
 
 						@Override
 						public void onFailure(Throwable caught) {
@@ -89,5 +89,15 @@ public class WorkflowUploader extends Window {
 				}
 			}
 		});
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

@@ -1,16 +1,19 @@
 package com.logicaldoc.gui.frontend.client.security.group;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import java.util.ArrayList;
+import java.util.List;
+
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.data.UsersDS;
-import com.logicaldoc.gui.common.client.formatters.UserCellFormatter;
+import com.logicaldoc.gui.common.client.grid.IdListGridField;
+import com.logicaldoc.gui.common.client.grid.UserListGridField;
+import com.logicaldoc.gui.common.client.grid.formatters.UserCellFormatter;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.services.SecurityService;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.common.client.util.Util;
 import com.logicaldoc.gui.common.client.widgets.InfoPanel;
-import com.logicaldoc.gui.common.client.widgets.grid.UserListGridField;
 import com.smartgwt.client.types.Alignment;
 import com.smartgwt.client.types.ListGridFieldType;
 import com.smartgwt.client.types.SelectionStyle;
@@ -57,8 +60,7 @@ public class GroupUsersPanel extends VLayout {
 
 		UserListGridField avatar = new UserListGridField(true);
 
-		ListGridField id = new ListGridField("id", 50);
-		id.setHidden(true);
+		ListGridField id = new IdListGridField();
 
 		ListGridField username = new ListGridField(USERNAME, I18N.message(USERNAME), 100);
 		username.setCanFilter(true);
@@ -92,7 +94,7 @@ public class GroupUsersPanel extends VLayout {
 		enabledIcon.setImageURLPrefix(Util.imagePrefix());
 		enabledIcon.setImageURLSuffix(".gif");
 		enabledIcon.setCanFilter(false);
-		
+
 		ListGridField enabled = new ListGridField(EENABLED, I18N.message("enabled"), 55);
 		enabled.setCanFilter(true);
 		enabled.setHidden(true);
@@ -134,13 +136,7 @@ public class GroupUsersPanel extends VLayout {
 			}
 
 			SecurityService.Instance.get().addUserToGroup(groupId, Long.parseLong(selectedRecord.getAttribute("id")),
-					new AsyncCallback<Void>() {
-
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
-						}
-
+					new DefaultAsyncCallback<>() {
 						@Override
 						public void onSuccess(Void ret) {
 							// Update the users table
@@ -183,19 +179,14 @@ public class GroupUsersPanel extends VLayout {
 		remove.addClickHandler(event -> {
 			if (selection == null || selection.length == 0)
 				return;
-			final long[] ids = new long[selection.length];
+			final List<Long> ids = new ArrayList<>();
 			for (int i = 0; i < selection.length; i++) {
-				ids[i] = Long.parseLong(selection[i].getAttribute("id"));
+				ids.add(Long.parseLong(selection[i].getAttribute("id")));
 			}
 
 			LD.ask(I18N.message("question"), I18N.message("confirmdelete"), confirm -> {
 				if (Boolean.TRUE.equals(confirm)) {
-					SecurityService.Instance.get().removeFromGroup(groupId, ids, new AsyncCallback<Void>() {
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
-						}
-
+					SecurityService.Instance.get().removeFromGroup(groupId, ids, new DefaultAsyncCallback<>() {
 						@Override
 						public void onSuccess(Void result) {
 							list.removeSelectedData();
@@ -211,5 +202,15 @@ public class GroupUsersPanel extends VLayout {
 
 		contextMenu.setItems(remove);
 		contextMenu.showContextMenu();
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

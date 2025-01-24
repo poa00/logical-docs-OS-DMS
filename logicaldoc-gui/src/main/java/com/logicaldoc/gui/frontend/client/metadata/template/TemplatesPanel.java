@@ -1,14 +1,17 @@
 package com.logicaldoc.gui.frontend.client.metadata.template;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import java.util.Arrays;
+
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
+import com.logicaldoc.gui.common.client.beans.GUIAccessControlEntry;
 import com.logicaldoc.gui.common.client.beans.GUITemplate;
 import com.logicaldoc.gui.common.client.data.TemplatesDS;
+import com.logicaldoc.gui.common.client.grid.IdListGridField;
+import com.logicaldoc.gui.common.client.grid.RefreshableListGrid;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.common.client.widgets.HTMLPanel;
 import com.logicaldoc.gui.common.client.widgets.InfoPanel;
-import com.logicaldoc.gui.common.client.widgets.grid.RefreshableListGrid;
 import com.logicaldoc.gui.frontend.client.services.TemplateService;
 import com.smartgwt.client.data.AdvancedCriteria;
 import com.smartgwt.client.data.Record;
@@ -19,7 +22,6 @@ import com.smartgwt.client.widgets.Canvas;
 import com.smartgwt.client.widgets.grid.ListGrid;
 import com.smartgwt.client.widgets.grid.ListGridField;
 import com.smartgwt.client.widgets.grid.ListGridRecord;
-import com.smartgwt.client.widgets.grid.events.DataArrivedEvent;
 import com.smartgwt.client.widgets.layout.Layout;
 import com.smartgwt.client.widgets.layout.VLayout;
 import com.smartgwt.client.widgets.menu.Menu;
@@ -34,6 +36,8 @@ import com.smartgwt.client.widgets.toolbar.ToolStripButton;
  * @since 6.0
  */
 public class TemplatesPanel extends VLayout {
+	private static final String LABEL = "label";
+
 	private static final String DESCRIPTION = "description";
 
 	protected Layout detailsContainer;
@@ -43,6 +47,8 @@ public class TemplatesPanel extends VLayout {
 	protected Canvas details = SELECT_TEMPLATE;
 
 	static final Canvas SELECT_TEMPLATE = new HTMLPanel("&nbsp;" + I18N.message("selecttemplate"));
+
+	protected Long templateIdToSelect;
 
 	public TemplatesPanel() {
 		setWidth100();
@@ -66,12 +72,15 @@ public class TemplatesPanel extends VLayout {
 		listing.setHeight("55%");
 		listing.setShowResizeBar(true);
 
-		ListGridField id = new ListGridField("id", 50);
-		id.setHidden(true);
+		ListGridField id = new IdListGridField();
 
 		ListGridField name = new ListGridField("name", I18N.message("name"), 200);
 		name.setCanFilter(true);
 		name.setCanSort(true);
+
+		ListGridField label = new ListGridField(LABEL, I18N.message(LABEL), 200);
+		label.setCanFilter(true);
+		label.setCanSort(true);
 
 		ListGridField description = new ListGridField(DESCRIPTION, I18N.message(DESCRIPTION), 300);
 		description.setCanFilter(true);
@@ -86,7 +95,7 @@ public class TemplatesPanel extends VLayout {
 		list.setAutoFetchData(true);
 		list.setWidth100();
 		list.setHeight100();
-		list.setFields(name, description);
+		list.setFields(id, name, label, description);
 		list.setSelectionType(SelectionStyle.SINGLE);
 		list.setShowRecordComponents(true);
 		list.setShowRecordComponentsByCell(true);
@@ -122,7 +131,7 @@ public class TemplatesPanel extends VLayout {
 
 		list.addCellContextClickHandler(event -> {
 			ListGridRecord rec = list.getSelectedRecord();
-			if (!"true".equals(rec.getAttributeAsString("readonly"))) {
+			if (!Boolean.parseBoolean(rec.getAttributeAsString("readonly"))) {
 				showContextMenu();
 			}
 			event.cancel();
@@ -132,13 +141,7 @@ public class TemplatesPanel extends VLayout {
 			Record rec = list.getSelectedRecord();
 			if (rec != null)
 				TemplateService.Instance.get().getTemplate(Long.parseLong(rec.getAttributeAsString("id")),
-						new AsyncCallback<GUITemplate>() {
-
-							@Override
-							public void onFailure(Throwable caught) {
-								GuiLog.serverError(caught);
-							}
-
+						new DefaultAsyncCallback<>() {
 							@Override
 							public void onSuccess(GUITemplate template) {
 								showTemplateDetails(template);
@@ -146,8 +149,18 @@ public class TemplatesPanel extends VLayout {
 						});
 		});
 
-		list.addDataArrivedHandler((DataArrivedEvent event) -> infoPanel
-				.setMessage(I18N.message("showtemplates", Integer.toString(list.getTotalRows()))));
+		list.addDataArrivedHandler(event -> {
+			infoPanel.setMessage(I18N.message("showtemplates", Integer.toString(list.getTotalRows())));
+			if (templateIdToSelect != null)
+				for (ListGridRecord rec : list.getRecords()) {
+					if (templateIdToSelect.longValue() == rec.getAttributeAsDouble("id").longValue()) {
+						list.scrollToRow(list.getRowNum(rec));
+						list.selectRecord(rec);
+						break;
+					}
+				}
+			templateIdToSelect = null;
+		});
 
 		detailsContainer.setAlign(Alignment.CENTER);
 		detailsContainer.addMember(details);
@@ -158,19 +171,14 @@ public class TemplatesPanel extends VLayout {
 	private void showContextMenu() {
 		Menu contextMenu = new Menu();
 
-		final ListGridRecord rec = list.getSelectedRecord();
-		final long id = Long.parseLong(rec.getAttributeAsString("id"));
+		final ListGridRecord selectedRecord = list.getSelectedRecord();
+		final long selectedTemplateId = selectedRecord.getAttributeAsLong("id");
 
 		MenuItem delete = new MenuItem();
 		delete.setTitle(I18N.message("ddelete"));
 		delete.addClickHandler(event -> LD.ask(I18N.message("question"), I18N.message("confirmdelete"), answer -> {
 			if (Boolean.TRUE.equals(answer)) {
-				TemplateService.Instance.get().delete(id, new AsyncCallback<Void>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				TemplateService.Instance.get().delete(selectedTemplateId, new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Void result) {
 						list.removeSelectedData();
@@ -181,7 +189,21 @@ public class TemplatesPanel extends VLayout {
 			}
 		}));
 
-		contextMenu.setItems(delete);
+		MenuItem clone = new MenuItem();
+		clone.setTitle(I18N.message("clone"));
+		clone.addClickHandler(event -> TemplateService.Instance.get().clone(selectedTemplateId,
+				selectedRecord.getAttribute("name") + "-Clone", new DefaultAsyncCallback<>() {
+					@Override
+					public void onSuccess(GUITemplate templateClone) {
+						list.deselectAllRecords();
+						list.refresh(new TemplatesDS(false, null, GUITemplate.TYPE_DEFAULT));
+						templateIdToSelect = templateClone.getId();
+						showTemplateDetails(templateClone);
+					}
+
+				}));
+
+		contextMenu.setItems(clone, delete);
 		contextMenu.showContextMenu();
 	}
 
@@ -215,6 +237,7 @@ public class TemplatesPanel extends VLayout {
 
 		rec.setAttribute("readonly", "" + template.isReadonly());
 		rec.setAttribute("name", template.getName());
+		rec.setAttribute(LABEL, template.getLabel() != null ? template.getLabel() : template.getName());
 		rec.setAttribute(DESCRIPTION, template.getDescription());
 		list.refreshRow(list.getRecordIndex(rec));
 	}
@@ -222,7 +245,18 @@ public class TemplatesPanel extends VLayout {
 	protected void onAddingTemplate() {
 		list.deselectAllRecords();
 		GUITemplate newTemplate = new GUITemplate();
-		newTemplate.setPermissions(new String[] { "read", "write" });
+		newTemplate.setPermissions(
+				Arrays.asList(GUIAccessControlEntry.PERMISSION_READ, GUIAccessControlEntry.PERMISSION_WRITE));
 		showTemplateDetails(newTemplate);
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

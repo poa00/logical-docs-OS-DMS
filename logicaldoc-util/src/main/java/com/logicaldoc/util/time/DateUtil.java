@@ -9,7 +9,6 @@ import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
 
-import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,7 +25,7 @@ public class DateUtil {
 	protected static Logger log = LoggerFactory.getLogger(DateUtil.class);
 
 	private DateUtil() {
-
+		throw new IllegalStateException("Utility class");
 	}
 
 	/**
@@ -41,17 +40,7 @@ public class DateUtil {
 			return null;
 
 		DateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z");
-		try {
-			return df.format(date);
-		} catch (Exception e) {
-			df = new SimpleDateFormat(YYYY_MM_DD);
-			try {
-				return df.format(date);
-			} catch (Exception e1) {
-				// Nothing to do
-			}
-		}
-		return null;
+		return df.format(date);
 	}
 
 	/**
@@ -67,17 +56,7 @@ public class DateUtil {
 			return null;
 
 		DateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS Z");
-		try {
-			return df.format(date);
-		} catch (Exception e) {
-			df = new SimpleDateFormat(YYYY_MM_DD);
-			try {
-				return df.format(date);
-			} catch (Exception e1) {
-				// Nothing to do
-			}
-		}
-		return null;
+		return df.format(date);
 	}
 
 	/**
@@ -88,9 +67,6 @@ public class DateUtil {
 	 * @return the parsed date
 	 */
 	public static Date parse(String formattedDate) {
-		if (StringUtils.isEmpty(formattedDate))
-			return null;
-
 		Date date = null;
 		String[] possibleFormats = new String[] { "yyyy-MM-dd HH:mm:ss.SSS Z", "yyyy-MM-dd HH:mm:ss.SS Z",
 				"yyyy-MM-dd HH:mm:ss Z", YYYY_MM_DD };
@@ -98,6 +74,8 @@ public class DateUtil {
 			try {
 				SimpleDateFormat df = new SimpleDateFormat(format);
 				date = df.parse(formattedDate);
+				if (date != null)
+					break;
 			} catch (ParseException e) {
 				// Nothing to do
 			}

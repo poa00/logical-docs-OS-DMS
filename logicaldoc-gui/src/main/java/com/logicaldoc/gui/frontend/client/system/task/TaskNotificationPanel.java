@@ -2,6 +2,7 @@ package com.logicaldoc.gui.frontend.client.system.task;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import com.logicaldoc.gui.common.client.beans.GUITask;
 import com.logicaldoc.gui.common.client.beans.GUIUser;
@@ -53,20 +54,17 @@ public class TaskNotificationPanel extends VLayout {
 		sendReport.setRedrawOnChange(true);
 		sendReport.setWidth(50);
 		sendReport.setValue(task.isSendActivityReport());
-		sendReport.addChangedHandler(event -> {
-			task.setSendActivityReport("true".equals(notificationsForm.getValue("sendReport").toString()));
+		sendReport.addChangedHandler(changed -> {
+			task.setSendActivityReport(Boolean.valueOf(notificationsForm.getValueAsString("sendReport")));
 
 			// Notify the external handler
-			changedHandler.onChanged(event);
+			changedHandler.onChanged(changed);
 		});
 
 		items.add(sendReport);
 
-		Long[] ids = new Long[task.getReportRecipients().length];
-		for (int i = 0; i < ids.length; i++)
-			ids[i] = task.getReportRecipients()[i].getId();
-
-		recipients = ItemFactory.newMultiComboBoxItem("recipients", "recipients", new UsersDS(null, false, false), ids);
+		recipients = ItemFactory.newMultiComboBoxItem("recipients", "recipients", new UsersDS(null, false, false), task
+				.getReportRecipients().stream().map(GUIUser::getId).collect(Collectors.toList()).toArray(new Long[0]));
 		recipients.setValueField("id");
 		recipients.setDisplayField("username");
 		recipients.addChangedHandler(changedHandler);
@@ -80,20 +78,28 @@ public class TaskNotificationPanel extends VLayout {
 		try {
 			if (recipients != null) {
 				String[] ids = recipients.getValues();
-				GUIUser[] users = new GUIUser[ids != null ? ids.length : 0];
-
+				List<GUIUser> users = new ArrayList<>();
 				if (ids != null && ids.length > 0)
 					for (int i = 0; i < ids.length; i++) {
 						GUIUser user = new GUIUser();
 						user.setId(Long.parseLong(ids[i]));
-						users[i] = user;
+						users.add(user);
 					}
-
 				task.setReportRecipients(users);
 			}
 			return true;
 		} catch (Exception t) {
 			return false;
 		}
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

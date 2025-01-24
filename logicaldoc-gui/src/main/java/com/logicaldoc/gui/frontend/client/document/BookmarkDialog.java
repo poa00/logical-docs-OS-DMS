@@ -2,10 +2,9 @@ package com.logicaldoc.gui.frontend.client.document;
 
 import java.util.Map;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIBookmark;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.frontend.client.services.DocumentService;
 import com.smartgwt.client.types.HeaderControls;
@@ -70,12 +69,7 @@ public class BookmarkDialog extends Window {
 						bookmark.setDescription((String) values.get(DESCRIPTION));
 					}
 
-					DocumentService.Instance.get().updateBookmark(bookmark, new AsyncCallback<Void>() {
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
-						}
-
+					DocumentService.Instance.get().updateBookmark(bookmark, new DefaultAsyncCallback<>() {
 						@Override
 						public void onSuccess(Void ret) {
 							destroy();
@@ -88,5 +82,15 @@ public class BookmarkDialog extends Window {
 
 		form.setFields(name, description, save);
 		addItem(form);
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+	
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

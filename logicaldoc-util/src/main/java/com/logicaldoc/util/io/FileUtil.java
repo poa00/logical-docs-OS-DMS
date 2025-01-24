@@ -13,6 +13,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.RandomAccessFile;
+import java.net.URL;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -27,21 +28,26 @@ import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.text.NumberFormat;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.StringTokenizer;
+import java.util.stream.Stream;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang.LocaleUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.tools.ant.types.selectors.SelectorUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.util.CollectionUtils;
 
-import com.logicaldoc.util.SystemUtil;
+import com.logicaldoc.util.time.TimeDiff;
 
 /**
  * This class manages I/O operations with files.
@@ -59,6 +65,7 @@ public class FileUtil {
 	protected static Logger log = LoggerFactory.getLogger(FileUtil.class);
 
 	private FileUtil() {
+		throw new IllegalStateException("Utility class");
 	}
 
 	/**
@@ -97,7 +104,8 @@ public class FileUtil {
 	}
 
 	public static void writeFile(String text, String filepath) {
-		try (BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(filepath));) {
+		try (FileOutputStream fos = new FileOutputStream(filepath);
+				BufferedOutputStream bos = new BufferedOutputStream(fos);) {
 			bos.write(text.getBytes(StandardCharsets.UTF_8));
 			bos.flush();
 		} catch (Exception e) {
@@ -118,6 +126,7 @@ public class FileUtil {
 	public static void appendFile(String text, String filepath) {
 		try (OutputStream bos = new FileOutputStream(filepath, true);) {
 			bos.write(text.getBytes());
+			bos.flush();
 		} catch (Exception e) {
 			logError(e.getLocalizedMessage());
 		}
@@ -209,48 +218,6 @@ public class FileUtil {
 	}
 
 	/**
-	 * This method calculates the digest of a file using the algorithm SHA-1.
-	 * 
-	 * @param file The file for which will be computed the digest
-	 * @return digest
-	 */
-	public static byte[] computeSha1Hash(File file) {
-		try (InputStream is = new BufferedInputStream(new FileInputStream(file), BUFF_SIZE);) {
-			return computeSha1Hash(is);
-		} catch (IOException io) {
-			log.error(io.getMessage(), io);
-		}
-		return new byte[0];
-	}
-
-	/**
-	 * This method calculates the digest of a inputStram content using the
-	 * algorithm SHA-1.
-	 * 
-	 * @param is The content of which will be computed the digest
-	 * @return digest
-	 */
-	public static byte[] computeSha1Hash(InputStream is) {
-		MessageDigest sha = null;
-		try {
-			if (is != null) {
-				sha = MessageDigest.getInstance("SHA-1");
-				byte[] message = new byte[BUFF_SIZE];
-				int len = 0;
-				while ((len = is.read(message)) != -1) {
-					sha.update(message, 0, len);
-				}
-				return sha.digest();
-			}
-		} catch (IOException io) {
-			log.error("Error generating SHA-1: ", io);
-		} catch (Exception t) {
-			log.error("Error generating SHA-1: ", t);
-		}
-		return new byte[0];
-	}
-
-	/**
 	 * Writes the specified classpath resource into a file
 	 * 
 	 * @param resourceName Fully qualified resource name
@@ -260,26 +227,23 @@ public class FileUtil {
 	 */
 	public static void copyResource(String resourceName, File out) throws IOException {
 		out.getParentFile().mkdirs();
-		InputStream is = null;
-		try {
-			try {
-				is = new BufferedInputStream(FileUtil.class.getResource(resourceName).openStream());
-			} catch (Exception e) {
-				is = new BufferedInputStream(
-						Thread.currentThread().getContextClassLoader().getResource(resourceName).openStream());
-			}
 
-			try (OutputStream os = new BufferedOutputStream(new FileOutputStream(out));) {
-				for (;;) {
-					int b = is.read();
-					if (b == -1)
-						break;
-					os.write(b);
-				}
+		URL resourceUrl = FileUtil.class.getResource(resourceName);
+		if (resourceUrl == null)
+			resourceUrl = Thread.currentThread().getContextClassLoader().getResource(resourceName);
+		if (resourceUrl == null)
+			throw new IOException("Resource cannot be found: " + resourceName);
+
+		try (InputStream is = resourceUrl.openStream();
+				BufferedInputStream bis = new BufferedInputStream(is);
+				OutputStream os = new FileOutputStream(out);
+				BufferedOutputStream bos = new BufferedOutputStream(os);) {
+			for (;;) {
+				int b = is.read();
+				if (b == -1)
+					break;
+				os.write(b);
 			}
-		} finally {
-			if (is != null)
-				is.close();
 		}
 	}
 
@@ -391,9 +355,9 @@ public class FileUtil {
 	 */
 	public static String getDisplaySize(long size, String language) {
 		String displaySize = "";
-		Locale locale = new Locale("en");
+		Locale locale = LocaleUtils.toLocale("en");
 		if (StringUtils.isNotEmpty(language))
-			locale = new Locale(language);
+			locale = LocaleUtils.toLocale(language);
 		NumberFormat nf = new DecimalFormat("###,###,###.0", new DecimalFormatSymbols(locale));
 		if (size > 1000000000) {
 			displaySize = nf.format((double) size / 1024 / 1024 / 1024) + " GB";
@@ -419,9 +383,9 @@ public class FileUtil {
 	 */
 	public static String getDisplaySizeKB(long size, String language) {
 		String displaySize = "";
-		Locale locale = new Locale("en");
+		Locale locale = LocaleUtils.toLocale("en");
 		if (StringUtils.isNotEmpty(language))
-			locale = new Locale(language);
+			locale = LocaleUtils.toLocale(language);
 		NumberFormat nf = new DecimalFormat("###,###,##0.0", new DecimalFormatSymbols(locale));
 		displaySize = nf.format((double) size / 1024) + " KB";
 		return displaySize;
@@ -438,10 +402,10 @@ public class FileUtil {
 	 * @return true only if the passed filename matches the includes and not the
 	 *         excludes
 	 */
-	public static boolean matches(String filename, String[] includes, String[] excludes) {
+	public static boolean matches(String filename, Collection<String> includes, Collection<String> excludes) {
 		// First of all check if the filename must be excluded
-		boolean matchesEcludes = matchesFilters(filename, excludes);
-		if (matchesEcludes)
+		boolean matchesExcludes = matchesFilters(filename, excludes);
+		if (matchesExcludes)
 			return false;
 
 		// Then check if the filename must can be included
@@ -449,11 +413,11 @@ public class FileUtil {
 		if (matchesIncludes)
 			return true;
 
-		return includes == null || includes.length == 0;
+		return CollectionUtils.isEmpty(includes);
 	}
 
-	private static boolean matchesFilters(String str, String[] filters) {
-		if (filters != null && filters.length > 0)
+	private static boolean matchesFilters(String str, Collection<String> filters) {
+		if (!CollectionUtils.isEmpty(filters))
 			for (String s : filters)
 				if (StringUtils.isNotEmpty(s) && SelectorUtils.match(s, str, false))
 					return true;
@@ -490,7 +454,7 @@ public class FileUtil {
 				inc.add(st.nextToken().trim());
 		}
 
-		return matches(filename, inc.toArray(new String[0]), exc.toArray(new String[0]));
+		return matches(filename, inc, exc);
 	}
 
 	public static void writeUTF8(String content, File file, boolean append) {
@@ -599,8 +563,10 @@ public class FileUtil {
 	 * @throws IOException if the copy resulted in an error
 	 */
 	public static void copyFile(File source, File target) throws IOException {
-		try (FileChannel in = new FileInputStream(source).getChannel();
-				FileChannel out = new FileOutputStream(target).getChannel();) {
+		try (FileInputStream fis = new FileInputStream(source);
+				FileChannel in = fis.getChannel();
+				FileOutputStream fos = new FileOutputStream(target);
+				FileChannel out = fos.getChannel();) {
 
 			ByteBuffer buffer = ByteBuffer.allocateDirect(BUFF_SIZE);
 			while (in.read(buffer) != -1) {
@@ -618,45 +584,43 @@ public class FileUtil {
 		}
 	}
 
-	public static void strongDelete(File file) {
-		try {
-			if (file != null && file.exists())
-				FileUtils.forceDelete(file);
-		} catch (IOException e) {
-			log.warn(e.getMessage());
-		}
+	/**
+	 * 
+	 * Deletes a file doing the best effort
+	 * 
+	 * @param file the file to delete
+	 * @return true inly if the deletion has been done successfully
+	 */
+	public static boolean delete(File file) {
+		if (file == null)
+			return true;
 
+		/*
+		 * Better to deleteQuitely first because the forceDelete seems to cause
+		 * locks at least on Windows when there are frequent deletions. Even
+		 * directly using the Windows command rd produces the same behavior
+		 */
+		Date start = new Date();
 		try {
-			if (file != null && file.exists())
-				Files.deleteIfExists(file.toPath());
-		} catch (IOException e) {
-			log.warn(e.getMessage());
+			return FileUtils.deleteQuietly(file);
+		} finally {
+			if (log.isDebugEnabled())
+				log.debug("Deleted path {} in {}", file.getAbsolutePath(), TimeDiff.printDuration(start, new Date()));
 		}
-		if (file != null && file.exists())
-			deleteUsingOSCommand(file);
 	}
 
 	public static void moveQuitely(File source, File target) {
+		Date start = new Date();
 		try {
 			Files.move(source.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE,
 					StandardCopyOption.REPLACE_EXISTING);
-		} catch (IOException e) {
+		} catch (Exception e) {
 			log.warn("Cannot move {} into {}", source.getAbsolutePath(), target.getAbsolutePath());
-		}
-	}
-
-	private static void deleteUsingOSCommand(File file) {
-		try {
-			log.debug("Delete file {} using OS command", file.getAbsolutePath());
-			if (SystemUtil.isWindows()) {
-				if (file.isDirectory())
-					java.lang.Runtime.getRuntime().exec("cmd /C del /F /Q \"" + file.getAbsolutePath() + "\"");
-				else
-					java.lang.Runtime.getRuntime().exec("cmd /C rmdir /S /Q \"" + file.getAbsolutePath() + "\"");
-			} else
-				java.lang.Runtime.getRuntime().exec("rm -rf \"" + file.getAbsolutePath() + "\"");
-		} catch (IOException e) {
 			log.warn(e.getMessage(), e);
+		} finally {
+			if (log.isDebugEnabled())
+				log.debug("Moved path {} into {} in {}", source.getAbsolutePath(), target.getAbsolutePath(),
+						TimeDiff.printDuration(start, new Date()));
 		}
 	}
 
@@ -676,7 +640,7 @@ public class FileUtil {
 		if (!created)
 			throw new IOException(CANNOT_CREATE_FILE + merged.getAbsolutePath());
 
-		File tmp = new File(merged.getParent(), "tmp");
+		File tmp = new File(merged.getParentFile(), "merge.tmp");
 
 		try {
 			created = tmp.createNewFile();
@@ -690,7 +654,6 @@ public class FileUtil {
 				if (!renamed)
 					throw new IOException("Cannot rename file to " + merged.getAbsolutePath());
 
-				tmp = new File(merged.getParent(), "tmp");
 				created = tmp.createNewFile();
 				if (!created)
 					throw new IOException(CANNOT_CREATE_FILE + tmp.getAbsolutePath());
@@ -712,7 +675,8 @@ public class FileUtil {
 			int maxReadBufferSize = 8 * 1024; // 8KB
 			for (int destIx = 1; destIx <= numSplits; destIx++) {
 				File chunkFile = new File(destDir, nf.format(destIx));
-				try (BufferedOutputStream bw = new BufferedOutputStream(new FileOutputStream(chunkFile));) {
+				try (FileOutputStream fos = new FileOutputStream(chunkFile);
+						BufferedOutputStream bw = new BufferedOutputStream(fos);) {
 					if (chunkSize > maxReadBufferSize) {
 						long numReads = chunkSize / maxReadBufferSize;
 						long numRemainingRead = chunkSize % maxReadBufferSize;
@@ -731,9 +695,10 @@ public class FileUtil {
 
 			if (remainingBytes > 0) {
 				File chunkFile = new File(destDir, nf.format(numSplits + 1));
-				BufferedOutputStream bw = new BufferedOutputStream(new FileOutputStream(chunkFile));
-				readWrite(raf, bw, remainingBytes);
-				bw.close();
+				try (FileOutputStream fos = new FileOutputStream(chunkFile);
+						BufferedOutputStream bos = new BufferedOutputStream(fos);) {
+					readWrite(raf, bos, remainingBytes);
+				}
 				chunks.add(chunkFile);
 			}
 		}
@@ -749,20 +714,8 @@ public class FileUtil {
 	}
 
 	public static long countLines(File file) throws IOException {
-		try (InputStream is = new BufferedInputStream(new FileInputStream(file));) {
-			byte[] c = new byte[1024];
-			long count = 0;
-			int readChars = 0;
-			boolean empty = true;
-			while ((readChars = is.read(c)) != -1) {
-				empty = false;
-				for (int i = 0; i < readChars; ++i) {
-					if (c[i] == '\n') {
-						++count;
-					}
-				}
-			}
-			return (count == 0 && !empty) ? 1 : count;
+		try (Stream<String> stream = Files.lines(file.toPath(), StandardCharsets.UTF_8)) {
+			return stream.count();
 		}
 	}
 
@@ -804,8 +757,8 @@ public class FileUtil {
 	 * Creates an empty folder in the default temporary-file directory, using
 	 * the given prefix to generate its name.
 	 * 
-	 * @param prefix The prefix string to be used in generating the file'sname;
-	 *        must be at least three characters longsuffix
+	 * @param prefix The prefix string to be used in generating the folder's
+	 *        name; must be at least three characters longsuffix
 	 * 
 	 * @return An abstract pathname denoting a newly-created empty folder
 	 * 

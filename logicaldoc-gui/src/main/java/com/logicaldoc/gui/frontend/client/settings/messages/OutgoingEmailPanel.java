@@ -1,9 +1,8 @@
 package com.logicaldoc.gui.frontend.client.settings.messages;
 
 import java.util.LinkedHashMap;
-import java.util.Map;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIEmailSettings;
 import com.logicaldoc.gui.common.client.i18n.I18N;
@@ -13,14 +12,16 @@ import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.common.client.widgets.FolderSelector;
 import com.logicaldoc.gui.frontend.client.administration.AdminPanel;
 import com.logicaldoc.gui.frontend.client.services.SettingService;
+import com.smartgwt.client.data.AdvancedCriteria;
+import com.smartgwt.client.types.OperatorId;
 import com.smartgwt.client.types.TitleOrientation;
 import com.smartgwt.client.util.SC;
 import com.smartgwt.client.widgets.form.DynamicForm;
 import com.smartgwt.client.widgets.form.ValuesManager;
 import com.smartgwt.client.widgets.form.fields.ButtonItem;
 import com.smartgwt.client.widgets.form.fields.CheckboxItem;
+import com.smartgwt.client.widgets.form.fields.FormItem;
 import com.smartgwt.client.widgets.form.fields.IntegerItem;
-import com.smartgwt.client.widgets.form.fields.PasswordItem;
 import com.smartgwt.client.widgets.form.fields.SelectItem;
 import com.smartgwt.client.widgets.form.fields.TextItem;
 import com.smartgwt.client.widgets.tab.Tab;
@@ -33,7 +34,7 @@ import com.smartgwt.client.widgets.tab.Tab;
  */
 public class OutgoingEmailPanel extends AdminPanel {
 
-	private static final String NODISPLAY = "nodisplay";
+	private static final String PROTOCOL = "protocol";
 
 	private static final String USERASFROM = "userasfrom";
 
@@ -61,11 +62,11 @@ public class OutgoingEmailPanel extends AdminPanel {
 		emailForm.setValuesManager(vm);
 		emailForm.setTitleOrientation(TitleOrientation.LEFT);
 
-		// SMTP Server
-		TextItem smtpServer = ItemFactory.newTextItem("smtpserver", this.emailSettings.getSmtpServer());
-		smtpServer.setRequired(true);
-		smtpServer.setWidth(350);
-		smtpServer.setWrapTitle(false);
+		// Server
+		TextItem server = ItemFactory.newTextItem("server", this.emailSettings.getServer());
+		server.setRequired(true);
+		server.setWidth(350);
+		server.setWrapTitle(false);
 
 		// Port
 		IntegerItem port = ItemFactory.newValidateIntegerItem("port", "port", this.emailSettings.getPort(), 1, null);
@@ -77,10 +78,9 @@ public class OutgoingEmailPanel extends AdminPanel {
 		username.setWidth(350);
 		username.setWrapTitle(false);
 
-		// Password
-		PasswordItem password = ItemFactory.newPasswordItemPreventAutocomplete(PASSWORD, PASSWORD,
-				this.emailSettings.getPwd());
-		password.setWrapTitle(false);
+		SelectItem protocol = ItemFactory.newSmtpProtocolSelector();
+		protocol.setRequired(true);
+		protocol.setValue(this.emailSettings.getProtocol());
 
 		// Connection Security
 		SelectItem connSecurity = new SelectItem();
@@ -136,20 +136,38 @@ public class OutgoingEmailPanel extends AdminPanel {
 
 		ButtonItem test = prepareTestButton();
 
+		TextItem clientId = ItemFactory.newTextItem("clientid", emailSettings.getClientId());
+		clientId.setWidth(350);
+		clientId.setVisibleWhen(new AdvancedCriteria(PROTOCOL, OperatorId.CONTAINS, "365"));
+
+		TextItem clientTenant = ItemFactory.newTextItem("clienttenant", I18N.message("tenantId"),
+				emailSettings.getClientTenant());
+		clientTenant.setWidth(350);
+		clientTenant.setVisibleWhen(new AdvancedCriteria(PROTOCOL, OperatorId.CONTAINS, "365"));
+
 		/*
 		 * Two invisible fields to 'mask' the real credentials to the browser
-		 * and prevent it to auto-fill the username and password we really use.
+		 * and prevent it to auto-fill the username, password and client secret
+		 * we really use.
 		 */
 		TextItem fakeUsername = ItemFactory.newTextItem("prevent_autofill", this.emailSettings.getUsername());
-		fakeUsername.setCellStyle(NODISPLAY);
-		fakeUsername.setTitleStyle(NODISPLAY);
-		PasswordItem fakePassword = ItemFactory.newPasswordItem("password_fake", "password_fake",
-				this.emailSettings.getPwd());
-		fakePassword.setCellStyle(NODISPLAY);
-		fakePassword.setTitleStyle(NODISPLAY);
+		fakeUsername.setHidden(true);
+		TextItem hiddenPassword = ItemFactory.newTextItem("password_hidden", this.emailSettings.getPwd());
+		hiddenPassword.setHidden(true);
+		TextItem hiddenClientSecret = ItemFactory.newTextItem("clientsecret_hidden",
+				this.emailSettings.getClientSecret());
+		hiddenClientSecret.setHidden(true);
 
-		emailForm.setItems(smtpServer, port, fakeUsername, fakePassword, username, password, connSecurity, secureAuth,
-				senderEmail, userAsSender, targetSelector, foldering, save, test);
+		FormItem password = ItemFactory.newSafePasswordItem(PASSWORD, I18N.message(PASSWORD),
+				this.emailSettings.getPwd(), hiddenPassword, null);
+
+		FormItem clientSecret = ItemFactory.newSafePasswordItem("clientsecret", I18N.message("clientsecret"),
+				this.emailSettings.getClientSecret(), hiddenClientSecret, null);
+		clientSecret.setVisibleWhen(new AdvancedCriteria(PROTOCOL, OperatorId.CONTAINS, "365"));
+
+		emailForm.setItems(protocol, server, port, connSecurity, secureAuth, username, password, clientId, clientTenant,
+				clientSecret, senderEmail, userAsSender, targetSelector, foldering, save, test, fakeUsername,
+				hiddenPassword, hiddenClientSecret);
 		body.setMembers(emailForm);
 
 		tabs.addTab(templates);
@@ -157,20 +175,14 @@ public class OutgoingEmailPanel extends AdminPanel {
 
 	private ButtonItem prepareTestButton() {
 		ButtonItem test = new ButtonItem("test", I18N.message("testconnection"));
-		test.addClickHandler((com.smartgwt.client.widgets.form.fields.events.ClickEvent event) -> {
+		test.addClickHandler(click -> {
 			if (Boolean.FALSE.equals(vm.validate()))
 				return;
 
 			LD.askForValue(I18N.message("email"), I18N.message("email"), vm.getValueAsString(SENDEREMAIL),
 					(String value) -> {
 						LD.contactingServer();
-						SettingService.Instance.get().testEmail(value, new AsyncCallback<Boolean>() {
-							@Override
-							public void onFailure(Throwable caught) {
-								GuiLog.serverError(caught);
-								LD.clearPrompt();
-							}
-
+						SettingService.Instance.get().testEmail(value, new DefaultAsyncCallback<>() {
 							@Override
 							public void onSuccess(Boolean yes) {
 								LD.clearPrompt();
@@ -193,32 +205,27 @@ public class OutgoingEmailPanel extends AdminPanel {
 			if (Boolean.FALSE.equals(vm.validate()))
 				return;
 
-			@SuppressWarnings("unchecked")
-			Map<String, Object> values = vm.getValues();
-
-			OutgoingEmailPanel.this.emailSettings.setSmtpServer((String) values.get("smtpserver"));
-			if (values.get("port") instanceof Integer)
-				OutgoingEmailPanel.this.emailSettings.setPort((Integer) values.get("port"));
+			OutgoingEmailPanel.this.emailSettings.setProtocol(vm.getValueAsString(PROTOCOL));
+			OutgoingEmailPanel.this.emailSettings.setServer(vm.getValueAsString("server"));
+			if (vm.getValue("port") instanceof Integer intVal)
+				OutgoingEmailPanel.this.emailSettings.setPort(intVal);
 			else
-				OutgoingEmailPanel.this.emailSettings.setPort(Integer.parseInt(values.get("port").toString()));
+				OutgoingEmailPanel.this.emailSettings.setPort(Integer.parseInt(vm.getValueAsString("port")));
 
-			OutgoingEmailPanel.this.emailSettings.setUsername((String) values.get(USERNAME));
-			OutgoingEmailPanel.this.emailSettings.setPwd((String) values.get(PASSWORD));
-			OutgoingEmailPanel.this.emailSettings.setConnSecurity((String) values.get("connSecurity"));
-			OutgoingEmailPanel.this.emailSettings.setSecureAuth(values.get("secureAuth").toString().equals("true"));
-			OutgoingEmailPanel.this.emailSettings.setSenderEmail((String) values.get(SENDEREMAIL));
-			OutgoingEmailPanel.this.emailSettings.setUserAsFrom(values.get(USERASFROM).toString().equals("true"));
-			OutgoingEmailPanel.this.emailSettings.setFoldering(Integer.parseInt(values.get("foldering").toString()));
+			OutgoingEmailPanel.this.emailSettings.setUsername(vm.getValueAsString(USERNAME));
+			OutgoingEmailPanel.this.emailSettings.setPwd(vm.getValueAsString("password_hidden"));
+			OutgoingEmailPanel.this.emailSettings.setConnSecurity(vm.getValueAsString("connSecurity"));
+			OutgoingEmailPanel.this.emailSettings.setSecureAuth(Boolean.valueOf(vm.getValueAsString("secureAuth")));
+			OutgoingEmailPanel.this.emailSettings.setSenderEmail(vm.getValueAsString(SENDEREMAIL));
+			OutgoingEmailPanel.this.emailSettings.setUserAsFrom(Boolean.valueOf(vm.getValueAsString(USERASFROM)));
+			OutgoingEmailPanel.this.emailSettings.setFoldering(Integer.parseInt(vm.getValueAsString("foldering")));
 			OutgoingEmailPanel.this.emailSettings.setTargetFolder(targetSelector.getFolder());
+			OutgoingEmailPanel.this.emailSettings.setClientId(vm.getValueAsString("clientid"));
+			OutgoingEmailPanel.this.emailSettings.setClientSecret(vm.getValueAsString("clientsecret_hidden"));
+			OutgoingEmailPanel.this.emailSettings.setClientTenant(vm.getValueAsString("clienttenant"));
 
 			SettingService.Instance.get().saveEmailSettings(OutgoingEmailPanel.this.emailSettings,
-					new AsyncCallback<Void>() {
-
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
-						}
-
+					new DefaultAsyncCallback<>() {
 						@Override
 						public void onSuccess(Void ret) {
 							Session.get().getInfo().setConfig(Session.get().getTenantName() + ".smtp.userasfrom",
@@ -228,5 +235,15 @@ public class OutgoingEmailPanel extends AdminPanel {
 					});
 		});
 		return save;
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

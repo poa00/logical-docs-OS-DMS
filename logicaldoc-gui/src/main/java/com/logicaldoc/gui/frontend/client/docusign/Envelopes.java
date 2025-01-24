@@ -3,13 +3,13 @@ package com.logicaldoc.gui.frontend.client.docusign;
 import java.util.Collection;
 
 import com.google.gwt.user.client.Window;
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.data.DocuSignEnvelopesDS;
+import com.logicaldoc.gui.common.client.grid.DateListGridField;
+import com.logicaldoc.gui.common.client.grid.IdListGridField;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.LD;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField;
 import com.logicaldoc.gui.frontend.client.services.DocuSignService;
 import com.smartgwt.client.types.HeaderControls;
 import com.smartgwt.client.types.SelectionStyle;
@@ -80,8 +80,7 @@ public class Envelopes extends com.smartgwt.client.widgets.Window {
 		if (list != null)
 			removeItem(list);
 
-		ListGridField id = new ListGridField("id", 50);
-		id.setHidden(true);
+		ListGridField id = new IdListGridField();
 
 		ListGridField subject = new ListGridField("subject", I18N.message("subject"));
 		subject.setCanFilter(true);
@@ -123,14 +122,8 @@ public class Envelopes extends com.smartgwt.client.widgets.Window {
 
 			MenuItem inviteToChat = new MenuItem();
 			inviteToChat.setTitle(I18N.message("signers"));
-			inviteToChat.addClickHandler(evnt -> DocuSignService.Instance.get().getSigners(
-					list.getSelectedRecord().getAttributeAsString("id"), new AsyncCallback<Collection<String>>() {
-
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
-						}
-
+			inviteToChat.addClickHandler(evnt -> DocuSignService.Instance.get()
+					.getSigners(list.getSelectedRecord().getAttributeAsString("id"), new DefaultAsyncCallback<>() {
 						@Override
 						public void onSuccess(Collection<String> signers) {
 							StringBuilder message = new StringBuilder();
@@ -153,5 +146,15 @@ public class Envelopes extends com.smartgwt.client.widgets.Window {
 
 	public void refresh() {
 		initGrid();
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

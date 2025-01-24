@@ -4,28 +4,28 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIAttribute;
 import com.logicaldoc.gui.common.client.beans.GUIDocument;
 import com.logicaldoc.gui.common.client.beans.GUIForm;
+import com.logicaldoc.gui.common.client.grid.DateListGridField;
+import com.logicaldoc.gui.common.client.grid.FileNameListGridField;
+import com.logicaldoc.gui.common.client.grid.FileSizeListGridField;
+import com.logicaldoc.gui.common.client.grid.IdListGridField;
+import com.logicaldoc.gui.common.client.grid.RefreshableListGrid;
+import com.logicaldoc.gui.common.client.grid.UserListGridField;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.FileNameListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.FileSizeListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.RefreshableListGrid;
-import com.logicaldoc.gui.common.client.widgets.grid.UserListGridField;
-import com.logicaldoc.gui.common.client.widgets.preview.PreviewPopup;
+import com.logicaldoc.gui.common.client.preview.PreviewPopup;
 import com.logicaldoc.gui.frontend.client.document.DocumentsPanel;
 import com.logicaldoc.gui.frontend.client.document.grid.DocumentGridUtil;
+import com.logicaldoc.gui.frontend.client.menu.QuickSearchTray;
 import com.logicaldoc.gui.frontend.client.services.DocumentService;
 import com.smartgwt.client.types.Alignment;
 import com.smartgwt.client.types.DateDisplayFormat;
 import com.smartgwt.client.types.ListGridFieldType;
 import com.smartgwt.client.widgets.grid.ListGridField;
 import com.smartgwt.client.widgets.grid.ListGridRecord;
-import com.smartgwt.client.widgets.grid.events.CellContextClickEvent;
 import com.smartgwt.client.widgets.menu.Menu;
 import com.smartgwt.client.widgets.menu.MenuItem;
 import com.smartgwt.client.widgets.menu.events.MenuItemClickEvent;
@@ -54,13 +54,12 @@ public class ResponsesGrid extends RefreshableListGrid {
 
 		prepareFields();
 
-		addCellContextClickHandler((CellContextClickEvent event) -> {
-			event.cancel();
+		addCellContextClickHandler(click -> {
+			click.cancel();
 			showContextMenu();
 		});
 
-		ResponsesDS dataSource = new ResponsesDS(form, 100);
-		setDataSource(dataSource);
+		setDataSource(new ResponsesDS(form, 100));
 	}
 
 	/**
@@ -71,8 +70,7 @@ public class ResponsesGrid extends RefreshableListGrid {
 		filename.setHidden(true);
 		filename.setCanFilter(true);
 
-		ListGridField id = new ListGridField("id", I18N.getAttributeLabel("id"), 60);
-		id.setHidden(true);
+		ListGridField id = new IdListGridField(I18N.getAttributeLabel("id"));
 
 		ListGridField size = new FileSizeListGridField("size", I18N.getAttributeLabel("size"));
 		size.setHidden(true);
@@ -105,37 +103,43 @@ public class ResponsesGrid extends RefreshableListGrid {
 		fields.add(respondent);
 		fields.add(folder);
 
-		for (String name : form.getAttributeNames()) {
-			if (name != null && !"".equals(name)) {
-				ListGridField ext = new ListGridField("ext_" + name, Session.get().getInfo().getAttributeLabel(name),
-						100);
-				GUIAttribute attDef = Session.get().getInfo().getAttributeDefinition(name);
-				if (attDef != null) {
-					if (attDef.getType() == GUIAttribute.TYPE_DATE) {
-						ext = new DateListGridField("ext_" + name, Session.get().getInfo().getAttributeLabel(name));
-						ext.setTitle(Session.get().getInfo().getAttributeLabel(name));
-					} else if (attDef.getType() == GUIAttribute.TYPE_INT) {
-						ext.setAlign(Alignment.RIGHT);
-						ext.setType(ListGridFieldType.INTEGER);
-						ext.setCanFilter(false);
-					} else if (attDef.getType() == GUIAttribute.TYPE_DOUBLE) {
-						ext.setAlign(Alignment.RIGHT);
-						ext.setType(ListGridFieldType.FLOAT);
-						ext.setCanFilter(false);
-					} else if (attDef.getType() == GUIAttribute.TYPE_USER) {
-						ext = new UserListGridField("ext_" + name, "ext_" + name,
-								Session.get().getInfo().getAttributeLabel(name));
-						ext.setTitle(Session.get().getInfo().getAttributeLabel(name));
-					}
-				}
-
-				ext.setCanFilter(true);
-				ext.setCanSort(true);
-				fields.add(ext);
-			}
-		}
+		addAttributes(fields);
 
 		setFields(fields.toArray(new ListGridField[0]));
+	}
+
+	private void addAttributes(List<ListGridField> fields) {
+		for (String name : form.getAttributeNames()) {
+			if (form.getAttribute(name).isSection() || name == null || name.trim().isEmpty())
+				continue;
+
+			ListGridField ext = new ListGridField("ext_" + name, Session.get().getInfo().getAttributeLabel(name), 100);
+			GUIAttribute attDef = Session.get().getInfo().getAttributeDefinition(name);
+			if (attDef != null) {
+				if (attDef.getType() == GUIAttribute.TYPE_DATE) {
+					ext = new DateListGridField("ext_" + name, Session.get().getInfo().getAttributeLabel(name));
+					ext.setTitle(Session.get().getInfo().getAttributeLabel(name));
+				} else if (attDef.getType() == GUIAttribute.TYPE_INT) {
+					ext.setAlign(Alignment.RIGHT);
+					ext.setType(ListGridFieldType.INTEGER);
+					ext.setCanFilter(false);
+				} else if (attDef.getType() == GUIAttribute.TYPE_DOUBLE) {
+					ext.setAlign(Alignment.RIGHT);
+					ext.setType(ListGridFieldType.FLOAT);
+					ext.setCanFilter(false);
+				} else if (attDef.getType() == GUIAttribute.TYPE_USER) {
+					ext = new UserListGridField("ext_" + name, "ext_" + name,
+							Session.get().getInfo().getAttributeLabel(name));
+					ext.setTitle(Session.get().getInfo().getAttributeLabel(name));
+				}
+
+				if (!attDef.isSection()) {
+					ext.setCanFilter(true);
+					ext.setCanSort(true);
+					fields.add(ext);
+				}
+			}
+		}
 	}
 
 	private void showContextMenu() {
@@ -172,7 +176,7 @@ public class ResponsesGrid extends RefreshableListGrid {
 				}
 				iv = new PreviewPopup(doc);
 			} else {
-				GUIDocument[] docs = DocumentGridUtil.toDocuments(selection);
+				List<GUIDocument> docs = DocumentGridUtil.toDocuments(selection);
 				for (GUIDocument doc : docs) {
 					/*
 					 * in case of alias the data servlet inverts the docId and
@@ -191,13 +195,7 @@ public class ResponsesGrid extends RefreshableListGrid {
 		MenuItem delete = new MenuItem();
 		delete.setTitle(I18N.message("ddelete"));
 		delete.addClickHandler((MenuItemClickEvent event) -> DocumentService.Instance.get()
-				.delete(DocumentGridUtil.getIds(selection), new AsyncCallback<Void>() {
-
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				.delete(DocumentGridUtil.getIds(selection), new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Void arg0) {
 						refresh(getDataSource());
@@ -216,5 +214,18 @@ public class ResponsesGrid extends RefreshableListGrid {
 	@Override
 	public DateDisplayFormat getDatetimeFormatter() {
 		return I18N.getDateDisplayFormat(true);
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (obj instanceof QuickSearchTray)
+			return super.equals(obj);
+		else
+			return false;
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

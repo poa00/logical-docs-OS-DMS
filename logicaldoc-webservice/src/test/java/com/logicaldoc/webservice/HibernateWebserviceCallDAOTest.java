@@ -2,7 +2,6 @@ package com.logicaldoc.webservice;
 
 import static org.junit.Assert.assertEquals;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.List;
@@ -11,6 +10,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.logicaldoc.core.PersistenceException;
+import com.logicaldoc.util.plugin.PluginException;
 
 /**
  * Test case for {@link HibernateWebserviceCallDAO}
@@ -23,7 +23,7 @@ public class HibernateWebserviceCallDAOTest extends AbstractWebserviceTestCase {
 	private WebserviceCallDAO testSubject;
 
 	@Before
-	public void setUp() throws FileNotFoundException, IOException, SQLException {
+	public void setUp() throws IOException, SQLException, PluginException {
 		super.setUp();
 		// Retrieve the instance under test from spring context. Make sure that
 		// it is an WebserviceCallDAO

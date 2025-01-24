@@ -1,13 +1,15 @@
 package com.logicaldoc.gui.common.client.widgets;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import java.util.ArrayList;
+import java.util.List;
+
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIUser;
+import com.logicaldoc.gui.common.client.grid.UserListGridField;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.services.SecurityService;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.LD;
-import com.logicaldoc.gui.common.client.widgets.grid.UserListGridField;
 import com.smartgwt.client.types.HeaderControls;
 import com.smartgwt.client.types.SelectionStyle;
 import com.smartgwt.client.widgets.Window;
@@ -89,31 +91,30 @@ public class UserSearchDialog extends Window {
 	}
 
 	protected void search(String username, String groupId) {
-		SecurityService.Instance.get().searchUsers(username, groupId, new AsyncCallback<GUIUser[]>() {
+		SecurityService.Instance.get().searchUsers(username, groupId, new DefaultAsyncCallback<>() {
 			@Override
 			public void onFailure(Throwable caught) {
 				LD.clearPrompt();
-				GuiLog.serverError(caught);
+				super.onFailure(caught);
 			}
 
 			@Override
-			public void onSuccess(GUIUser[] result) {
-				lastResult = new ListGridRecord[result.length];
-				for (int i = 0; i < result.length; i++) {
-					GUIUser hit = result[i];
+			public void onSuccess(List<GUIUser> result) {
+				List<ListGridRecord> recs = new ArrayList<>();
+				for (GUIUser hit : result) {
 					ListGridRecord rec = new ListGridRecord();
-					lastResult[i] = rec;
 					rec.setAttribute("avatar", hit.getId());
 					rec.setAttribute("id", hit.getId());
 					rec.setAttribute(USERNAME, hit.getUsername());
 					rec.setAttribute(FIRSTNAME, hit.getFirstName());
 					rec.setAttribute(LASTNAME, hit.getName());
+					recs.add(rec);
 				}
 
-				if (lastResult.length == 1) {
-					onSelect(lastResult[0].getAttributeAsLong("id"));
+				if (recs.size() == 1) {
+					onSelect(recs.get(0).getAttributeAsLong("id"));
 				} else
-					grid.setData(lastResult);
+					grid.setData(recs.toArray(new ListGridRecord[0]));
 			}
 		});
 	}
@@ -126,5 +127,15 @@ public class UserSearchDialog extends Window {
 		selector.setValue(Long.toString(id));
 		selector.fireUserChanged();
 		destroy();
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+	
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

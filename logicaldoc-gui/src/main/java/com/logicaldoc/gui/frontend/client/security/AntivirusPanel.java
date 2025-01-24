@@ -1,6 +1,10 @@
 package com.logicaldoc.gui.frontend.client.security;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIParameter;
 import com.logicaldoc.gui.common.client.i18n.I18N;
@@ -10,10 +14,9 @@ import com.logicaldoc.gui.frontend.client.services.SettingService;
 import com.smartgwt.client.types.Alignment;
 import com.smartgwt.client.types.TitleOrientation;
 import com.smartgwt.client.widgets.IButton;
-import com.smartgwt.client.widgets.events.ClickEvent;
 import com.smartgwt.client.widgets.form.DynamicForm;
-import com.smartgwt.client.widgets.form.fields.RadioGroupItem;
 import com.smartgwt.client.widgets.form.fields.TextItem;
+import com.smartgwt.client.widgets.form.fields.ToggleItem;
 import com.smartgwt.client.widgets.layout.VLayout;
 import com.smartgwt.client.widgets.tab.Tab;
 import com.smartgwt.client.widgets.tab.TabSet;
@@ -27,11 +30,17 @@ import com.smartgwt.client.widgets.tab.TabSet;
 public class AntivirusPanel extends VLayout {
 
 	private static final String ENABLED = "enabled";
+
 	private static final String ANTIVIRUS_EXCLUDES = ".antivirus.excludes";
+
 	private static final String ANTIVIRUS_INCLUDES = ".antivirus.includes";
+
 	private static final String ANTIVIRUS_TIMEOUT = ".antivirus.timeout";
+
 	private static final String ANTIVIRUS_ENABLED = ".antivirus.enabled";
+
 	private static final String ANTIVIRUS_COMMAND = "antivirus.command";
+
 	private DynamicForm form = new DynamicForm();
 
 	public AntivirusPanel() {
@@ -44,49 +53,38 @@ public class AntivirusPanel extends VLayout {
 	protected void onDraw() {
 		String tenant = Session.get().getTenantName();
 		SettingService.Instance.get()
-				.loadSettingsByNames(new String[] { ANTIVIRUS_COMMAND, tenant + ANTIVIRUS_ENABLED,
-						tenant + ANTIVIRUS_INCLUDES, tenant + ANTIVIRUS_EXCLUDES, tenant + ANTIVIRUS_TIMEOUT },
-						new AsyncCallback<GUIParameter[]>() {
+				.loadSettingsByNames(Arrays.asList(ANTIVIRUS_COMMAND, tenant + ANTIVIRUS_ENABLED,
+						tenant + ANTIVIRUS_INCLUDES, tenant + ANTIVIRUS_EXCLUDES, tenant + ANTIVIRUS_TIMEOUT),
+						new DefaultAsyncCallback<>() {
 							@Override
-							public void onFailure(Throwable caught) {
-								GuiLog.serverError(caught);
-							}
-
-							@Override
-							public void onSuccess(GUIParameter[] parameters) {
+							public void onSuccess(List<GUIParameter> parameters) {
 								initGUI(parameters);
 							}
 						});
 
 	}
 
-	private void initGUI(GUIParameter[] settings) {
+	private void initGUI(List<GUIParameter> settings) {
 		prepareForm(settings);
 
 		IButton save = new IButton();
 		save.setTitle(I18N.message("save"));
-		save.addClickHandler((ClickEvent event) -> {
+		save.addClickHandler(click -> {
 			if (form.validate()) {
-				GUIParameter[] params = new GUIParameter[Session.get().isDefaultTenant() ? 4 : 3];
-				params[0] = new GUIParameter(Session.get().getTenantName() + ANTIVIRUS_ENABLED,
-						"" + ("yes".equals(form.getValueAsString(ENABLED))));
-				params[1] = new GUIParameter(Session.get().getTenantName() + ANTIVIRUS_EXCLUDES,
-						form.getValueAsString("excludes").trim());
-				params[2] = new GUIParameter(Session.get().getTenantName() + ANTIVIRUS_INCLUDES,
-						form.getValueAsString("includes").trim());
-				params[3] = new GUIParameter(Session.get().getTenantName() + ANTIVIRUS_TIMEOUT,
-						form.getValueAsString("timeout").trim());
+				List<GUIParameter> params = new ArrayList<>();
+				params.add(new GUIParameter(Session.get().getTenantName() + ANTIVIRUS_ENABLED,
+						"" + ("yes".equals(form.getValueAsString(ENABLED)))));
+				params.add(new GUIParameter(Session.get().getTenantName() + ANTIVIRUS_EXCLUDES,
+						form.getValueAsString("excludes").trim()));
+				params.add(new GUIParameter(Session.get().getTenantName() + ANTIVIRUS_INCLUDES,
+						form.getValueAsString("includes").trim()));
+				params.add(new GUIParameter(Session.get().getTenantName() + ANTIVIRUS_TIMEOUT,
+						form.getValueAsString("timeout").trim()));
 
 				if (Session.get().isDefaultTenant())
-					params[4] = new GUIParameter(ANTIVIRUS_COMMAND, form.getValueAsString("command").trim());
+					params.add(new GUIParameter(ANTIVIRUS_COMMAND, form.getValueAsString("command").trim()));
 
-				SettingService.Instance.get().saveSettings(params, new AsyncCallback<Void>() {
-
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				SettingService.Instance.get().saveSettings(params, new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Void ret) {
 						GuiLog.info(I18N.message("settingssaved"), null);
@@ -107,11 +105,11 @@ public class AntivirusPanel extends VLayout {
 		setMembers(tabs, save);
 	}
 
-	private void prepareForm(GUIParameter[] settings) {
+	private void prepareForm(List<GUIParameter> settings) {
 		form.setTitleOrientation(TitleOrientation.LEFT);
 		form.setAlign(Alignment.LEFT);
 
-		RadioGroupItem enabled = ItemFactory.newBooleanSelector(ENABLED, I18N.message(ENABLED));
+		ToggleItem enabled = ItemFactory.newToggleItem(ENABLED, false);
 		enabled.setWrapTitle(false);
 		enabled.setRequired(true);
 
@@ -129,7 +127,7 @@ public class AntivirusPanel extends VLayout {
 
 		for (GUIParameter setting : settings) {
 			if ((Session.get().getTenantName() + ANTIVIRUS_ENABLED).equals(setting.getName()))
-				enabled.setValue("true".equals(setting.getValue()) ? "yes" : "no");
+				enabled.setValue(setting.getValueAsBoolean());
 			else if (ANTIVIRUS_COMMAND.equals(setting.getName()))
 				command.setValue(setting.getValue());
 			else if ((Session.get().getTenantName() + ANTIVIRUS_EXCLUDES).equals(setting.getName()))
@@ -144,5 +142,15 @@ public class AntivirusPanel extends VLayout {
 			form.setFields(enabled, command, includes, excludes, timeout);
 		else
 			form.setFields(enabled, includes, excludes, timeout);
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

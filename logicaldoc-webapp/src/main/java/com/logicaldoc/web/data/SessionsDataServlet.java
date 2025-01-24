@@ -10,19 +10,21 @@ import java.util.Locale;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.logicaldoc.core.PersistenceException;
-import com.logicaldoc.core.security.Menu;
 import com.logicaldoc.core.security.Session;
+import com.logicaldoc.core.security.SessionDAO;
 import com.logicaldoc.core.security.SessionManager;
 import com.logicaldoc.core.security.Tenant;
-import com.logicaldoc.core.security.User;
-import com.logicaldoc.core.security.dao.MenuDAO;
-import com.logicaldoc.core.security.dao.SessionDAO;
+import com.logicaldoc.core.security.menu.Menu;
+import com.logicaldoc.core.security.menu.MenuDAO;
+import com.logicaldoc.core.security.user.User;
 import com.logicaldoc.i18n.I18N;
 import com.logicaldoc.util.Context;
+import com.logicaldoc.util.time.TimeDiff;
 import com.logicaldoc.web.util.ServletUtil;
 
 /**
@@ -45,15 +47,11 @@ public class SessionsDataServlet extends AbstractDataServlet {
 	protected void service(HttpServletRequest request, HttpServletResponse response, Session session, Integer max,
 			Locale locale) throws PersistenceException, IOException {
 
-		// Headers required by Internet Explorer
-		response.setHeader("Pragma", "public");
-		response.setHeader("Cache-Control", "must-revalidate, post-check=0,pre-check=0");
-		response.setHeader("Expires", "0");
-
 		if (request.getParameter("kill") != null) {
 			// Kill a specific session
 			SessionManager.get().kill(request.getParameter("kill"));
-			log.debug("Killed session {}", request.getParameter("kill"));
+			if (log.isDebugEnabled())
+				log.debug("Killed session {}", request.getParameter("kill"));
 			PrintWriter writer = response.getWriter();
 			writer.println("ok");
 		} else {
@@ -62,7 +60,7 @@ public class SessionsDataServlet extends AbstractDataServlet {
 					: null;
 
 			// Just listing the sessions
-			SessionDAO sessionDao = (SessionDAO) Context.get().getBean(SessionDAO.class);
+			SessionDAO sessionDao = Context.get(SessionDAO.class);
 			List<Session> sessions = sessionDao.findByNode(node);
 
 			boolean csvFormat = "true".equals(request.getParameter("csv"));
@@ -85,7 +83,7 @@ public class SessionsDataServlet extends AbstractDataServlet {
 			/*
 			 * The current user must be enabled to see the sessions.
 			 */
-			MenuDAO mDao = (MenuDAO) Context.get().getBean(MenuDAO.class);
+			MenuDAO mDao = Context.get(MenuDAO.class);
 			boolean showSid = currentUser == null || mDao.isReadEnable(Menu.ADMIN_SESSIONS, currentUser.getId());
 
 			PrintWriter writer = response.getWriter();
@@ -121,14 +119,8 @@ public class SessionsDataServlet extends AbstractDataServlet {
 		writer.print(showSid ? session.getSid() : "--");
 		writer.print(",");
 
-		if (showSid) {
-			if (SessionManager.get().getStatus(session.getSid()) == Session.STATUS_OPEN)
-				writer.print(I18N.message("opened", locale));
-			else if (SessionManager.get().getStatus(session.getSid()) == Session.STATUS_CLOSED)
-				writer.print(I18N.message("closed", locale));
-			else if (SessionManager.get().getStatus(session.getSid()) == Session.STATUS_EXPIRED)
-				writer.print(I18N.message("expired", locale));
-		}
+		if (showSid)
+			printSessionStatusCsv(session, locale, writer);
 
 		writer.print(",");
 		if (showSid)
@@ -150,9 +142,24 @@ public class SessionsDataServlet extends AbstractDataServlet {
 		}
 
 		writer.print(",");
+		writer.print(StringUtils.defaultString(session.getKeyLabel()));
+		writer.print(",");
 		if (showSid)
 			writer.print(session.getNode());
 		writer.print("\n");
+	}
+
+	private void printSessionStatusCsv(Session session, Locale locale, PrintWriter writer) {
+		int status = SessionManager.get().getStatus(session.getSid());
+		if (status < 0)
+			status = session.getStatus();
+
+		if (status == Session.STATUS_OPEN)
+			writer.print(I18N.message("opened", locale));
+		else if (status == Session.STATUS_CLOSED)
+			writer.print(I18N.message("closed", locale));
+		else if (status == Session.STATUS_EXPIRED)
+			writer.print(I18N.message("expired", locale));
 	}
 
 	private void printSessionXml(PrintWriter writer, Session session, Locale locale, boolean showSid) {
@@ -160,17 +167,9 @@ public class SessionsDataServlet extends AbstractDataServlet {
 
 		writer.print("<session>");
 		writer.print("<sid><![CDATA[" + (showSid ? session.getSid() : "--") + "]]></sid>");
-		writer.print("<status>" + (showSid ? session.getStatus() : "") + "</status>");
-		if (showSid) {
-			if (SessionManager.get().getStatus(session.getSid()) == Session.STATUS_OPEN)
-				writer.print(STATUS_LABEL + I18N.message("opened", locale) + CLOSE_STATUS_LABEL);
-			else if (SessionManager.get().getStatus(session.getSid()) == Session.STATUS_CLOSED)
-				writer.print(STATUS_LABEL + I18N.message("closed", locale) + CLOSE_STATUS_LABEL);
-			else if (SessionManager.get().getStatus(session.getSid()) == Session.STATUS_EXPIRED)
-				writer.print(STATUS_LABEL + I18N.message("expired", locale) + CLOSE_STATUS_LABEL);
-		} else {
-			writer.print("<statusLabel></statusLabel>");
-		}
+		writer.print("<key><![CDATA[" + StringUtils.defaultString(session.getKeyLabel()) + "]]></key>");
+		printSessionStatusXml(session, locale, showSid, writer);
+
 		writer.print("<username><![CDATA[" + (showSid ? session.getUsername() : "") + "]]></username>");
 		writer.print("<node><![CDATA[" + (showSid ? session.getNode() : "") + "]]></node>");
 
@@ -178,11 +177,32 @@ public class SessionsDataServlet extends AbstractDataServlet {
 		writer.print("<client><![CDATA[" + (showSid ? client : "") + "]]></client>");
 		writer.print("<tenant><![CDATA[" + session.getTenantName() + "]]></tenant>");
 		writer.print("<created>" + df.format(session.getCreation()) + "</created>");
+		if (session.getFinished() != null)
+			writer.print("<finished>" + df.format(session.getCreation()) + "</finished>");
+		writer.print("<duration>" + TimeDiff.printDuration(session.getDuration()) + "</duration>");
 		if (SessionManager.get().get(session.getSid()) != null)
 			writer.print("<renew>" + df.format(SessionManager.get().get(session.getSid()).getLastRenew()) + "</renew>");
 		else
 			writer.print("<renew>" + df.format(session.getLastRenew()) + "</renew>");
 		writer.print("</session>");
+	}
+
+	private void printSessionStatusXml(Session session, Locale locale, boolean showSid, PrintWriter writer) {
+		writer.print("<status>" + (showSid ? session.getStatus() : "") + "</status>");
+		if (showSid) {
+			int status = SessionManager.get().getStatus(session.getSid());
+			if (status < 0)
+				status = session.getStatus();
+
+			if (status == Session.STATUS_OPEN)
+				writer.print(STATUS_LABEL + I18N.message("opened", locale) + CLOSE_STATUS_LABEL);
+			else if (status == Session.STATUS_CLOSED)
+				writer.print(STATUS_LABEL + I18N.message("closed", locale) + CLOSE_STATUS_LABEL);
+			else if (status == Session.STATUS_EXPIRED)
+				writer.print(STATUS_LABEL + I18N.message("expired", locale) + CLOSE_STATUS_LABEL);
+		} else {
+			writer.print("<statusLabel></statusLabel>");
+		}
 	}
 
 	private User getCurrentUser(HttpServletRequest request, Session currentSession) {

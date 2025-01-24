@@ -1,10 +1,13 @@
 package com.logicaldoc.gui.frontend.client.document.reading;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import java.util.List;
+
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.i18n.I18N;
 import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.LD;
+import com.logicaldoc.gui.common.client.widgets.GroupSelectorCombo;
 import com.logicaldoc.gui.common.client.widgets.StickyWindow;
 import com.logicaldoc.gui.common.client.widgets.UserSelectorCombo;
 import com.logicaldoc.gui.frontend.client.services.ReadingRequestService;
@@ -24,11 +27,13 @@ public class ReadingRequestDialog extends StickyWindow {
 
 	private DynamicForm form = new DynamicForm();
 
-	private Long[] docIds;
+	private List<Long> docIds;
 
 	private UserSelectorCombo usersItem;
 
-	public ReadingRequestDialog(Long[] docIds) {
+	private GroupSelectorCombo groupsItem;
+
+	public ReadingRequestDialog(List<Long> docIds) {
 		super(I18N.message("requesttoconfirmreading"));
 		setCanDragResize(true);
 		setIsModal(true);
@@ -43,7 +48,8 @@ public class ReadingRequestDialog extends StickyWindow {
 		form.setHeight100();
 
 		usersItem = new UserSelectorCombo("users", "users", null, true, true);
-		usersItem.setRequired(true);
+
+		groupsItem = new GroupSelectorCombo("groups", "groups");
 
 		TextAreaItem message = ItemFactory.newTextAreaItem("message", null);
 		message.setMinHeight(80);
@@ -52,7 +58,7 @@ public class ReadingRequestDialog extends StickyWindow {
 		CheckboxItem alertConfirmation = ItemFactory.newCheckbox("notifyreadingconfirmation");
 		alertConfirmation.setValue(true);
 
-		form.setItems(usersItem, message, alertConfirmation);
+		form.setItems(usersItem, groupsItem, message, alertConfirmation);
 
 		addItem(form);
 		addItem(prepareButtons());
@@ -64,14 +70,15 @@ public class ReadingRequestDialog extends StickyWindow {
 			if (form.validate()) {
 				LD.contactingServer();
 				ReadingRequestService.Instance.get().askReadingConfirmation(docIds, usersItem.getUserIds(),
+						groupsItem.getGroupIds(),
 						Boolean.parseBoolean(form.getValueAsString("notifyreadingconfirmation")),
-						form.getValueAsString("message"), new AsyncCallback<Void>() {
+						form.getValueAsString("message"), new DefaultAsyncCallback<>() {
 
 							@Override
 							public void onFailure(Throwable caught) {
 								LD.clearPrompt();
 								sendButton.enable();
-								GuiLog.serverError(caught);
+								super.onFailure(caught);
 							}
 
 							@Override
@@ -90,5 +97,15 @@ public class ReadingRequestDialog extends StickyWindow {
 		toolStrip.addButton(sendButton);
 
 		return toolStrip;
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

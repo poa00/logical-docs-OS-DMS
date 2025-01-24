@@ -1,5 +1,8 @@
 package com.logicaldoc.gui.common.client;
 
+import java.util.Arrays;
+import java.util.List;
+
 public final class Constants {
 
 	private Constants() {
@@ -47,46 +50,6 @@ public final class Constants {
 	public static final String TIME_WEEK = "week";
 
 	public static final String TIME_BUSINESS_WEEK = "businessweek";
-
-	public static final String PERMISSION_DELETE = "delete";
-
-	public static final String PERMISSION_IMMUTABLE = "immutable";
-
-	public static final String PERMISSION_SECURITY = "security";
-
-	public static final String PERMISSION_WRITE = "write";
-
-	public static final String PERMISSION_ADD = "add";
-
-	public static final String PERMISSION_RENAME = "rename";
-
-	public static final String PERMISSION_IMPORT = "import";
-
-	public static final String PERMISSION_EXPORT = "export";
-
-	public static final String PERMISSION_SIGN = "sign";
-
-	public static final String PERMISSION_ARCHIVE = "archive";
-
-	public static final String PERMISSION_WORKFLOW = "workflow";
-
-	public static final String PERMISSION_DOWNLOAD = "download";
-
-	public static final String PERMISSION_CALENDAR = "calendar";
-
-	public static final String PERMISSION_SUBSCRIPTION = "subscription";
-
-	public static final String PERMISSION_PASSWORD = "password";
-
-	public static final String PERMISSION_MOVE = "move";
-
-	public static final String PERMISSION_EMAIL = "email";
-
-	public static final String PERMISSION_AUTOMATION = "automation";
-
-	public static final String PERMISSION_STORAGE = "storage";
-	
-	public static final String PERMISSION_READINGREQ = "readingreq";
 
 	public static final int DOC_UNLOCKED = 0;
 
@@ -162,8 +125,8 @@ public final class Constants {
 
 	public static final String DOC_ID = "docId";
 
-	private static final String[] AUDIT_DEFAULT_EVENTS = new String[] { "event.stored", EVENT_CHANGED,
-			EVENT_CHECKEDIN };
+	private static final List<String> AUDIT_DEFAULT_EVENTS = Arrays.asList("event.stored", EVENT_CHANGED,
+			EVENT_CHECKEDIN);
 
 	public static final String FULLTEXT_FIELD_TITLE = "title";
 
@@ -187,14 +150,14 @@ public final class Constants {
 
 	public static final String TWOFA_DUO = "duo";
 
-	private static final String[] FULLTEXT_DEFAULT_FIELDS = new String[] { FULLTEXT_FIELD_FILENAME,
-			FULLTEXT_FIELD_CONTENT, FULLTEXT_FIELD_TAGS };
+	private static final List<String> FULLTEXT_DEFAULT_FIELDS = Arrays.asList(FULLTEXT_FIELD_FILENAME,
+			FULLTEXT_FIELD_CONTENT, FULLTEXT_FIELD_TAGS);
 
-	public static String[] getAuditDefaultEvents() {
+	public static List<String> getAuditDefaultEvents() {
 		return AUDIT_DEFAULT_EVENTS;
 	}
 
-	public static String[] getFulltextDefaultFields() {
+	public static List<String> getFulltextDefaultFields() {
 		return FULLTEXT_DEFAULT_FIELDS;
 	}
 }

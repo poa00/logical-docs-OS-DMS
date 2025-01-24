@@ -10,6 +10,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import javax.annotation.Resource;
+
 import org.apache.commons.lang3.StringUtils;
 import org.quartz.CronScheduleBuilder;
 import org.quartz.JobBuilder;
@@ -25,6 +27,7 @@ import org.quartz.TriggerKey;
 import org.quartz.impl.matchers.GroupMatcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
 
 import com.logicaldoc.util.config.ContextProperties;
 
@@ -35,6 +38,7 @@ import com.logicaldoc.util.config.ContextProperties;
  * 
  * @since 8.7.4
  */
+@Component("jobManager")
 public class JobManager {
 
 	public static final String TENANT_ID = "tenantId";
@@ -45,9 +49,17 @@ public class JobManager {
 
 	protected static Logger log = LoggerFactory.getLogger(JobManager.class);
 
+	@Resource(name = "Scheduler")
 	private Scheduler scheduler;
 
+	@Resource(name = "ContextProperties")
 	private ContextProperties config;
+
+	public JobManager(Scheduler scheduler, ContextProperties config) {
+		super();
+		this.scheduler = scheduler;
+		this.config = config;
+	}
 
 	/**
 	 * Schedules a new Job
@@ -87,7 +99,7 @@ public class JobManager {
 		JobKey jobKey = JobKey.jobKey(job.getName(), job.getGroup());
 		JobDetail jobDetail = scheduler.getJobDetail(jobKey);
 		if (jobDetail != null) {
-			// Delete the job and all it's triggers that may altrady exist
+			// Delete the job and all it's triggers that may already exist
 			scheduler.deleteJob(jobKey);
 		}
 
@@ -105,14 +117,12 @@ public class JobManager {
 	}
 
 	private Trigger prepareTrigger(AbstractJob job, Object triggerSpec, Map<Object, Map<String, Object>> triggersMap) {
-		Trigger trig = null;
-
 		if (!triggersMap.get(triggerSpec).containsKey(TENANT_ID))
 			triggersMap.get(triggerSpec).put(TENANT_ID, job.getTenantId());
 
-		if (triggerSpec instanceof Date) {
+		return switch (triggerSpec) {
+		case Date dateSpec -> {
 			// The job must be fired on a specific data
-
 			SimpleScheduleBuilder schedule = SimpleScheduleBuilder.simpleSchedule();
 			if (MISSFIRE_RUNNOW.equals(getMissfireInstruction(job.getGroup())))
 				schedule = schedule.withMisfireHandlingInstructionFireNow();
@@ -120,25 +130,26 @@ public class JobManager {
 				schedule = schedule.withMisfireHandlingInstructionIgnoreMisfires();
 
 			SimpleDateFormat df = new SimpleDateFormat("yyyyMMdd_HHmmss");
-			trig = TriggerBuilder.newTrigger()
-					.withIdentity(job.getName() + "-" + df.format(triggerSpec), job.getGroup())
-					.usingJobData(new JobDataMap(triggersMap.get(triggerSpec))).startAt((Date) triggerSpec)
-					.withSchedule(schedule).build();
-		} else if (triggerSpec instanceof String) {
+			yield TriggerBuilder.newTrigger().withIdentity(job.getName() + "-" + df.format(triggerSpec), job.getGroup())
+					.usingJobData(new JobDataMap(triggersMap.get(triggerSpec))).startAt(dateSpec).withSchedule(schedule)
+					.build();
+		}
+		case String cronSpec -> {
 			// The job must be fired on a specific data
-			CronScheduleBuilder schedule = CronScheduleBuilder.cronSchedule((String) triggerSpec);
+			CronScheduleBuilder schedule = CronScheduleBuilder.cronSchedule(cronSpec);
 			if (MISSFIRE_RUNNOW.equals(getMissfireInstruction(job.getGroup())))
 				schedule = schedule.withMisfireHandlingInstructionFireAndProceed();
 			else
 				schedule = schedule.withMisfireHandlingInstructionDoNothing();
 
-			trig = TriggerBuilder.newTrigger().withIdentity(job.getName() + "-" + triggerSpec, job.getGroup())
+			yield TriggerBuilder.newTrigger().withIdentity(job.getName() + "-" + triggerSpec, job.getGroup())
 					.usingJobData(new JobDataMap(triggersMap.get(triggerSpec))).withSchedule(schedule).build();
-		} else {
-			log.warn("Skipping trigger {} because not a string nor a date", triggerSpec);
 		}
-
-		return trig;
+		default -> {
+			log.warn("Skipping trigger {} because not a string nor a date", triggerSpec);
+			yield null;
+		}
+		};
 	}
 
 	/**
@@ -149,7 +160,7 @@ public class JobManager {
 	 * @return JobManager.MISSFIRE_RUNNOW or JobManager.MISSFIRE_IGNORE
 	 */
 	public String getMissfireInstruction(String group) {
-		return config.getProperty("job.calendar.missfire", MISSFIRE_RUNNOW);
+		return config.getProperty("job." + group + ".missfire", MISSFIRE_RUNNOW);
 	}
 
 	/**
@@ -160,7 +171,7 @@ public class JobManager {
 	 * @return max number of days
 	 */
 	public int getMissfireMax(String group) {
-		return config.getInt("job.calendar.missfire.max", 2);
+		return config.getInt("job." + group + ".missfire.max", 2);
 	}
 
 	/**
@@ -261,13 +272,5 @@ public class JobManager {
 
 	public Trigger getTrigger(String name, String group) throws SchedulerException {
 		return scheduler.getTrigger(TriggerKey.triggerKey(name, group));
-	}
-
-	public void setScheduler(Scheduler scheduler) {
-		this.scheduler = scheduler;
-	}
-
-	public void setConfig(ContextProperties config) {
-		this.config = config;
 	}
 }

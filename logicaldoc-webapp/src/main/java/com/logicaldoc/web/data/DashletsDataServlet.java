@@ -11,7 +11,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import com.logicaldoc.core.PersistenceException;
-import com.logicaldoc.core.document.dao.BookmarkDAO;
+import com.logicaldoc.core.document.BookmarkDAO;
 import com.logicaldoc.core.security.Session;
 import com.logicaldoc.i18n.I18N;
 import com.logicaldoc.util.Context;
@@ -37,7 +37,7 @@ public class DashletsDataServlet extends AbstractDataServlet {
 		writer.write("<list>");
 
 		List<Object> records = new ArrayList<>();
-		BookmarkDAO dao = (BookmarkDAO) Context.get().getBean(BookmarkDAO.class);
+		BookmarkDAO dao = Context.get(BookmarkDAO.class);
 
 		/*
 		 * Search for folders first.

@@ -15,7 +15,6 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.http.HttpHeaders;
 import org.apache.jackrabbit.webdav.DavConstants;
 import org.apache.jackrabbit.webdav.DavException;
 import org.apache.jackrabbit.webdav.DavLocatorFactory;
@@ -48,14 +47,18 @@ import org.apache.jackrabbit.webdav.version.report.ReportInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.net.HttpHeaders;
 import com.logicaldoc.core.security.Session;
 import com.logicaldoc.core.security.SessionManager;
-import com.logicaldoc.core.security.User;
-import com.logicaldoc.core.security.dao.UserDAO;
+import com.logicaldoc.core.security.user.User;
+import com.logicaldoc.core.security.user.UserDAO;
 import com.logicaldoc.util.Context;
 import com.logicaldoc.webdav.context.ExportContext;
+import com.logicaldoc.webdav.context.ImportContextImpl;
 import com.logicaldoc.webdav.resource.DavResourceFactory;
 import com.logicaldoc.webdav.resource.DavResourceImpl;
+import com.logicaldoc.webdav.resource.model.Resource;
+import com.logicaldoc.webdav.resource.service.ResourceService;
 import com.logicaldoc.webdav.session.DavSessionImpl;
 import com.logicaldoc.webdav.session.WebdavSession;
 
@@ -110,8 +113,7 @@ public abstract class AbstractWebdavServlet extends HttpServlet implements DavCo
 	public void service(HttpServletRequest request, HttpServletResponse response) {
 		log.debug("Received WebDAV request");
 
-		// DeltaV requires 'Cache-Control' header for all methods except
-		// 'VERSION-CONTROL' and 'REPORT'.
+		// DeltaV requires 'Cache-Control' header for all methods
 		int methodCode = DavMethods.getMethodCode(request.getMethod());
 
 		WebdavRequest webdavRequest = new EncodingWebdavRequest(request, getLocatorFactory());
@@ -128,7 +130,7 @@ public abstract class AbstractWebdavServlet extends HttpServlet implements DavCo
 			DavSessionImpl davSession = new DavSessionImpl();
 			davSession.setTenantId(SessionManager.get().get(session.getSid()).getTenantId());
 			davSession.putObject("sid", session.getSid());
-			UserDAO dao = (UserDAO) Context.get().getBean(UserDAO.class);
+			UserDAO dao = Context.get(UserDAO.class);
 			User user = dao.findById(session.getUserId());
 			dao.initialize(user);
 			davSession.putObject("id", session.getUserId());
@@ -138,7 +140,7 @@ public abstract class AbstractWebdavServlet extends HttpServlet implements DavCo
 
 			getPath(webdavRequest);
 
-			// check matching if=header for lock-token relevant operations
+			// check matching if header for lock-token relevant operations
 			DavResource resource = getResourceFactory().createResource(webdavRequest.getRequestLocator(), webdavRequest,
 					davSession);
 
@@ -352,9 +354,8 @@ public abstract class AbstractWebdavServlet extends HttpServlet implements DavCo
 		OutputStream outX = (sendContent) ? response.getOutputStream() : null;
 		OutputContext oc = getOutputContext(response, outX);
 
-		if (!resource.isCollection() && (resource instanceof DavResourceImpl)) {
+		if (!resource.isCollection() && resource instanceof DavResourceImpl dri) {
 			log.debug("resource instanceof DavResourceImpl");
-			DavResourceImpl dri = (DavResourceImpl) resource;
 
 			// Enforce download permission
 			ExportContext exportCtx = dri.getExportContext(oc);
@@ -437,7 +438,6 @@ public abstract class AbstractWebdavServlet extends HttpServlet implements DavCo
 	 */
 	protected void doPropFind(WebdavRequest request, WebdavResponse response, DavResource resource)
 			throws IOException, DavException {
-
 		log.debug("doPropFind");
 
 		log.debug("[READ] FINDING {} {}",
@@ -476,7 +476,6 @@ public abstract class AbstractWebdavServlet extends HttpServlet implements DavCo
 
 		MultiStatus mstatus = new MultiStatus();
 		mstatus.addResourceProperties(resource, requestProperties, propfindType, depth);
-
 		response.sendMultiStatus(mstatus);
 	}
 
@@ -559,7 +558,6 @@ public abstract class AbstractWebdavServlet extends HttpServlet implements DavCo
 
 			response.setStatus(status);
 		} catch (DavException dave) {
-
 			log.debug("A DavException occurred!", dave);
 
 			// return the status code
@@ -727,7 +725,8 @@ public abstract class AbstractWebdavServlet extends HttpServlet implements DavCo
 		WebdavSession session = (com.logicaldoc.webdav.session.WebdavSession) request.getDavSession();
 		DavResource destResource = null;
 		try {
-			log.debug("Destination: {}", request.getHeader("Destination"));
+			if (log.isDebugEnabled())
+				log.debug("Destination: {}", request.getHeader("Destination"));
 			destResource = getResourceFactory().createResource(request.getDestinationLocator(), request, session);
 		} catch (Exception e) {
 			destResource = resource.getCollection();
@@ -785,10 +784,12 @@ public abstract class AbstractWebdavServlet extends HttpServlet implements DavCo
 				// matching if-header required for existing resources
 				if (!request.matchesIfHeader(destResource)) {
 					return HttpServletResponse.SC_PRECONDITION_FAILED;
-				} else {
+				} else if (!destResource.isCollection()) {
 					// overwrite existing resource
 					destResource.getCollection().removeMember(destResource);
 					status = HttpServletResponse.SC_NO_CONTENT;
+				} else {
+					status = HttpServletResponse.SC_CREATED;
 				}
 			} else {
 				// cannot copy/move to an existing item, if overwrite is not
@@ -816,17 +817,18 @@ public abstract class AbstractWebdavServlet extends HttpServlet implements DavCo
 		response.addHeader(DavConstants.HEADER_DAV, resource.getComplianceClass());
 		response.addHeader("Allow", resource.getSupportedMethods());
 		response.addHeader("MS-Author-Via", DavConstants.HEADER_DAV);
-		if (resource instanceof SearchResource) {
-			String[] langs = ((SearchResource) resource).getQueryGrammerSet().getQueryLanguages();
+		if (resource instanceof SearchResource searchResource) {
+			String[] langs = searchResource.getQueryGrammerSet().getQueryLanguages();
 			for (int i = 0; i < langs.length; i++) {
 				response.addHeader(SearchConstants.HEADER_DASL, "<" + langs[i] + ">");
 			}
 		}
+
 		// with DeltaV the OPTIONS request may contain a Xml body.
 		OptionsResponse oR = null;
 		OptionsInfo oInfo = request.getOptionsInfo();
-		if (oInfo != null && resource instanceof DeltaVResource) {
-			oR = ((DeltaVResource) resource).getOptionResponse(oInfo);
+		if (oInfo != null && resource instanceof DeltaVResource deltaResource) {
+			oR = deltaResource.getOptionResponse(oInfo);
 		}
 		if (oR == null) {
 			response.setStatus(HttpServletResponse.SC_OK);
@@ -903,11 +905,12 @@ public abstract class AbstractWebdavServlet extends HttpServlet implements DavCo
 			throws DavException, IOException {
 		log.debug("doCheckin");
 
-		try {
-			response.sendError(HttpServletResponse.SC_METHOD_NOT_ALLOWED);
-		} catch (Exception t) {
-			// Nothing to do
-		}
+		ResourceService resourceService = Context.get(ResourceService.class);
+		WebdavSession session = (com.logicaldoc.webdav.session.WebdavSession) request.getDavSession();
+		Resource repositoryResource = resourceService.getResource(resource.getResourcePath(), session);
+
+		resourceService.updateResource(repositoryResource,
+				new ImportContextImpl(repositoryResource, null, request.getInputStream()), session);
 	}
 
 	/**
@@ -926,17 +929,18 @@ public abstract class AbstractWebdavServlet extends HttpServlet implements DavCo
 
 		ReportInfo info = request.getReportInfo();
 		Report report;
-		if (resource instanceof DeltaVResource) {
-			report = ((DeltaVResource) resource).getReport(info);
-		} else if (resource instanceof AclResource) {
-			report = ((AclResource) resource).getReport(info);
-		} else {
+
+		switch (resource) {
+		case DeltaVResource deltaResource -> report = deltaResource.getReport(info);
+		case AclResource aclResource -> report = aclResource.getReport(info);
+		default -> {
 			try {
 				response.sendError(HttpServletResponse.SC_METHOD_NOT_ALLOWED);
 			} catch (Exception t) {
 				// Nothing to do
 			}
 			return;
+		}
 		}
 
 		int statusCode = (report.isMultiStatusReport()) ? DavServletResponse.SC_MULTI_STATUS

@@ -1,6 +1,8 @@
 package com.logicaldoc.gui.frontend.client.search;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import java.util.List;
+
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIDocument;
 import com.logicaldoc.gui.common.client.beans.GUIFolder;
 import com.logicaldoc.gui.common.client.beans.GUISearchOptions;
@@ -9,7 +11,6 @@ import com.logicaldoc.gui.common.client.controllers.DocumentObserver;
 import com.logicaldoc.gui.common.client.controllers.FolderController;
 import com.logicaldoc.gui.common.client.controllers.FolderObserver;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.frontend.client.document.DocumentDetailsPanel;
 import com.logicaldoc.gui.frontend.client.document.grid.DocumentsGrid;
 import com.logicaldoc.gui.frontend.client.document.grid.DocumentsListGrid;
@@ -102,8 +103,8 @@ public class SearchPanel extends HLayout implements SearchObserver, DocumentObse
 
 		previewPanel = new SearchPreviewPanel();
 		previewPanel.addVisibilityChangedHandler(event -> {
-			if (detailPanel instanceof DocumentDetailsPanel)
-				previewPanel.setDocument(((DocumentDetailsPanel) detailPanel).getDocument());
+			if (detailPanel instanceof DocumentDetailsPanel docDetails)
+				previewPanel.setDocument(docDetails.getDocument());
 		});
 
 		// The listing plus the preview
@@ -119,12 +120,7 @@ public class SearchPanel extends HLayout implements SearchObserver, DocumentObse
 
 	public void onSelectedDocumentHit(long id) {
 		if (id > 0) {
-			DocumentService.Instance.get().getById(id, new AsyncCallback<GUIDocument>() {
-				@Override
-				public void onFailure(Throwable caught) {
-					GuiLog.serverError(caught);
-				}
-
+			DocumentService.Instance.get().getById(id, new DefaultAsyncCallback<>() {
 				@Override
 				public void onSuccess(GUIDocument result) {
 					DocumentController.get().setCurrentDocument(result);
@@ -136,17 +132,11 @@ public class SearchPanel extends HLayout implements SearchObserver, DocumentObse
 
 	public void onSelectedFolderHit(long id) {
 		if (id > 0) {
-			FolderService.Instance.get().getFolder(id, true, false, false, new AsyncCallback<GUIFolder>() {
-
-				@Override
-				public void onFailure(Throwable caught) {
-					GuiLog.serverError(caught);
-				}
-
+			FolderService.Instance.get().getFolder(id, true, false, false, new DefaultAsyncCallback<>() {
 				@Override
 				public void onSuccess(GUIFolder fld) {
-					if (detailPanel instanceof FolderDetailsPanel) {
-						((FolderDetailsPanel) detailPanel).setFolder(fld);
+					if (detailPanel instanceof FolderDetailsPanel folderDetails) {
+						folderDetails.setFolder(fld);
 					} else {
 						details.removeMember(detailPanel);
 						detailPanel = new FolderDetailsPanel(fld);
@@ -211,8 +201,8 @@ public class SearchPanel extends HLayout implements SearchObserver, DocumentObse
 			}
 		}
 
-		if (detailPanel instanceof DocumentDetailsPanel) {
-			((DocumentDetailsPanel) detailPanel).setDocument(document);
+		if (detailPanel instanceof DocumentDetailsPanel docDetails) {
+			docDetails.setDocument(document);
 
 		} else {
 			detailPanel = new DocumentDetailsPanel();
@@ -237,7 +227,7 @@ public class SearchPanel extends HLayout implements SearchObserver, DocumentObse
 	}
 
 	@Override
-	public void onDocumentsDeleted(GUIDocument[] documents) {
+	public void onDocumentsDeleted(List<GUIDocument> documents) {
 		previewPanel.reset();
 	}
 
@@ -373,5 +363,15 @@ public class SearchPanel extends HLayout implements SearchObserver, DocumentObse
 		if (grid.getSelectedDocument().getId() == folder.getId()) {
 			enableAll();
 		}
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

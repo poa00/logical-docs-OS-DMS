@@ -3,7 +3,6 @@ package com.logicaldoc.core.document;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.Collections;
@@ -14,7 +13,8 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.logicaldoc.core.AbstractCoreTestCase;
-import com.logicaldoc.core.document.dao.DocumentDAO;
+import com.logicaldoc.core.PersistenceException;
+import com.logicaldoc.util.plugin.PluginException;
 
 public class DocumentComparatorTest extends AbstractCoreTestCase {
 
@@ -22,7 +22,7 @@ public class DocumentComparatorTest extends AbstractCoreTestCase {
 	private DocumentDAO dao;
 
 	@Before
-	public void setUp() throws FileNotFoundException, IOException, SQLException {
+	public void setUp() throws IOException, SQLException, PluginException {
 		super.setUp();
 
 		// Retrieve the instance under test from spring context. Make sure that
@@ -31,7 +31,7 @@ public class DocumentComparatorTest extends AbstractCoreTestCase {
 	}
 
 	@Test
-	public void testGetComparatorString() {
+	public void testGetComparatorString() throws PersistenceException {
 
 		Comparator<AbstractDocument> fdatec = DocumentComparator.getComparator("fileName desc, date asc");
 		assertNotNull(fdatec);

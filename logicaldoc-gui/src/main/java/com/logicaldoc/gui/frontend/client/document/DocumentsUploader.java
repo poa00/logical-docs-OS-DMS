@@ -1,13 +1,13 @@
 package com.logicaldoc.gui.frontend.client.document;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
-import com.logicaldoc.gui.common.client.Constants;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
+import com.logicaldoc.gui.common.client.IgnoreAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
+import com.logicaldoc.gui.common.client.beans.GUIAccessControlEntry;
 import com.logicaldoc.gui.common.client.beans.GUIDocument;
 import com.logicaldoc.gui.common.client.beans.GUIFolder;
 import com.logicaldoc.gui.common.client.controllers.FolderController;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.widgets.MultipleUpload;
 import com.logicaldoc.gui.frontend.client.document.update.UpdateDialog;
@@ -22,8 +22,6 @@ import com.smartgwt.client.widgets.form.ValuesManager;
 import com.smartgwt.client.widgets.form.fields.CheckboxItem;
 import com.smartgwt.client.widgets.form.fields.SelectItem;
 import com.smartgwt.client.widgets.form.fields.StaticTextItem;
-import com.smartgwt.client.widgets.form.fields.events.ChangeEvent;
-import com.smartgwt.client.widgets.form.fields.events.ChangedEvent;
 import com.smartgwt.client.widgets.layout.VLayout;
 
 /**
@@ -36,7 +34,7 @@ public class DocumentsUploader extends Window {
 
 	private static final String CHARSET = "charset";
 
-	private IButton sendButton;
+	private IButton submitButton;
 
 	private ValuesManager vm;
 
@@ -53,12 +51,12 @@ public class DocumentsUploader extends Window {
 		setIsModal(true);
 		setShowModalMask(true);
 		centerInPage();
-		setMinWidth(450);
+		setMinWidth(480);
 		setAutoSize(true);
 
-		sendButton = new IButton(I18N.message("send"));
-		sendButton.addClickHandler(event -> onSend());
-		sendButton.setDisabled(true);
+		submitButton = new IButton(I18N.message("submit"));
+		submitButton.addClickHandler(event -> onSubmit());
+		submitButton.setDisabled(true);
 
 		prepareForm();
 
@@ -68,39 +66,23 @@ public class DocumentsUploader extends Window {
 
 		layout.addMember(form);
 
-		uploader = new MultipleUpload(sendButton);
+		uploader = new MultipleUpload(submitButton);
 		layout.addMember(uploader);
-		layout.addMember(sendButton);
+		layout.addMember(submitButton);
 
 		// Clean the upload folder if the window is closed
-		addCloseClickHandler(event -> DocumentService.Instance.get().cleanUploadedFileFolder(new AsyncCallback<Void>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
-			@Override
-			public void onSuccess(Void result) {
-				destroy();
-			}
-		}));
+		addCloseClickHandler(
+				event -> DocumentService.Instance.get().cleanUploadedFileFolder(new DefaultAsyncCallback<>() {
+					@Override
+					public void onSuccess(Void result) {
+						destroy();
+					}
+				}));
 
 		addItem(layout);
 
 		// Just to clean the upload folder
-		DocumentService.Instance.get().cleanUploadedFileFolder(new AsyncCallback<Void>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				// Nothing to do
-			}
-
-			@Override
-			public void onSuccess(Void result) {
-				// Nothing to do
-			}
-		});
+		DocumentService.Instance.get().cleanUploadedFileFolder(new IgnoreAsyncCallback<>());
 	}
 
 	private void prepareForm() {
@@ -124,7 +106,7 @@ public class DocumentsUploader extends Window {
 		zipItem.setTitle(I18N.message("importfromzip"));
 		zipItem.setValue(!zipImport);
 		zipItem.setTitleAlign(Alignment.LEFT);
-		zipItem.addChangedHandler((ChangedEvent event) -> {
+		zipItem.addChangedHandler(event -> {
 			if (Boolean.TRUE.equals(event.getValue()))
 				charset.show();
 			else
@@ -137,17 +119,17 @@ public class DocumentsUploader extends Window {
 		immediateIndexing.setValue(false);
 		immediateIndexing.setTitleAlign(Alignment.LEFT);
 
-		if (!FolderController.get().getCurrentFolder().hasPermission(Constants.PERMISSION_IMPORT)) {
+		if (!FolderController.get().getCurrentFolder().hasPermission(GUIAccessControlEntry.PERMISSION_IMPORT)) {
 			zipItem.setDisabled(true);
 			zipItem.setValue(false);
 		}
 
-		zipItem.addChangeHandler((ChangeEvent event) -> zipImport = !zipImport);
+		zipItem.addChangeHandler(event -> zipImport = !zipImport);
 
 		form.setItems(zipItem, charset, immediateIndexing, fileNameWaring);
 	}
 
-	public void onSend() {
+	public void onSubmit() {
 		if (Boolean.FALSE.equals(vm.validate()))
 			return;
 
@@ -158,7 +140,7 @@ public class DocumentsUploader extends Window {
 
 		GUIFolder folder = FolderController.get().getCurrentFolder();
 		GUIDocument metadata = new GUIDocument();
-		metadata.setFolder(FolderController.get().getCurrentFolder());
+		metadata.setFolder(folder);
 		metadata.setLanguage(I18N.getDefaultLocaleForDoc());
 		metadata.setTemplateId(folder.getTemplateId());
 		metadata.setTemplate(folder.getTemplate());
@@ -181,10 +163,20 @@ public class DocumentsUploader extends Window {
 	}
 
 	public boolean getImportZip() {
-		return "true".equals(vm.getValueAsString("zip"));
+		return Boolean.valueOf(vm.getValueAsString("zip"));
 	}
 
 	public boolean getImmediateIndexing() {
-		return "true".equals(vm.getValueAsString("immediateIndexing"));
+		return Boolean.valueOf(vm.getValueAsString("immediateIndexing"));
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

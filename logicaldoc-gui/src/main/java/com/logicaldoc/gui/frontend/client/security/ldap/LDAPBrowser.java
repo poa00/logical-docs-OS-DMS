@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUILDAPServer;
 import com.logicaldoc.gui.common.client.beans.GUIUser;
 import com.logicaldoc.gui.common.client.beans.GUIValue;
@@ -32,7 +32,6 @@ import com.smartgwt.client.widgets.layout.Layout;
 import com.smartgwt.client.widgets.layout.VLayout;
 import com.smartgwt.client.widgets.menu.Menu;
 import com.smartgwt.client.widgets.menu.MenuItem;
-import com.smartgwt.client.widgets.menu.events.MenuItemClickEvent;
 
 /**
  * This panel is used to perform user searches in the LDAP repositories
@@ -145,7 +144,7 @@ public class LDAPBrowser extends VLayout {
 	private void onSearch() {
 		users.setData();
 
-		final Map<String, Object> values =  vm.getValues();
+		final Map<String, Object> values = vm.getValues();
 
 		if (Boolean.TRUE.equals(vm.validate())) {
 			String username = (String) values.get(USERNAME);
@@ -158,31 +157,28 @@ public class LDAPBrowser extends VLayout {
 			searchButton.setDisabled(true);
 
 			LD.contactingServer();
-			LDAPService.Instance.get().listUsers(username, server.getId(), new AsyncCallback<GUIUser[]>() {
+			LDAPService.Instance.get().listUsers(username, server.getId(), new DefaultAsyncCallback<>() {
 
 				@Override
 				public void onFailure(Throwable caught) {
 					searchButton.setDisabled(false);
-					LD.clearPrompt();
-					GuiLog.serverError(caught);
+					super.onFailure(caught);
 				}
 
 				@Override
-				public void onSuccess(GUIUser[] result) {
+				public void onSuccess(List<GUIUser> result) {
 					searchButton.setDisabled(false);
 					LD.clearPrompt();
-					if (result != null && result.length > 0) {
-						ListGridRecord[] records = new ListGridRecord[result.length];
-						for (int i = 0; i < result.length; i++) {
-							ListGridRecord rec = new ListGridRecord();
-							rec.setAttribute("name", result[i].getFullName());
-							rec.setAttribute("dn", result[i].getAddress());
-							rec.setAttribute(USERNAME, result[i].getUsername());
-							rec.setAttribute(EMAIL, result[i].getEmail());
-							records[i] = rec;
-						}
-						users.setData(records);
+					List<ListGridRecord> records = new ArrayList<>();
+					for (GUIUser user : result) {
+						ListGridRecord rec = new ListGridRecord();
+						rec.setAttribute("name", user.getFullName());
+						rec.setAttribute("dn", user.getAddress());
+						rec.setAttribute(USERNAME, user.getUsername());
+						rec.setAttribute(EMAIL, user.getEmail());
+						records.add(rec);
 					}
+					users.setData(records.toArray(new ListGridRecord[0]));
 					infoPanel.setMessage(I18N.message("showelements", Integer.toString(users.getTotalRows())));
 				}
 			});
@@ -195,28 +191,22 @@ public class LDAPBrowser extends VLayout {
 		ListGridRecord[] selection = users.getSelectedRecords();
 		if (selection == null || selection.length == 0)
 			return;
-		final String[] usernames = new String[selection.length];
+		List<String> usernames = new ArrayList<>();
 		for (int i = 0; i < selection.length; i++)
-			usernames[i] = selection[i].getAttributeAsString(USERNAME);
+			usernames.add(selection[i].getAttributeAsString(USERNAME));
 
 		MenuItem importItem = new MenuItem();
 		importItem.setTitle(I18N.message("iimport"));
-		importItem.addClickHandler((MenuItemClickEvent event) -> {
+		importItem.addClickHandler(click -> {
 			LD.contactingServer();
 			users.deselectAllRecords();
-			LDAPService.Instance.get().importUsers(usernames, server.getId(), new AsyncCallback<GUIValue[]>() {
+			LDAPService.Instance.get().importUsers(usernames, server.getId(), new DefaultAsyncCallback<>() {
 				@Override
-				public void onFailure(Throwable caught) {
-					GuiLog.serverError(caught);
+				public void onSuccess(List<GUIValue> report) {
 					LD.clearPrompt();
-				}
-
-				@Override
-				public void onSuccess(GUIValue[] report) {
-					LD.clearPrompt();
-					String message = I18N.message("importreport",
-							new String[] { report[0].getValue(), report[1].getValue(), report[2].getValue() });
-					if ("0".equals(report[2].getValue()))
+					String message = I18N.message("importreport", report.get(0).getValue(), report.get(1).getValue(),
+							report.get(2).getValue());
+					if ("0".equals(report.get(2).getValue()))
 						GuiLog.info(I18N.message("importcompleted"), message);
 					else
 						GuiLog.error(I18N.message("importerrors"), message, null);
@@ -231,5 +221,15 @@ public class LDAPBrowser extends VLayout {
 
 	public void setServer(GUILDAPServer server) {
 		this.server = server;
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

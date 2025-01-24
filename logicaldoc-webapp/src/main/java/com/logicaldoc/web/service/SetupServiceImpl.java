@@ -20,7 +20,7 @@ import org.slf4j.LoggerFactory;
 
 import com.logicaldoc.core.dbinit.PluginDbInit;
 import com.logicaldoc.core.searchengine.SearchEngine;
-import com.logicaldoc.core.security.User;
+import com.logicaldoc.core.security.user.User;
 import com.logicaldoc.gui.common.client.AccessDeniedException;
 import com.logicaldoc.gui.common.client.InvalidSessionServerException;
 import com.logicaldoc.gui.common.client.ServerException;
@@ -28,7 +28,7 @@ import com.logicaldoc.gui.setup.client.SetupInfo;
 import com.logicaldoc.gui.setup.client.services.SetupService;
 import com.logicaldoc.util.Context;
 import com.logicaldoc.util.config.ContextProperties;
-import com.logicaldoc.util.config.LoggingConfigurator;
+import com.logicaldoc.util.config.LogConfigurator;
 import com.logicaldoc.util.plugin.PluginRegistry;
 
 /**
@@ -90,7 +90,7 @@ public class SetupServiceImpl extends AbstractRemoteService implements SetupServ
 	private void setLogFolder() {
 		try {
 			ContextProperties pbean = new ContextProperties();
-			LoggingConfigurator lconf = new LoggingConfigurator();
+			LogConfigurator lconf = new LogConfigurator();
 			lconf.setLogsRoot(pbean.getProperty("conf.logdir"));
 			lconf.write();
 		} catch (Exception t) {
@@ -141,7 +141,7 @@ public class SetupServiceImpl extends AbstractRemoteService implements SetupServ
 
 		ContextProperties conf = Context.get().getProperties();
 
-		SearchEngine indexer = (SearchEngine) Context.get().getBean(SearchEngine.class);
+		SearchEngine indexer = Context.get(SearchEngine.class);
 		indexer.close();
 		indexer.init();
 
@@ -200,15 +200,16 @@ public class SetupServiceImpl extends AbstractRemoteService implements SetupServ
 
 		// Refresh the current logging location
 		String log4jPath = URLDecoder.decode(this.getClass().getResource("/log.xml").getPath(), "UTF-8");
+		Logger console = LoggerFactory.getLogger("console");
 		try {
 			// Init the logs
-			System.out.println("Taking log configuration from " + log4jPath);
+			console.info("Taking log configuration from {}", log4jPath);
 			try (InputStream inputStream = new FileInputStream(log4jPath)) {
 				ConfigurationSource source = new ConfigurationSource(inputStream);
 				Configurator.initialize(null, source);
 			}
 		} catch (FileNotFoundException e) {
-			System.err.println("Cannot access log file " + log4jPath);
+			console.error("Cannot access log file {}", log4jPath);
 		}
 
 		reloadContext();

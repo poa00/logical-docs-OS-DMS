@@ -1,26 +1,31 @@
 package com.logicaldoc.web;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.SQLException;
+import java.util.List;
 
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.support.ClassPathXmlApplicationContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.security.Client;
+import com.logicaldoc.core.security.Device;
 import com.logicaldoc.core.security.Session;
 import com.logicaldoc.core.security.SessionManager;
-import com.logicaldoc.core.security.User;
-import com.logicaldoc.core.security.dao.UserDAO;
 import com.logicaldoc.core.security.spring.LDAuthenticationToken;
 import com.logicaldoc.core.security.spring.LDSecurityContextRepository;
+import com.logicaldoc.core.security.user.User;
+import com.logicaldoc.core.security.user.UserDAO;
 import com.logicaldoc.gui.common.client.ServerException;
 import com.logicaldoc.gui.common.client.beans.GUISession;
 import com.logicaldoc.util.Context;
+import com.logicaldoc.util.io.FileUtil;
 import com.logicaldoc.util.junit.AbstractTestCase;
+import com.logicaldoc.util.plugin.PluginException;
+import com.logicaldoc.util.servlet.MockServletSession;
 import com.logicaldoc.web.service.SecurityServiceImpl;
-import com.logicaldoc.web.util.MockServletSession;
 
 import junit.framework.Assert;
 
@@ -45,29 +50,48 @@ public abstract class AbstractWebappTestCase extends AbstractTestCase {
 	protected MockServletSession servletSession = new MockServletSession();
 
 	@Override
-	public void setUp() throws FileNotFoundException, IOException, SQLException {
+	public void setUp() throws IOException, SQLException, PluginException {
 		super.setUp();
 
 		repositoryDir.mkdirs();
 		repositoryDir.mkdir();
 
+		File docs = new File(repositoryDir, "docs");
+		docs.mkdir();
+		File docDir = new File(docs+"/1/doc");
+		docDir.mkdirs();
+		docDir.mkdir();
+		FileUtil.copyResource("/pdf1.pdf", new File(docDir, "1.0"));
+		docDir = new File(docs+"/3/doc");
+		docDir.mkdirs();
+		docDir.mkdir();
+		FileUtil.copyResource("/pdf2.pdf", new File(docDir, "1.1"));
+		
+		
 		File docs2 = new File(repositoryDir, "docs2");
 		docs2.mkdir();
 
 		try {
 			prepareSession("admin", "admin");
-		} catch (Exception e) {
-			throw new IOException(e.getMessage(), e);
+		} catch (ServerException e) {
+			throw new IOException(e);
 		}
+
 		Assert.assertNotNull(guiSession);
 		Assert.assertNotNull(SessionManager.get().get(guiSession.getSid()));
 	}
 
 	protected void prepareSession(String username, String password) throws ServerException, PersistenceException {
-		UserDAO userDao = (UserDAO) Context.get().getBean(UserDAO.class);
+		UserDAO userDao = Context.get(UserDAO.class);
 
 		guiSession = new GUISession();
-		session = SessionManager.get().newSession(username, password, null, new Client());
+		Client client=new Client("xyz", "192.168.2.231", "ghost");
+		Device device=new Device();
+		device.setBrowser("Firefox");
+		device.setBrowserVersion("18");
+		device.setOperativeSystem("Windows");
+		client.setDevice(device);
+		session = SessionManager.get().newSession(username, password, null, client);
 		if (session != null) {
 			User user = userDao.findByUsernameIgnoreCase(username);
 			userDao.initialize(user);
@@ -81,12 +105,12 @@ public abstract class AbstractWebappTestCase extends AbstractTestCase {
 	}
 
 	@Override
-	protected String[] getContexts() {
-		return new String[] { "/contexttest.xml" };
+	protected ApplicationContext buildApplicationContext() {
+		return new ClassPathXmlApplicationContext(new String[] { "/contexttest.xml" });
 	}
 
 	@Override
-	protected String[] getSqlScripts() {
-		return new String[] { "/sql/logicaldoc-core.sql", "/data.sql" };
+	protected List<String> getDatabaseScripts() {
+		return List.of("/sql/logicaldoc-core.sql", "/data.sql");
 	}
 }

@@ -6,15 +6,17 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIAttribute;
 import com.logicaldoc.gui.common.client.beans.GUIAttributeSet;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.frontend.client.services.AttributeSetService;
+import com.smartgwt.client.data.AdvancedCriteria;
+import com.smartgwt.client.data.Criterion;
 import com.smartgwt.client.data.Record;
+import com.smartgwt.client.types.OperatorId;
 import com.smartgwt.client.types.SelectionStyle;
 import com.smartgwt.client.types.TitleOrientation;
 import com.smartgwt.client.util.SC;
@@ -41,7 +43,6 @@ import com.smartgwt.client.widgets.layout.SectionStackSection;
 import com.smartgwt.client.widgets.layout.VLayout;
 import com.smartgwt.client.widgets.menu.Menu;
 import com.smartgwt.client.widgets.menu.MenuItem;
-import com.smartgwt.client.widgets.menu.events.MenuItemClickEvent;
 
 /**
  * This panel shows the properties of an attribute set.
@@ -160,7 +161,7 @@ public class AttributeSetPropertiesPanel extends HLayout {
 				attributes.add(rec.getAttributeAsString("name"));
 			}
 
-			AttributeSetPropertiesPanel.this.attributeSet.reorderAttributes(attributes);
+			AttributeSetPropertiesPanel.this.attributeSet.repositionAttributes(attributes);
 			changedHandler.onChanged(null);
 		});
 
@@ -208,6 +209,11 @@ public class AttributeSetPropertiesPanel extends HLayout {
 		mandatory.setWidth(50);
 		mandatory.setDefaultValue(false);
 		mandatory.setDisabled(attributeSet.isReadonly());
+		mandatory.setVisible(true);
+
+		boolean updatingAttributeIsNotSection = updatingAttributeName == null
+				|| attributeSet.getAttribute(updatingAttributeName.trim()) == null
+				|| attributeSet.getAttribute(updatingAttributeName.trim()).getType() != GUIAttribute.TYPE_SECTION;
 
 		// Hidden
 		final CheckboxItem hidden = new CheckboxItem();
@@ -217,6 +223,7 @@ public class AttributeSetPropertiesPanel extends HLayout {
 		hidden.setWidth(50);
 		hidden.setDefaultValue(false);
 		hidden.setDisabled(attributeSet.isReadonly());
+		hidden.setVisible(updatingAttributeIsNotSection);
 
 		// Readonly
 		final CheckboxItem readonly = new CheckboxItem();
@@ -226,6 +233,7 @@ public class AttributeSetPropertiesPanel extends HLayout {
 		readonly.setWidth(50);
 		readonly.setDefaultValue(false);
 		readonly.setDisabled(attributeSet.isReadonly());
+		readonly.setVisible(updatingAttributeIsNotSection);
 
 		// Multiple
 		final CheckboxItem multiple = new CheckboxItem();
@@ -236,6 +244,7 @@ public class AttributeSetPropertiesPanel extends HLayout {
 		multiple.setDefaultValue(false);
 		multiple.setDisabled(attributeSet.isReadonly());
 		multiple.setEndRow(true);
+		multiple.setVisible(updatingAttributeIsNotSection);
 
 		// Editor
 		addEditorItem();
@@ -247,6 +256,7 @@ public class AttributeSetPropertiesPanel extends HLayout {
 		group = ItemFactory.newTextItem(GROUP_STR, null);
 		group.setHint(I18N.message("groupname"));
 		group.setDisabled(attributeSet.isReadonly());
+		group.setVisibleWhen(new AdvancedCriteria("type", OperatorId.EQUALS, "" + GUIAttribute.TYPE_USER));
 
 		// Options (for preset editor)
 		addOptionsItem(attributeName);
@@ -267,6 +277,12 @@ public class AttributeSetPropertiesPanel extends HLayout {
 		attributeSettingsForm1.setItems(attributeName, new SpacerItem(), mandatory, readonly, hidden, multiple);
 		attributeSettingsForm2.setItems(label, type, editor, group, options, initialization, validation);
 		attributeButtonsForm.setItems(save, clean);
+
+		/*
+		 * Make sure that all the controls are not visible when editing a
+		 * Section, but not the initialization
+		 */
+		validation.setVisibleWhen(new AdvancedCriteria("type", OperatorId.INOT_EQUAL, "" + GUIAttribute.TYPE_SECTION));
 
 		attributesLayout.setMembers(attributeSettingsForm1, attributeSettingsForm2, attributeButtonsForm);
 		attributesLayout.setMembersMargin(10);
@@ -408,7 +424,8 @@ public class AttributeSetPropertiesPanel extends HLayout {
 	}
 
 	private void addOptionsItem(final TextItem attributeName) {
-		options = ItemFactory.newLinkItem("options", I18N.message("options"));
+		options = new LinkItem("options");
+		options.setTitle(I18N.message("options"));
 		options.setLinkTitle(I18N.message("attributeoptions"));
 		options.addClickHandler(optionsClick -> {
 			if (attributeSet.getId() == 0L) {
@@ -419,6 +436,9 @@ public class AttributeSetPropertiesPanel extends HLayout {
 				attributeOptions.show();
 			}
 		});
+		options.setVisibleWhen(new AdvancedCriteria(OperatorId.AND,
+				new Criterion[] { new AdvancedCriteria("type", OperatorId.EQUALS, "" + GUIAttribute.TYPE_STRING),
+						new AdvancedCriteria(EDITOR_STR, OperatorId.EQUALS, "" + GUIAttribute.EDITOR_LISTBOX) }));
 	}
 
 	private void addTypeSelector() {
@@ -431,6 +451,8 @@ public class AttributeSetPropertiesPanel extends HLayout {
 		types.put("" + GUIAttribute.TYPE_BOOLEAN, I18N.message("boolean"));
 		types.put("" + GUIAttribute.TYPE_USER, I18N.message("user"));
 		types.put("" + GUIAttribute.TYPE_FOLDER, I18N.message("folder"));
+		types.put("" + GUIAttribute.TYPE_DOCUMENT, I18N.message("document"));
+		types.put("" + GUIAttribute.TYPE_SECTION, I18N.message("section"));
 		type.setValueMap(types);
 		type.setWrapTitle(false);
 		type.setDefaultValue("" + GUIAttribute.TYPE_STRING);
@@ -450,6 +472,7 @@ public class AttributeSetPropertiesPanel extends HLayout {
 		editor.setDefaultValue("" + GUIAttribute.EDITOR_DEFAULT);
 		editor.setDisabled(attributeSet.isReadonly());
 		editor.addChangedHandler(editorChanged -> refreshFieldForm());
+		editor.setVisibleWhen(new AdvancedCriteria("type", OperatorId.EQUALS, "" + GUIAttribute.TYPE_STRING));
 	}
 
 	private TextItem addAttributeNameItem() {
@@ -553,13 +576,18 @@ public class AttributeSetPropertiesPanel extends HLayout {
 		if (!attributeSet.isReadonly())
 			name.addChangedHandler(changedHandler);
 
+		TextItem label = ItemFactory.newTextItem(LABEL, attributeSet.getLabel());
+		label.setDisabled(attributeSet.isReadonly());
+		if (!attributeSet.isReadonly())
+			label.addChangedHandler(changedHandler);
+
 		TextAreaItem description = ItemFactory.newTextAreaItem("description", attributeSet.getDescription());
 		description.setDisabled(attributeSet.isReadonly());
 
 		if (!attributeSet.isReadonly())
 			description.addChangedHandler(changedHandler);
 
-		setPropertiesForm.setItems(id, name, description);
+		setPropertiesForm.setItems(id, name, label, description);
 
 		setPropertiesForm.setWidth(200);
 	}
@@ -571,6 +599,7 @@ public class AttributeSetPropertiesPanel extends HLayout {
 		if (Boolean.FALSE.equals(vm.hasErrors())) {
 			attributeSet.setName((String) values.get("name"));
 			attributeSet.setDescription((String) values.get("description"));
+			attributeSet.setLabel((String) values.get(LABEL));
 		}
 		return !vm.hasErrors();
 	}
@@ -632,13 +661,7 @@ public class AttributeSetPropertiesPanel extends HLayout {
 				if (Boolean.TRUE.equals(yes)) {
 					LD.contactingServer();
 					AttributeSetService.Instance.get().applyAllToTemplates(attributeSet.getId(),
-							selection.getAttributeAsString("name"), new AsyncCallback<Void>() {
-								@Override
-								public void onFailure(Throwable caught) {
-									GuiLog.serverError(caught);
-									LD.clearPrompt();
-								}
-
+							selection.getAttributeAsString("name"), new DefaultAsyncCallback<>() {
 								@Override
 								public void onSuccess(Void arg0) {
 									LD.clearPrompt();
@@ -662,13 +685,7 @@ public class AttributeSetPropertiesPanel extends HLayout {
 						if (Boolean.TRUE.equals(yes)) {
 							LD.contactingServer();
 							AttributeSetService.Instance.get().applyInitializationToTemplates(attributeSet.getId(),
-									selection.getAttributeAsString("name"), new AsyncCallback<Void>() {
-										@Override
-										public void onFailure(Throwable caught) {
-											GuiLog.serverError(caught);
-											LD.clearPrompt();
-										}
-
+									selection.getAttributeAsString("name"), new DefaultAsyncCallback<>() {
 										@Override
 										public void onSuccess(Void arg0) {
 											LD.clearPrompt();
@@ -692,13 +709,7 @@ public class AttributeSetPropertiesPanel extends HLayout {
 						if (Boolean.TRUE.equals(confirm)) {
 							LD.contactingServer();
 							AttributeSetService.Instance.get().applyValidationToTemplates(attributeSet.getId(),
-									selection.getAttributeAsString("name"), new AsyncCallback<Void>() {
-										@Override
-										public void onFailure(Throwable caught) {
-											GuiLog.serverError(caught);
-											LD.clearPrompt();
-										}
-
+									selection.getAttributeAsString("name"), new DefaultAsyncCallback<>() {
 										@Override
 										public void onSuccess(Void arg0) {
 											LD.clearPrompt();
@@ -714,7 +725,7 @@ public class AttributeSetPropertiesPanel extends HLayout {
 	private MenuItem prepareDeleteContextMenuItem() {
 		MenuItem delete = new MenuItem();
 		delete.setTitle(I18N.message("ddelete"));
-		delete.addClickHandler((MenuItemClickEvent deleteClick) -> {
+		delete.addClickHandler(click -> {
 			final ListGridRecord[] selection = attributesList.getSelectedRecords();
 			if (selection == null || selection.length == 0)
 				return;
@@ -745,6 +756,11 @@ public class AttributeSetPropertiesPanel extends HLayout {
 			attributeSettingsForm1.setValue(HIDDEN, extAttr.isHidden());
 			attributeSettingsForm1.setValue(READONLY, extAttr.isReadonly());
 			attributeSettingsForm1.setValue(MULTIPLE, extAttr.isMultiple());
+
+			attributeSettingsForm1.getItem(HIDDEN).setVisible(!extAttr.isSection());
+			attributeSettingsForm1.getItem(READONLY).setVisible(!extAttr.isSection());
+			attributeSettingsForm1.getItem(MULTIPLE).setVisible(!extAttr.isSection());
+
 			attributeSettingsForm2.setValue(LABEL, extAttr.getLabel());
 			attributeSettingsForm2.setValue("type", extAttr.getType());
 			attributeSettingsForm2.setValue(EDITOR_STR, extAttr.getEditor());
@@ -771,6 +787,11 @@ public class AttributeSetPropertiesPanel extends HLayout {
 			options.setVisible(false);
 			group.setVisible(false);
 			group.setValue("");
+		} else if (type.getValueAsString().equals("" + GUIAttribute.TYPE_SECTION)) {
+			editor.setVisible(false);
+			options.setVisible(true);
+			group.setVisible(false);
+			group.setValue("");
 		} else {
 			editor.setVisible(false);
 			group.setVisible(false);
@@ -783,5 +804,15 @@ public class AttributeSetPropertiesPanel extends HLayout {
 
 		attributeSettingsForm1.markForRedraw();
 		attributeSettingsForm2.markForRedraw();
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

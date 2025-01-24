@@ -31,6 +31,8 @@ public abstract class PersistentObject implements Serializable {
 
 	private Date lastModified = new Date();
 
+	private Date creation = new Date();
+
 	private long recordVersion = 0L;
 
 	/**
@@ -92,16 +94,36 @@ public abstract class PersistentObject implements Serializable {
 		this.recordVersion = recordVersion;
 	}
 
-	@Override
-	public boolean equals(Object obj) {
-		if (!(obj instanceof PersistentObject))
-			return false;
-		PersistentObject other = (PersistentObject) obj;
-		return other.getId() == this.getId();
+	/**
+	 * The object's creation date
+	 * 
+	 * @return the creation date
+	 */
+	public Date getCreation() {
+		return creation;
+	}
+
+	public void setCreation(Date creation) {
+		this.creation = creation;
 	}
 
 	@Override
 	public int hashCode() {
-		return Long.valueOf(getId()).hashCode();
+		final int prime = 31;
+		int result = 1;
+		result = prime * result + (int) (id ^ (id >>> 32));
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		PersistentObject other = (PersistentObject) obj;
+		return id == other.id;
 	}
 }

@@ -2,8 +2,10 @@ package com.logicaldoc.gui.frontend.client.services;
 
 import java.util.Collection;
 import java.util.Date;
+import java.util.List;
 
 import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.beans.GUIAccessControlEntry;
 import com.logicaldoc.gui.common.client.beans.GUIBookmark;
 import com.logicaldoc.gui.common.client.beans.GUIDocument;
 import com.logicaldoc.gui.common.client.beans.GUIDocumentNote;
@@ -13,7 +15,7 @@ import com.logicaldoc.gui.common.client.beans.GUIVersion;
 
 public interface DocumentServiceAsync {
 
-	void getVersionsById(long id1, long id2, AsyncCallback<GUIVersion[]> callback);
+	void getVersionsById(long id1, long id2, AsyncCallback<List<GUIVersion>> callback);
 
 	void getById(long docId, AsyncCallback<GUIDocument> callback);
 
@@ -23,38 +25,40 @@ public interface DocumentServiceAsync {
 
 	void updateLink(long id, String type, AsyncCallback<Void> callback);
 
-	void deleteLinks(long[] ids, AsyncCallback<Void> callback);
+	void deleteLinks(List<Long> ids, AsyncCallback<Void> callback);
 
-	void delete(Long[] ids, AsyncCallback<Void> callback);
+	void delete(List<Long> ids, AsyncCallback<Void> callback);
 
-	void makeImmutable(Long[] ids, String comment, AsyncCallback<Void> callback);
+	void destroyDocuments(List<Long> ids, AsyncCallback<Void> callback);
 
-	void lock(Long[] ids, String comment, AsyncCallback<Void> callback);
+	void makeImmutable(List<Long> ids, String comment, AsyncCallback<Void> callback);
 
-	void unlock(Long[] ids, AsyncCallback<Void> callback);
+	void lock(List<Long> ids, String comment, AsyncCallback<Void> callback);
+
+	void unlock(List<Long> ids, AsyncCallback<Void> callback);
 
 	void addDocuments(String language, long folderId, boolean importZip, String charset, boolean immediateIndexing,
-			Long templateId, AsyncCallback<GUIDocument[]> callback);
+			Long templateId, AsyncCallback<List<GUIDocument>> callback);
 
-	void checkout(Long[] docIds, AsyncCallback<Void> callback);
+	void checkout(List<Long> docIds, AsyncCallback<Void> callback);
 
 	void checkin(GUIDocument document, boolean major, AsyncCallback<GUIDocument> callback);
 
-	void linkDocuments(Long[] inDocIds, Long[] outDocIds, AsyncCallback<Void> callback);
+	void linkDocuments(List<Long> inDocIds, List<Long> outDocIds, AsyncCallback<Void> callback);
 
-	void restore(Long[] docIds, long folderId, AsyncCallback<Void> callback);
+	void restore(List<Long> docIds, long folderId, AsyncCallback<Void> callback);
 
-	void addBookmarks(Long[] targetIds, int type, AsyncCallback<Void> callback);
+	void addBookmarks(List<Long> targetIds, int type, AsyncCallback<Void> callback);
 
-	void deleteBookmarks(long[] bookmarkIds, AsyncCallback<Void> callback);
+	void deleteBookmarks(List<Long> bookmarkIds, AsyncCallback<Void> callback);
 
 	void updateBookmark(GUIBookmark bookmark, AsyncCallback<Void> callback);
 
 	void markHistoryAsRead(String event, AsyncCallback<Void> callback);
 
-	void markIndexable(Long[] docIds, int policy, AsyncCallback<Void> callback);
+	void markIndexable(List<Long> docIds, int policy, AsyncCallback<Void> callback);
 
-	void markUnindexable(Long[] docIds, AsyncCallback<Void> callback);
+	void markUnindexable(List<Long> docIds, AsyncCallback<Void> callback);
 
 	void cleanUploadedFileFolder(AsyncCallback<Void> callback);
 
@@ -62,37 +66,38 @@ public interface DocumentServiceAsync {
 
 	void saveRating(GUIRating rating, AsyncCallback<Integer> callback);
 
-	void deleteNotes(long[] ids, AsyncCallback<Void> callback);
+	void deleteNotes(List<Long> ids, AsyncCallback<Void> callback);
 
 	void addNote(long docId, String message, AsyncCallback<Long> callback);
 
-	void bulkUpdate(Long[] ids, GUIDocument vo, boolean ignoreEmptyFields, AsyncCallback<GUIDocument[]> callback);
+	void bulkUpdate(List<Long> ids, GUIDocument vo, boolean ignoreEmptyFields,
+			AsyncCallback<List<GUIDocument>> callback);
 
 	void addDocuments(boolean importZip, String charset, boolean immediateIndexing, GUIDocument metadata,
-			AsyncCallback<GUIDocument[]> callback);
+			AsyncCallback<List<GUIDocument>> callback);
 
-	void updateNote(long docId, long noteId, String message, AsyncCallback<Void> callback);
+	void updateNote(long docId, long noteId, String fileVersion, String message, AsyncCallback<Void> callback);
 
-	void deleteVersions(long[] ids, AsyncCallback<GUIDocument> callback);
+	void deleteVersions(List<Long> ids, AsyncCallback<GUIDocument> callback);
 
 	void createWithContent(GUIDocument vo, String content, boolean checkout, AsyncCallback<GUIDocument> callback);
 
-	void indexDocuments(Long[] docIds, AsyncCallback<Void> callback);
+	void indexDocuments(List<Long> docIds, AsyncCallback<Void> callback);
 
-	void deleteFromTrash(Long[] ids, AsyncCallback<Void> callback);
+	void deleteFromTrash(List<Long> ids, AsyncCallback<Void> callback);
 
 	void emptyTrash(AsyncCallback<Void> callback);
 
-	void archiveDocuments(Long[] docIds, String comment, AsyncCallback<Void> callback);
+	void archiveDocuments(List<Long> docIds, String comment, AsyncCallback<Void> callback);
 
 	void archiveFolder(long folderId, String comment, AsyncCallback<Long> callback);
 
-	void countDocuments(long[] folderIds, int status, AsyncCallback<Long> callback);
+	void countDocuments(List<Long> folderIds, int status, AsyncCallback<Long> callback);
 
-	void unarchiveDocuments(long[] docIds, AsyncCallback<Void> callback);
+	void unarchiveDocuments(List<Long> docIds, AsyncCallback<Void> callback);
 
 	void createDownloadTicket(long docId, int type, String suffix, Integer expireHours, Date expireDate,
-			Integer maxDownloads, Integer maxViews, AsyncCallback<String[]> callback);
+			Integer maxDownloads, Integer maxViews, AsyncCallback<List<String>> callback);
 
 	void setPassword(long docId, String password, AsyncCallback<Void> callback);
 
@@ -125,9 +130,10 @@ public interface DocumentServiceAsync {
 
 	void promoteVersion(long docId, String version, AsyncCallback<GUIDocument> callback);
 
-	void getNotes(long docId, String fileVersion, Collection<String> types, AsyncCallback<GUIDocumentNote[]> callback);
+	void getNotes(long docId, String fileVersion, Collection<String> types,
+			AsyncCallback<List<GUIDocumentNote>> callback);
 
-	void saveNotes(long docId, GUIDocumentNote[] notes, Collection<String> types, AsyncCallback<Void> callback);
+	void saveNotes(long docId, String fileVersion, List<GUIDocumentNote> notes, Collection<String> types, AsyncCallback<Void> callback);
 
 	void deleteTicket(long ticketId, AsyncCallback<Void> callback);
 
@@ -135,13 +141,19 @@ public interface DocumentServiceAsync {
 
 	void disableTicket(long ticketId, AsyncCallback<Void> callback);
 
-	void enforceFilesIntoFolderStorage(long folderId, AsyncCallback<Void> callback);
+	void enforceFilesIntoFolderStore(long folderId, AsyncCallback<Void> callback);
 
-	void merge(Long[] docIds, long targetFolderId, String fileName, AsyncCallback<GUIDocument> callback);
+	void merge(List<Long> docIds, long targetFolderId, String fileName, AsyncCallback<GUIDocument> callback);
 
 	void updatePages(long docId, AsyncCallback<Integer> callback);
 
 	void rename(long documentId, String name, AsyncCallback<GUIDocument> callback);
 
 	void validate(GUIDocument document, AsyncCallback<Void> callback);
+
+	void getAllowedPermissions(List<Long> docIds, AsyncCallback<GUIAccessControlEntry> callback);
+
+	void saveACL(GUIDocument document, AsyncCallback<Void> callback);
+
+	void applyParentFolderSecurity(long docId, AsyncCallback<Void> callback);
 }

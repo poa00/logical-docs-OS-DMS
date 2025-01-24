@@ -11,8 +11,8 @@ import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.communication.Recipient;
 import com.logicaldoc.core.communication.SystemMessage;
 import com.logicaldoc.core.communication.SystemMessageDAO;
-import com.logicaldoc.core.security.User;
-import com.logicaldoc.core.security.dao.UserDAO;
+import com.logicaldoc.core.security.user.User;
+import com.logicaldoc.core.security.user.UserDAO;
 import com.logicaldoc.core.threading.NotifyingThread;
 import com.logicaldoc.core.threading.NotifyingThread.ThreadCompleteListener;
 import com.logicaldoc.i18n.I18N;
@@ -55,8 +55,8 @@ public class LongRunningOperationCompleteListener implements ThreadCompleteListe
 
 	@Override
 	public void completed(NotifyingThread thread) {
-		SystemMessageDAO smdao = (SystemMessageDAO) Context.get().getBean(SystemMessageDAO.class);
-		UserDAO uDao = (UserDAO) Context.get().getBean(UserDAO.class);
+		SystemMessageDAO smdao = Context.get(SystemMessageDAO.class);
+		UserDAO uDao = Context.get(UserDAO.class);
 		Date now = new Date();
 
 		for (String username : usernames) {

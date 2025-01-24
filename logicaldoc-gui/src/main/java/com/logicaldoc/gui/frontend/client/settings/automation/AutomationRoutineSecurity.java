@@ -3,14 +3,14 @@ package com.logicaldoc.gui.frontend.client.settings.automation;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.logicaldoc.gui.common.client.beans.GUIAccessControlEntry;
 import com.logicaldoc.gui.common.client.beans.GUIAutomationRoutine;
-import com.logicaldoc.gui.common.client.beans.GUIRight;
-import com.logicaldoc.gui.common.client.data.AutomationRoutineRightsDS;
+import com.logicaldoc.gui.common.client.data.AutomationRoutineAclDS;
+import com.logicaldoc.gui.common.client.grid.UserListGridField;
 import com.logicaldoc.gui.common.client.i18n.I18N;
 import com.logicaldoc.gui.common.client.util.GridUtil;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.LD;
-import com.logicaldoc.gui.common.client.widgets.grid.UserListGridField;
 import com.smartgwt.client.data.Record;
 import com.smartgwt.client.types.ListGridFieldType;
 import com.smartgwt.client.types.SelectionStyle;
@@ -35,6 +35,8 @@ import com.smartgwt.client.widgets.menu.MenuItem;
  * @since 8.8.6
  */
 public class AutomationRoutineSecurity extends AutomationRoutineDetailsTab {
+
+	private static final String READ = "read";
 
 	private static final String WRITE = "write";
 
@@ -65,7 +67,7 @@ public class AutomationRoutineSecurity extends AutomationRoutineDetailsTab {
 		entity.setCanEdit(false);
 		entity.setRotateTitle(false);
 
-		ListGridField read = new ListGridField("read", I18N.message("read"), 80);
+		ListGridField read = new ListGridField(READ, I18N.message(READ), 80);
 		read.setType(ListGridFieldType.BOOLEAN);
 		read.setCanEdit(true);
 		read.setAutoFitWidth(true);
@@ -89,7 +91,7 @@ public class AutomationRoutineSecurity extends AutomationRoutineDetailsTab {
 		list.setMinHeight(200);
 		list.setMinWidth(300);
 
-		list.setDataSource(new AutomationRoutineRightsDS(routine.getId()));
+		list.setDataSource(new AutomationRoutineAclDS(routine.getId()));
 		list.setFields(entityId, entity, read, write);
 
 		container.addMember(list);
@@ -103,6 +105,17 @@ public class AutomationRoutineSecurity extends AutomationRoutineDetailsTab {
 					contextMenu.showContextMenu();
 				}
 				event.cancel();
+			});
+
+			list.addEditCompleteHandler(event -> {
+				for (ListGridRecord rec : list.getSelectedRecords()) {
+					GUIAccessControlEntry acl = routine.getAce(rec.getAttributeAsLong(ENTITY_ID));
+					if (acl != null) {
+						acl.setWrite(rec.getAttributeAsBoolean(WRITE, false));
+						acl.setRead(rec.getAttributeAsBoolean(READ, false));
+					}
+				}
+				changedHandler.onChanged(null);
 			});
 		}
 	}
@@ -158,7 +171,7 @@ public class AutomationRoutineSecurity extends AutomationRoutineDetailsTab {
 			rec.setAttribute(AVATAR, selectedRecord.getAttribute("id"));
 			rec.setAttribute(ENTITY,
 					selectedRecord.getAttribute("label") + " (" + selectedRecord.getAttribute("username") + ")");
-			rec.setAttribute("read", true);
+			rec.setAttribute(READ, true);
 
 			addRecord(rec);
 
@@ -169,6 +182,13 @@ public class AutomationRoutineSecurity extends AutomationRoutineDetailsTab {
 
 	private void addRecord(ListGridRecord rec) {
 		list.addData(rec);
+
+		GUIAccessControlEntry ace = new GUIAccessControlEntry();
+		ace.setEntityId(rec.getAttributeAsLong(ENTITY_ID));
+		ace.setRead(rec.getAttributeAsBoolean(READ, false));
+		ace.setWrite(rec.getAttributeAsBoolean(WRITE, false));
+		routine.addAce(ace);
+
 		changedHandler.onChanged(null);
 	}
 
@@ -197,7 +217,7 @@ public class AutomationRoutineSecurity extends AutomationRoutineDetailsTab {
 			rec.setAttribute(ENTITY_ID, selectedRecord.getAttribute("id"));
 			rec.setAttribute(AVATAR, "group");
 			rec.setAttribute(ENTITY, selectedRecord.getAttribute("name"));
-			rec.setAttribute("read", true);
+			rec.setAttribute(READ, true);
 
 			addRecord(rec);
 			group.clearValue();
@@ -205,29 +225,25 @@ public class AutomationRoutineSecurity extends AutomationRoutineDetailsTab {
 	}
 
 	/**
-	 * Creates an array of all the rights
+	 * Creates a list of all the ACL
 	 * 
 	 * @return the array of rights
 	 */
-	public GUIRight[] getRights() {
+	public List<GUIAccessControlEntry> getACL() {
 		int totalRecords = list.getRecordList().getLength();
-		List<GUIRight> tmp = new ArrayList<>();
+		List<GUIAccessControlEntry> acl = new ArrayList<>();
 
 		for (int i = 0; i < totalRecords; i++) {
 			Record rec = list.getRecordList().get(i);
-			if (Boolean.FALSE.equals(rec.getAttributeAsBoolean("read")))
-				continue;
-
-			GUIRight right = new GUIRight();
-
-			right.setName(rec.getAttributeAsString(ENTITY));
-			right.setEntityId(Long.parseLong(rec.getAttribute(ENTITY_ID)));
-			right.setWrite("true".equals(rec.getAttributeAsString(WRITE)));
-
-			tmp.add(right);
+			GUIAccessControlEntry ace = new GUIAccessControlEntry();
+			ace.setName(rec.getAttributeAsString(ENTITY));
+			ace.setEntityId(Long.parseLong(rec.getAttribute(ENTITY_ID)));
+			ace.setWrite(rec.getAttributeAsBoolean(WRITE));
+			ace.setRead(rec.getAttributeAsBoolean(READ));
+			acl.add(ace);
 		}
 
-		return tmp.toArray(new GUIRight[0]);
+		return acl;
 	}
 
 	/**
@@ -252,6 +268,8 @@ public class AutomationRoutineSecurity extends AutomationRoutineDetailsTab {
 
 		LD.ask(I18N.message("question"), I18N.message("confirmdelete"), confirm -> {
 			if (Boolean.TRUE.equals(confirm)) {
+				for (ListGridRecord listGridRecord : selection)
+					routine.removeAce(listGridRecord.getAttributeAsLong(ENTITY_ID));
 				list.removeSelectedData();
 				changedHandler.onChanged(null);
 			}
@@ -260,14 +278,16 @@ public class AutomationRoutineSecurity extends AutomationRoutineDetailsTab {
 
 	@Override
 	public boolean validate() {
-		// the grid could not be initialized already so scroll it
-		if (list != null) {
-			try {
-				routine.setRights(this.getRights());
-			} catch (Exception e) {
-				// Nothing to do
-			}
-		}
 		return true;
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

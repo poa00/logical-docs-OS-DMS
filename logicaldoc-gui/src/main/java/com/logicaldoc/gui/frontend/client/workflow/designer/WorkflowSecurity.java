@@ -3,15 +3,16 @@ package com.logicaldoc.gui.frontend.client.workflow.designer;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.logicaldoc.gui.common.client.beans.GUIRight;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
+import com.logicaldoc.gui.common.client.beans.GUIAccessControlEntry;
 import com.logicaldoc.gui.common.client.beans.GUIWorkflow;
-import com.logicaldoc.gui.common.client.data.WorkflowRightsDS;
+import com.logicaldoc.gui.common.client.data.WorkflowAclDS;
+import com.logicaldoc.gui.common.client.grid.UserListGridField;
 import com.logicaldoc.gui.common.client.i18n.I18N;
 import com.logicaldoc.gui.common.client.util.GridUtil;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.LD;
-import com.logicaldoc.gui.common.client.widgets.grid.UserListGridField;
-import com.smartgwt.client.data.Record;
+import com.logicaldoc.gui.frontend.client.services.WorkflowService;
 import com.smartgwt.client.types.HeaderControls;
 import com.smartgwt.client.types.ListGridFieldType;
 import com.smartgwt.client.types.SelectionStyle;
@@ -46,7 +47,7 @@ public class WorkflowSecurity extends Window {
 
 	private static final String ENTITY_ID = "entityId";
 
-	private WorkflowRightsDS dataSource;
+	private WorkflowAclDS dataSource;
 
 	private ListGrid list;
 
@@ -107,7 +108,8 @@ public class WorkflowSecurity extends Window {
 		list.setHeight100();
 		list.setMinHeight(200);
 		list.setMinWidth(300);
-		dataSource = new WorkflowRightsDS(Long.parseLong(workflow.getId()));
+
+		dataSource = new WorkflowAclDS(Long.parseLong(workflow.getId()));
 		list.setDataSource(dataSource);
 
 		List<ListGridField> fields = new ArrayList<>();
@@ -226,29 +228,24 @@ public class WorkflowSecurity extends Window {
 	}
 
 	/**
-	 * Creates an array of all the right
+	 * Creates an array of all the ACL
 	 * 
-	 * @return the array of rights
+	 * @return the list of ACEs
 	 */
-	public GUIRight[] getRights() {
-		int totalRecords = list.getRecordList().getLength();
-		List<GUIRight> tmp = new ArrayList<>();
+	public List<GUIAccessControlEntry> getACL() {
+		List<GUIAccessControlEntry> acl = new ArrayList<>();
 
-		for (int i = 0; i < totalRecords; i++) {
-			Record rec = list.getRecordList().get(i);
-			if (Boolean.FALSE.equals(rec.getAttributeAsBoolean("read")))
-				continue;
+		if (list.getRecords() != null)
+			for (ListGridRecord rec : list.getRecords()) {
+				GUIAccessControlEntry right = new GUIAccessControlEntry();
+				right.setName(rec.getAttributeAsString(ENTITY));
+				right.setEntityId(Long.parseLong(rec.getAttribute(ENTITY_ID)));
+				right.setWrite(Boolean.TRUE.equals(rec.getAttributeAsBoolean(WRITE)));
+				right.setRead(Boolean.TRUE.equals(rec.getAttributeAsBoolean("read")));
+				acl.add(right);
+			}
 
-			GUIRight right = new GUIRight();
-
-			right.setName(rec.getAttributeAsString(ENTITY));
-			right.setEntityId(Long.parseLong(rec.getAttribute(ENTITY_ID)));
-			right.setWrite("true".equals(rec.getAttributeAsString(WRITE)));
-
-			tmp.add(right);
-		}
-
-		return tmp.toArray(new GUIRight[0]);
+		return acl;
 	}
 
 	@Override
@@ -268,8 +265,7 @@ public class WorkflowSecurity extends Window {
 
 		MenuItem deleteItem = new MenuItem();
 		deleteItem.setTitle(I18N.message("ddelete"));
-		deleteItem.addClickHandler(event ->
-				onDelete());
+		deleteItem.addClickHandler(event -> onDelete());
 
 		contextMenu.setItems(deleteItem);
 		return contextMenu;
@@ -287,8 +283,22 @@ public class WorkflowSecurity extends Window {
 	}
 
 	public void onSave() {
-		// Apply all rights
-		workflow.setRights(this.getRights());
-		destroy();
+		workflow.setAccessControlList(getACL());
+		WorkflowService.Instance.get().saveACL(workflow, new DefaultAsyncCallback<>() {
+			@Override
+			public void onSuccess(Void arg0) {
+				destroy();
+			}
+		});
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

@@ -84,7 +84,7 @@ public class DocumentsDS extends DataSource {
 
 		DataSourceTextField filename = new DataSourceTextField("filename");
 
-		DataSourceImageField icon = new DataSourceImageField("icon");
+		DataSourceTextField icon = new DataSourceTextField("icon");
 		icon.setHidden(true);
 		DataSourceTextField customId = new DataSourceTextField("customId");
 		DataSourceTextField type = new DataSourceTextField("type");
@@ -116,6 +116,7 @@ public class DocumentsDS extends DataSource {
 		status.setHidden(true);
 		DataSourceIntegerField rating = new DataSourceIntegerField("rating");
 		DataSourceTextField comment = new DataSourceTextField("comment");
+		DataSourceTextField lastNote = new DataSourceTextField("lastNote");
 		DataSourceTextField wfStatus = new DataSourceTextField("workflowStatus");
 		DataSourceTextField wfStatusDisplay = new DataSourceTextField("workflowStatusDisplay");
 		wfStatusDisplay.setHidden(true);
@@ -164,6 +165,7 @@ public class DocumentsDS extends DataSource {
 		fields.add(rating);
 		fields.add(fileVersion);
 		fields.add(comment);
+		fields.add(lastNote);
 		fields.add(wfStatus);
 		fields.add(wfStatusDisplay);
 		fields.add(color);

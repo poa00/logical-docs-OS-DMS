@@ -6,7 +6,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.metadata.Attribute;
@@ -16,20 +19,18 @@ import com.logicaldoc.core.metadata.AttributeSet;
 import com.logicaldoc.core.metadata.AttributeSetDAO;
 import com.logicaldoc.core.metadata.Template;
 import com.logicaldoc.core.metadata.TemplateDAO;
-import com.logicaldoc.core.metadata.TemplateGroup;
-import com.logicaldoc.core.security.Group;
-import com.logicaldoc.core.security.User;
+import com.logicaldoc.core.security.AccessControlEntry;
+import com.logicaldoc.core.security.Permission;
 import com.logicaldoc.core.security.authentication.AuthenticationException;
 import com.logicaldoc.core.security.authorization.PermissionException;
-import com.logicaldoc.core.security.dao.GroupDAO;
-import com.logicaldoc.core.security.dao.UserDAO;
+import com.logicaldoc.core.security.user.User;
 import com.logicaldoc.util.Context;
 import com.logicaldoc.webservice.AbstractService;
 import com.logicaldoc.webservice.WebserviceException;
+import com.logicaldoc.webservice.model.WSAccessControlEntry;
 import com.logicaldoc.webservice.model.WSAttribute;
 import com.logicaldoc.webservice.model.WSAttributeOption;
 import com.logicaldoc.webservice.model.WSAttributeSet;
-import com.logicaldoc.webservice.model.WSRight;
 import com.logicaldoc.webservice.model.WSTemplate;
 import com.logicaldoc.webservice.model.WSUtil;
 import com.logicaldoc.webservice.soap.DocumentMetadataService;
@@ -42,25 +43,27 @@ import com.logicaldoc.webservice.soap.DocumentMetadataService;
  */
 public class SoapDocumentMetadataService extends AbstractService implements DocumentMetadataService {
 
+	protected static Logger log = LoggerFactory.getLogger(SoapDocumentMetadataService.class);
+
 	private static final String TEMPLATE = "template ";
 
 	@Override
-	public WSTemplate[] listTemplates(String sid)
+	public List<WSTemplate> listTemplates(String sid)
 			throws AuthenticationException, WebserviceException, PersistenceException {
 		User user = validateSession(sid);
 		List<WSTemplate> templates = new ArrayList<>();
-		TemplateDAO dao = (TemplateDAO) Context.get().getBean(TemplateDAO.class);
+		TemplateDAO dao = Context.get(TemplateDAO.class);
 		for (Template template : dao.findAll(user.getTenantId()))
 			if (dao.isReadEnable(template.getId(), user.getId()))
 				templates.add(WSUtil.toWSTemplate(template));
-		return templates.toArray(new WSTemplate[0]);
+		return templates;
 	}
 
 	@Override
 	public WSTemplate getTemplate(String sid, String name)
 			throws AuthenticationException, WebserviceException, PersistenceException {
 		User user = validateSession(sid);
-		TemplateDAO dao = (TemplateDAO) Context.get().getBean(TemplateDAO.class);
+		TemplateDAO dao = Context.get(TemplateDAO.class);
 		Template template = dao.findByName(name, user.getTenantId());
 		if (template != null && dao.isReadEnable(template.getId(), user.getId()))
 			return WSUtil.toWSTemplate(template);
@@ -72,7 +75,7 @@ public class SoapDocumentMetadataService extends AbstractService implements Docu
 	public WSTemplate getTemplateById(String sid, long templateId)
 			throws AuthenticationException, WebserviceException, PersistenceException {
 		User user = validateSession(sid);
-		TemplateDAO dao = (TemplateDAO) Context.get().getBean(TemplateDAO.class);
+		TemplateDAO dao = Context.get(TemplateDAO.class);
 		Template template = dao.findById(templateId);
 		if (template != null && dao.isReadEnable(template.getId(), user.getId()))
 			return WSUtil.toWSTemplate(template);
@@ -87,34 +90,34 @@ public class SoapDocumentMetadataService extends AbstractService implements Docu
 
 		Template template = loadTemplate(sid, wsTemplate, user);
 
-		TemplateDAO dao = (TemplateDAO) Context.get().getBean(TemplateDAO.class);
+		TemplateDAO dao = Context.get(TemplateDAO.class);
 		Map<String, Attribute> attrs = new HashMap<>();
-		if (wsTemplate.getAttributes() != null && wsTemplate.getAttributes().length > 0) {
+		if (CollectionUtils.isNotEmpty(wsTemplate.getAttributes())) {
 			template.getAttributes().clear();
-			for (WSAttribute attribute : wsTemplate.getAttributes()) {
-				if (attribute != null) {
-					Attribute att = new Attribute();
-					att.setPosition(attribute.getPosition());
-					att.setMandatory(attribute.getMandatory());
-					att.setHidden(attribute.getHidden());
-					att.setReadonly(attribute.getReadonly());
-					att.setMultiple(attribute.getMultiple());
-					att.setParent(attribute.getParent());
-					att.setLabel(attribute.getLabel());
-					if (StringUtils.isEmpty(attribute.getLabel()))
-						att.setLabel(attribute.getName());
-					att.setStringValue(attribute.getStringValue());
-					att.setIntValue(attribute.getIntValue());
-					att.setDateValue(AbstractService.convertStringToDate(attribute.getDateValue()));
-					att.setDoubleValue(attribute.getDoubleValue());
-					att.setType(attribute.getType());
-					att.setEditor(attribute.getEditor());
-					att.setSetId(attribute.getSetId());
-					att.setDependsOn(attribute.getDependsOn());
-					att.setValidation(attribute.getValidation());
-					att.setInitialization(attribute.getInitialization());
+			for (WSAttribute wsAttribute : wsTemplate.getAttributes()) {
+				if (wsAttribute != null) {
+					Attribute attribute = new Attribute();
+					attribute.setPosition(wsAttribute.getPosition());
+					attribute.setMandatory(wsAttribute.getMandatory());
+					attribute.setHidden(wsAttribute.getHidden());
+					attribute.setReadonly(wsAttribute.getReadonly());
+					attribute.setMultiple(wsAttribute.getMultiple());
+					attribute.setParent(wsAttribute.getParent());
+					attribute.setLabel(wsAttribute.getLabel());
+					if (StringUtils.isEmpty(wsAttribute.getLabel()))
+						attribute.setLabel(wsAttribute.getName());
+					attribute.setStringValue(wsAttribute.getStringValue());
+					attribute.setIntValue(wsAttribute.getIntValue());
+					attribute.setDateValue(AbstractService.convertStringToDate(wsAttribute.getDateValue()));
+					attribute.setDoubleValue(wsAttribute.getDoubleValue());
+					attribute.setType(wsAttribute.getType());
+					attribute.setEditor(wsAttribute.getEditor());
+					attribute.setSetId(wsAttribute.getSetId());
+					attribute.setDependsOn(wsAttribute.getDependsOn());
+					attribute.setValidation(wsAttribute.getValidation());
+					attribute.setInitialization(wsAttribute.getInitialization());
 
-					attrs.put(attribute.getName(), att);
+					attrs.put(wsAttribute.getName(), attribute);
 				}
 			}
 		}
@@ -127,7 +130,7 @@ public class SoapDocumentMetadataService extends AbstractService implements Docu
 
 	private Template loadTemplate(String sid, WSTemplate wsTemplate, User user)
 			throws PersistenceException, WebserviceException, PermissionException {
-		TemplateDAO dao = (TemplateDAO) Context.get().getBean(TemplateDAO.class);
+		TemplateDAO dao = Context.get(TemplateDAO.class);
 		Template template = WSUtil.toTemplate(wsTemplate);
 		template.setTenantId(user.getTenantId());
 		if (wsTemplate.getId() != 0) {
@@ -136,7 +139,7 @@ public class SoapDocumentMetadataService extends AbstractService implements Docu
 			template.setName(wsTemplate.getName());
 			template.setDescription(wsTemplate.getDescription());
 
-			if (template.getReadonly() == 1 || !isTemplateWritable(sid, template.getId()))
+			if (template.getReadonly() == 1 || !isWritable(sid, template.getId()))
 				throw new PermissionException(user.getUsername(), TEMPLATE + wsTemplate.getName(), "read");
 		}
 
@@ -149,75 +152,73 @@ public class SoapDocumentMetadataService extends AbstractService implements Docu
 	public void deleteTemplate(String sid, long templateId)
 			throws AuthenticationException, WebserviceException, PersistenceException, PermissionException {
 		User user = validateSession(sid);
-		TemplateDAO dao = (TemplateDAO) Context.get().getBean(TemplateDAO.class);
+		TemplateDAO dao = Context.get(TemplateDAO.class);
 		if (dao.countDocs(templateId) > 0)
 			throw new WebserviceException("You cannot delete template with id " + templateId
 					+ " because some documents belongs to that template.");
 		Template templ = dao.findById(templateId);
-		if (templ.getReadonly() == 1 || !isTemplateWritable(sid, templateId))
+		if (templ.getReadonly() == 1 || !isWritable(sid, templateId))
 			throw new PermissionException(user.getUsername(), TEMPLATE + templ.getName(), "write");
 
 		dao.delete(templateId);
 	}
 
 	@Override
-	public void setAttributeOptions(String sid, long setId, String attribute, WSAttributeOption[] wsOptions)
+	public void setAttributeOptions(String sid, long setId, String attribute, List<WSAttributeOption> wsOptions)
 			throws WebserviceException, PersistenceException {
 		checkAdministrator(sid);
 
-		AttributeOptionDAO dao = (AttributeOptionDAO) Context.get().getBean(AttributeOptionDAO.class);
+		AttributeOptionDAO dao = Context.get(AttributeOptionDAO.class);
 		dao.deleteBySetIdAndAttribute(setId, attribute);
 
-		if (wsOptions == null || wsOptions.length == 0) {
+		if (CollectionUtils.isEmpty(wsOptions))
 			return;
-		}
-		for (int i = 0; i < wsOptions.length; i++) {
-			AttributeOption option = new AttributeOption(setId, attribute, wsOptions[i].getValue(),
-					wsOptions[i].getCategory());
-			option.setPosition(i);
+		int i = 0;
+		for (WSAttributeOption wsOption : wsOptions) {
+			AttributeOption option = new AttributeOption(setId, attribute, wsOption.getValue(), wsOption.getCategory());
+			option.setPosition(i++);
 			dao.store(option);
 		}
 	}
 
 	@Override
-	public String[] getAttributeOptions(String sid, long setId, String attribute)
+	public List<String> getAttributeOptions(String sid, long setId, String attribute)
 			throws AuthenticationException, WebserviceException, PersistenceException {
 		validateSession(sid);
-		AttributeOptionDAO dao = (AttributeOptionDAO) Context.get().getBean(AttributeOptionDAO.class);
+		AttributeOptionDAO dao = Context.get(AttributeOptionDAO.class);
 
 		List<AttributeOption> options = dao.findByAttribute(setId, attribute);
-		return options.stream().map(o -> o.getValue()).collect(Collectors.toList()).toArray(new String[0]);
+		return options.stream().map(o -> o.getValue()).collect(Collectors.toList());
 	}
 
 	@Override
-	public WSAttributeOption[] getAttributeOptionsByCategory(String sid, long setId, String attribute, String category)
-			throws AuthenticationException, WebserviceException, PersistenceException {
+	public List<WSAttributeOption> getAttributeOptionsByCategory(String sid, long setId, String attribute,
+			String category) throws AuthenticationException, WebserviceException, PersistenceException {
 		validateSession(sid);
-		AttributeOptionDAO dao = (AttributeOptionDAO) Context.get().getBean(AttributeOptionDAO.class);
+		AttributeOptionDAO dao = Context.get(AttributeOptionDAO.class);
 
 		List<AttributeOption> options = dao.findByAttributeAndCategory(setId, attribute, category);
-		
-		
+
 		return options.stream().map(o -> new WSAttributeOption(o.getValue(), o.getCategory()))
-				.collect(Collectors.toList()).toArray(new WSAttributeOption[0]);
+				.collect(Collectors.toList());
 	}
 
 	@Override
-	public WSAttributeSet[] listAttributeSets(String sid)
+	public List<WSAttributeSet> listAttributeSets(String sid)
 			throws AuthenticationException, WebserviceException, PersistenceException {
 		User user = validateSession(sid);
 		List<WSAttributeSet> templates = new ArrayList<>();
-		AttributeSetDAO dao = (AttributeSetDAO) Context.get().getBean(AttributeSetDAO.class);
+		AttributeSetDAO dao = Context.get(AttributeSetDAO.class);
 		for (AttributeSet set : dao.findAll(user.getTenantId()))
 			templates.add(WSUtil.toWSAttributeSet(set));
-		return templates.toArray(new WSAttributeSet[0]);
+		return templates;
 	}
 
 	@Override
 	public WSAttributeSet getAttributeSet(String sid, String name)
 			throws AuthenticationException, WebserviceException, PersistenceException {
 		User user = validateSession(sid);
-		AttributeSetDAO dao = (AttributeSetDAO) Context.get().getBean(AttributeSetDAO.class);
+		AttributeSetDAO dao = Context.get(AttributeSetDAO.class);
 		AttributeSet set = dao.findByName(name, user.getTenantId());
 		if (set != null)
 			return WSUtil.toWSAttributeSet(set);
@@ -229,7 +230,7 @@ public class SoapDocumentMetadataService extends AbstractService implements Docu
 	public WSAttributeSet getAttributeSetById(String sid, long setId)
 			throws AuthenticationException, WebserviceException, PersistenceException {
 		validateSession(sid);
-		AttributeSetDAO dao = (AttributeSetDAO) Context.get().getBean(AttributeSetDAO.class);
+		AttributeSetDAO dao = Context.get(AttributeSetDAO.class);
 		AttributeSet set = dao.findById(setId);
 		if (set != null)
 			return WSUtil.toWSAttributeSet(set);
@@ -238,51 +239,51 @@ public class SoapDocumentMetadataService extends AbstractService implements Docu
 	}
 
 	@Override
-	public long storeAttributeSet(String sid, WSAttributeSet attributeSet)
+	public long storeAttributeSet(String sid, WSAttributeSet wsAttributeSet)
 			throws WebserviceException, PersistenceException {
 		checkAdministrator(sid);
 		User user = validateSession(sid);
 
-		AttributeSetDAO dao = (AttributeSetDAO) Context.get().getBean(AttributeSetDAO.class);
-		AttributeSet set = WSUtil.toAttributeSet(attributeSet);
+		AttributeSetDAO dao = Context.get(AttributeSetDAO.class);
+		AttributeSet set = WSUtil.toAttributeSet(wsAttributeSet);
 		set.setTenantId(user.getTenantId());
 
-		if (attributeSet.getId() != 0) {
-			set = dao.findById(attributeSet.getId());
+		if (wsAttributeSet.getId() != 0) {
+			set = dao.findById(wsAttributeSet.getId());
 			dao.initialize(set);
-			set.setName(attributeSet.getName());
-			set.setDescription(attributeSet.getDescription());
+			set.setName(wsAttributeSet.getName());
+			set.setDescription(wsAttributeSet.getDescription());
 		}
 
 		if (StringUtils.isEmpty(set.getName()))
 			throw new WebserviceException("Missing mandatory value 'Name'");
 
 		Map<String, Attribute> attrs = new HashMap<>();
-		if (attributeSet.getAttributes() != null && attributeSet.getAttributes().length > 0) {
+		if (CollectionUtils.isNotEmpty(wsAttributeSet.getAttributes())) {
 			set.getAttributes().clear();
-			for (WSAttribute attribute : attributeSet.getAttributes()) {
-				if (attribute != null) {
-					Attribute att = new Attribute();
-					att.setPosition(attribute.getPosition());
-					att.setMandatory(attribute.getMandatory());
-					att.setHidden(attribute.getHidden());
-					att.setReadonly(attribute.getReadonly());
-					att.setMultiple(attribute.getMultiple());
-					att.setParent(attribute.getParent());
-					att.setLabel(attribute.getLabel());
-					if (StringUtils.isEmpty(attribute.getLabel()))
-						att.setLabel(attribute.getName());
-					att.setStringValue(attribute.getStringValue());
-					att.setIntValue(attribute.getIntValue());
-					att.setDateValue(AbstractService.convertStringToDate(attribute.getDateValue()));
-					att.setDoubleValue(attribute.getDoubleValue());
-					att.setType(attribute.getType());
-					att.setEditor(attribute.getEditor());
-					att.setSetId(attribute.getSetId());
-					att.setDependsOn(attribute.getDependsOn());
-					att.setValidation(attribute.getValidation());
-					att.setInitialization(attribute.getInitialization());
-					attrs.put(attribute.getName(), att);
+			for (WSAttribute wsAttribute : wsAttributeSet.getAttributes()) {
+				if (wsAttribute != null) {
+					Attribute attribute = new Attribute();
+					attribute.setPosition(wsAttribute.getPosition());
+					attribute.setMandatory(wsAttribute.getMandatory());
+					attribute.setHidden(wsAttribute.getHidden());
+					attribute.setReadonly(wsAttribute.getReadonly());
+					attribute.setMultiple(wsAttribute.getMultiple());
+					attribute.setParent(wsAttribute.getParent());
+					attribute.setLabel(wsAttribute.getLabel());
+					if (StringUtils.isEmpty(wsAttribute.getLabel()))
+						attribute.setLabel(wsAttribute.getName());
+					attribute.setStringValue(wsAttribute.getStringValue());
+					attribute.setIntValue(wsAttribute.getIntValue());
+					attribute.setDateValue(AbstractService.convertStringToDate(wsAttribute.getDateValue()));
+					attribute.setDoubleValue(wsAttribute.getDoubleValue());
+					attribute.setType(wsAttribute.getType());
+					attribute.setEditor(wsAttribute.getEditor());
+					attribute.setSetId(wsAttribute.getSetId());
+					attribute.setDependsOn(wsAttribute.getDependsOn());
+					attribute.setValidation(wsAttribute.getValidation());
+					attribute.setInitialization(wsAttribute.getInitialization());
+					attrs.put(wsAttribute.getName(), attribute);
 				}
 			}
 		}
@@ -296,109 +297,75 @@ public class SoapDocumentMetadataService extends AbstractService implements Docu
 	@Override
 	public void deleteAttributeSet(String sid, long setId) throws WebserviceException, PersistenceException {
 		checkAdministrator(sid);
-		AttributeSetDAO dao = (AttributeSetDAO) Context.get().getBean(AttributeSetDAO.class);
+		AttributeSetDAO dao = Context.get(AttributeSetDAO.class);
 		dao.delete(setId);
 	}
 
 	@Override
-	public boolean isTemplateReadable(String sid, long templateId)
+	public boolean isReadable(String sid, long templateId)
 			throws AuthenticationException, WebserviceException, PersistenceException {
 		User user = validateSession(sid);
-		TemplateDAO dao = (TemplateDAO) Context.get().getBean(TemplateDAO.class);
+		TemplateDAO dao = Context.get(TemplateDAO.class);
 		return dao.isReadEnable(templateId, user.getId());
 	}
 
 	@Override
-	public boolean isTemplateWritable(String sid, long templateId)
+	public boolean isWritable(String sid, long templateId)
 			throws AuthenticationException, WebserviceException, PersistenceException {
 		User user = validateSession(sid);
-		TemplateDAO dao = (TemplateDAO) Context.get().getBean(TemplateDAO.class);
+		TemplateDAO dao = Context.get(TemplateDAO.class);
 		return dao.isWriteEnable(templateId, user.getId());
 	}
 
 	@Override
-	public void grantUserToTemplate(String sid, long templateId, long userId, int permissions)
-			throws PersistenceException, AuthenticationException, WebserviceException, PermissionException {
-		UserDAO userDao = (UserDAO) Context.get().getBean(UserDAO.class);
-		User user = userDao.findById(userId);
-		grantGroupToTemplate(sid, templateId, user.getUserGroup().getId(), permissions);
+	public void setAccessControlList(String sid, long templateId, List<WSAccessControlEntry> acl)
+			throws PersistenceException, PermissionException, AuthenticationException, WebserviceException {
+		User sessionUser = validateSession(sid);
+
+		TemplateDAO templateDAO = Context.get(TemplateDAO.class);
+		// Check if the session user has the Write Permission of this template
+		if (!templateDAO.isWriteEnable(templateId, sessionUser.getId()))
+			throw new PermissionException(sessionUser.getUsername(), "Template " + templateId, Permission.WRITE);
+
+		Template template = templateDAO.findById(templateId);
+		templateDAO.initialize(template);
+		template.getAccessControlList().clear();
+		for (WSAccessControlEntry wsAcwe : acl)
+			template.addAccessControlEntry(WSUtil.toAccessControlEntry(wsAcwe));
+		templateDAO.store(template);
+
 	}
 
 	@Override
-	public void grantGroupToTemplate(String sid, long templateId, long groupId, int permissions)
-			throws AuthenticationException, WebserviceException, PersistenceException, PermissionException {
-		User user = validateSession(sid);
-		if (!isTemplateWritable(sid, templateId))
-			throw new PermissionException(user.getUsername(), TEMPLATE + templateId, "write");
-
-		TemplateDAO dao = (TemplateDAO) Context.get().getBean(TemplateDAO.class);
-		Template templ = dao.findById(templateId);
-		if (templ == null || templ.getReadonly() == 1)
-			return;
-
-		TemplateGroup fg = new TemplateGroup();
-		fg.setGroupId(groupId);
-		fg.setPermissions(permissions);
-		templ.addTemplateGroup(fg);
-
-		dao.store(templ);
-	}
-
-	private WSRight[] getGranted(String sid, long templateId, boolean users)
+	public List<WSAccessControlEntry> getAccessControlList(String sid, long templateId)
 			throws AuthenticationException, WebserviceException, PersistenceException {
 		validateSession(sid);
 
-		List<WSRight> rightsList = new ArrayList<>();
-		TemplateDAO templateDao = (TemplateDAO) Context.get().getBean(TemplateDAO.class);
-		GroupDAO groupDao = (GroupDAO) Context.get().getBean(GroupDAO.class);
+		List<WSAccessControlEntry> acl = new ArrayList<>();
+		TemplateDAO templateDao = Context.get(TemplateDAO.class);
 
 		Template template = templateDao.findById(templateId);
 		templateDao.initialize(template);
-		for (TemplateGroup tg : template.getTemplateGroups()) {
-			Group group = groupDao.findById(tg.getGroupId());
-			if (group.getName().startsWith("_user_") && users) {
-				rightsList.add(
-						new WSRight(Long.parseLong(group.getName().substring(group.getName().lastIndexOf('_') + 1)),
-								tg.getPermissions()));
-			} else if (!group.getName().startsWith("_user_") && !users)
-				rightsList.add(new WSRight(group.getId(), tg.getPermissions()));
-		}
 
-		return rightsList.toArray(new WSRight[rightsList.size()]);
+		for (AccessControlEntry ace : template.getAccessControlList())
+			acl.add(WSUtil.toWSAccessControlEntry(ace));
+
+		return acl;
 	}
 
 	@Override
-	public WSRight[] getGrantedUsers(String sid, long templateId)
-			throws AuthenticationException, WebserviceException, PersistenceException, PermissionException {
-		User user = validateSession(sid);
-		if (!isTemplateReadable(sid, templateId))
-			throw new PermissionException(user.getUsername(), TEMPLATE + templateId, "read");
-
-		return getGranted(sid, templateId, true);
-	}
-
-	@Override
-	public WSRight[] getGrantedGroups(String sid, long templateId)
-			throws AuthenticationException, WebserviceException, PersistenceException, PermissionException {
-		User user = validateSession(sid);
-		if (!isTemplateReadable(sid, templateId))
-			throw new PermissionException(user.getUsername(), TEMPLATE + templateId, "read");
-
-		return getGranted(sid, templateId, false);
-	}
-
-	@Override
-	public void addAttributeOption(String sid, long setId, String attribute, WSAttributeOption wsoption) throws AuthenticationException, WebserviceException, PersistenceException {
+	public void addAttributeOption(String sid, long setId, String attribute, WSAttributeOption wsoption)
+			throws AuthenticationException, WebserviceException, PersistenceException {
 
 		validateSession(sid);
-	
+
 		if (wsoption == null)
 			return;
 
-		AttributeOptionDAO dao = (AttributeOptionDAO) Context.get().getBean(AttributeOptionDAO.class);
-		
+		AttributeOptionDAO dao = Context.get(AttributeOptionDAO.class);
+
 		AttributeOption option = new AttributeOption(setId, attribute, wsoption.getValue(), wsoption.getCategory());
 		dao.store(option);
 	}
-	
+
 }

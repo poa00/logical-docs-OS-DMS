@@ -1,5 +1,7 @@
 package com.logicaldoc.webservice.rest.endpoint;
 
+import java.util.List;
+
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
@@ -15,6 +17,7 @@ import org.slf4j.LoggerFactory;
 import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.security.authentication.AuthenticationException;
 import com.logicaldoc.core.security.authorization.PermissionException;
+import com.logicaldoc.core.security.authorization.UnexistingResourceException;
 import com.logicaldoc.webservice.WebserviceException;
 import com.logicaldoc.webservice.model.WSBookmark;
 import com.logicaldoc.webservice.rest.BookmarkService;
@@ -31,16 +34,16 @@ public class RestBookmarkService extends SoapBookmarkService implements Bookmark
 
 	@POST
 	@Path("/saveBookmark")
-	public WSBookmark saveBookmark(WSBookmark bookmark) throws AuthenticationException, PermissionException, WebserviceException, PersistenceException {
-		String sid = validateSession();
+	public WSBookmark saveBookmark(WSBookmark bookmark) throws AuthenticationException, PermissionException, WebserviceException, PersistenceException, UnexistingResourceException {
+		String sid = validateSessionREST();
 		return super.saveBookmark(sid, bookmark);
 	}
 
 	@GET
 	@Path("/bookmarkDocument")
 	public WSBookmark bookmarkDocument(@QueryParam("docId")
-	long docId) throws AuthenticationException, PermissionException, WebserviceException, PersistenceException {
-		String sid = validateSession();
+	long docId) throws AuthenticationException, PermissionException, WebserviceException, PersistenceException, UnexistingResourceException {
+		String sid = validateSessionREST();
 		return super.bookmarkDocument(sid, docId);
 	}
 
@@ -48,14 +51,14 @@ public class RestBookmarkService extends SoapBookmarkService implements Bookmark
 	@Path("/bookmarkFolder")
 	public WSBookmark bookmarkFolder(@QueryParam("folderId")
 	long folderId) throws AuthenticationException, PermissionException, WebserviceException, PersistenceException {
-		String sid = validateSession();
+		String sid = validateSessionREST();
 		return super.bookmarkFolder(sid, folderId);
 	}
 
 	@GET
 	@Path("/getBookmarks")
-	public WSBookmark[] getBookmarks() throws AuthenticationException, WebserviceException, PersistenceException {
-		String sid = validateSession();
+	public List<WSBookmark> getBookmarks() throws AuthenticationException, WebserviceException, PersistenceException {
+		String sid = validateSessionREST();
 		return super.getBookmarks(sid);
 	}
 
@@ -63,7 +66,7 @@ public class RestBookmarkService extends SoapBookmarkService implements Bookmark
 	@Path("/deleteBookmark")
 	public void deleteBookmark(@QueryParam("bookmarkId")
 	long bookmarkId) throws AuthenticationException, WebserviceException, PersistenceException {
-		String sid = validateSession();
+		String sid = validateSessionREST();
 		super.deleteBookmark(sid, bookmarkId);
 	}
 
@@ -71,7 +74,7 @@ public class RestBookmarkService extends SoapBookmarkService implements Bookmark
 	@Path("/unbookmarkDocument")
 	public void unbookmarkDocument(@QueryParam("docId")
 	long docId) throws AuthenticationException, WebserviceException, PersistenceException {
-		String sid = validateSession();
+		String sid = validateSessionREST();
 		super.unbookmarkDocument(sid, docId);
 	}
 
@@ -79,7 +82,7 @@ public class RestBookmarkService extends SoapBookmarkService implements Bookmark
 	@Path("/unbookmarkFolder")
 	public void unbookmarkFolder(@QueryParam("folderId")
 	long folderId) throws AuthenticationException, WebserviceException, PersistenceException {
-		String sid = validateSession();
+		String sid = validateSessionREST();
 		super.unbookmarkFolder(sid, folderId);
 	}
 }

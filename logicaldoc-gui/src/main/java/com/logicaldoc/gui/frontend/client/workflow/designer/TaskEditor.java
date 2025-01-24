@@ -2,18 +2,17 @@ package com.logicaldoc.gui.frontend.client.workflow.designer;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.List;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIMessageTemplate;
 import com.logicaldoc.gui.common.client.beans.GUIValue;
 import com.logicaldoc.gui.common.client.beans.GUIWFState;
+import com.logicaldoc.gui.common.client.grid.RefreshableListGrid;
+import com.logicaldoc.gui.common.client.grid.UserListGridField;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
-import com.logicaldoc.gui.common.client.widgets.grid.RefreshableListGrid;
-import com.logicaldoc.gui.common.client.widgets.grid.UserListGridField;
 import com.logicaldoc.gui.frontend.client.services.MessageService;
 import com.smartgwt.client.data.AdvancedCriteria;
 import com.smartgwt.client.types.HeaderControls;
@@ -30,12 +29,11 @@ import com.smartgwt.client.widgets.form.DynamicForm;
 import com.smartgwt.client.widgets.form.ValuesManager;
 import com.smartgwt.client.widgets.form.fields.ColorPickerItem;
 import com.smartgwt.client.widgets.form.fields.FormItemIcon;
-import com.smartgwt.client.widgets.form.fields.RadioGroupItem;
 import com.smartgwt.client.widgets.form.fields.SelectItem;
 import com.smartgwt.client.widgets.form.fields.SpinnerItem;
 import com.smartgwt.client.widgets.form.fields.TextAreaItem;
 import com.smartgwt.client.widgets.form.fields.TextItem;
-import com.smartgwt.client.widgets.form.fields.events.ChangedEvent;
+import com.smartgwt.client.widgets.form.fields.ToggleItem;
 import com.smartgwt.client.widgets.form.fields.events.FormItemIconClickEvent;
 import com.smartgwt.client.widgets.grid.ListGrid;
 import com.smartgwt.client.widgets.grid.ListGridField;
@@ -57,6 +55,8 @@ import com.smartgwt.client.widgets.tab.TabSet;
  */
 public class TaskEditor extends Window {
 
+	private static final String GROUP_PREFIX = "#group.";
+
 	private static final String AVATAR = "avatar";
 
 	private static final String LABEL = "label";
@@ -65,25 +65,25 @@ public class TaskEditor extends Window {
 
 	private GUIWFState state;
 
-	private ListGrid participantsGrid;
+	private ListGrid candidatesGrid;
 
 	private StateWidget widget;
 
 	public TaskEditor(StateWidget widget) {
-		this.state = widget.getWfState();
+		this.state = widget.getWFState();
 		this.widget = widget;
 
 		HeaderControl closeIcon = new HeaderControl(HeaderControl.CLOSE, event -> destroy());
 
 		setHeaderControls(HeaderControls.HEADER_LABEL, closeIcon);
 		setTitle(I18N.message("editworkflowstate",
-				state.getType() == GUIWFState.TYPE_TASK ? I18N.message("task") : I18N.message("endstate")));
+				state.getType() == GUIWFState.TYPE_TASK ? I18N.message("task") : I18N.message("endstate")) + " - "
+				+ state.getName());
 		setCanDragResize(true);
 		setIsModal(true);
 		setShowModalMask(true);
 		setMargin(3);
-		setWidth(600);
-		setHeight(600);
+		setWidth(650);
 		centerInPage();
 
 		Tab propertiesTab = new Tab(I18N.message("properties"));
@@ -92,12 +92,25 @@ public class TaskEditor extends Window {
 		Tab automationTab = new Tab(I18N.message("automation"));
 		automationTab.setPane(prepareAutomationPanel());
 
+		Tab duedateTab = new Tab(I18N.message("duedate"));
+		duedateTab.setPane(prepareDueDatePanel());
+
+		Tab validationTab = new Tab(I18N.message("validation"));
+		validationTab.setPane(prepareValidationPanel());
+
 		Tab messagesTab = new Tab(I18N.message("messages"));
 		messagesTab.setPane(prepareMessagesPanel());
 
 		TabSet tabSet = new TabSet();
 		tabSet.setWidth100();
-		tabSet.setTabs(propertiesTab, automationTab, messagesTab);
+
+		if (state.getType() == GUIWFState.TYPE_TASK) {
+			tabSet.setTabs(propertiesTab, duedateTab, validationTab, automationTab, messagesTab);
+			setHeight(600);
+		} else {
+			tabSet.setTabs(propertiesTab, automationTab, messagesTab);
+			setHeight(550);
+		}
 		addItem(tabSet);
 
 		Button save = new Button(I18N.message("save"));
@@ -149,38 +162,31 @@ public class TaskEditor extends Window {
 
 		messagesPanel.addMember(messagesForm);
 
-		MessageService.Instance.get().loadTemplates(I18N.getLocale(), "user",
-				new AsyncCallback<GUIMessageTemplate[]>() {
+		MessageService.Instance.get().loadTemplates(I18N.getLocale(), "user", new DefaultAsyncCallback<>() {
+			@Override
+			public void onSuccess(List<GUIMessageTemplate> templates) {
+				LinkedHashMap<String, String> map = new LinkedHashMap<>();
+				map.put("", "");
+				for (GUIMessageTemplate t : templates)
+					map.put("" + t.getName(), t.getName());
 
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
+				creationMessageTemplate.setValueMap(map);
+				creationMessageTemplate.setValue("");
+				creationMessageTemplate.setValue(state.getCreationMessageTemplate());
 
-					@Override
-					public void onSuccess(GUIMessageTemplate[] templates) {
-						LinkedHashMap<String, String> map = new LinkedHashMap<>();
-						map.put("", "");
-						for (GUIMessageTemplate t : templates)
-							map.put("" + t.getName(), t.getName());
+				completionMessageTemplate.setValueMap(map);
+				completionMessageTemplate.setValue("");
+				completionMessageTemplate.setValue(state.getCompletionMessageTemplate());
 
-						creationMessageTemplate.setValueMap(map);
-						creationMessageTemplate.setValue("");
-						creationMessageTemplate.setValue(state.getCreationMessageTemplate());
+				assignmentMessageTemplate.setValueMap(map);
+				assignmentMessageTemplate.setValue("");
+				assignmentMessageTemplate.setValue(state.getAssignmentMessageTemplate());
 
-						completionMessageTemplate.setValueMap(map);
-						completionMessageTemplate.setValue("");
-						completionMessageTemplate.setValue(state.getCompletionMessageTemplate());
-
-						assignmentMessageTemplate.setValueMap(map);
-						assignmentMessageTemplate.setValue("");
-						assignmentMessageTemplate.setValue(state.getAssignmentMessageTemplate());
-
-						reminderMessageTemplate.setValueMap(map);
-						reminderMessageTemplate.setValue("");
-						reminderMessageTemplate.setValue(state.getReminderMessageTemplate());
-					}
-				});
+				reminderMessageTemplate.setValueMap(map);
+				reminderMessageTemplate.setValue("");
+				reminderMessageTemplate.setValue(state.getReminderMessageTemplate());
+			}
+		});
 
 		return messagesPanel;
 	}
@@ -199,25 +205,25 @@ public class TaskEditor extends Window {
 				state.getType() == GUIWFState.TYPE_TASK ? "execscriptontaskreached" : "execscriptonenstatusreached",
 				state.getOnCreation(), null, false);
 		onCreation.setWidth("*");
-		onCreation.setHeight(125);
+		onCreation.setHeight(130);
 		onCreation.setWrapTitle(false);
 
 		TextAreaItem onAssignment = ItemFactory.newTextAreaItemForAutomation("onAssignment",
 				"execscriptontaskassignment", state.getOnAssignment(), null, false);
 		onAssignment.setWidth("*");
-		onAssignment.setHeight(125);
+		onAssignment.setHeight(130);
 		onAssignment.setWrapTitle(false);
 
 		TextAreaItem onCompletion = ItemFactory.newTextAreaItemForAutomation("onCompletion",
 				"execscriptontaskcompletion", state.getOnCompletion(), null, false);
 		onCompletion.setWidth("*");
-		onCompletion.setHeight(125);
+		onCompletion.setHeight(130);
 		onCompletion.setWrapTitle(false);
 
 		if (state.getType() == GUIWFState.TYPE_TASK)
 			automationForm.setItems(onCreation, onAssignment, onCompletion);
 		else {
-			onCreation.setHeight(400);
+			onCreation.setHeight(390);
 			automationForm.setItems(onCreation);
 		}
 
@@ -226,11 +232,83 @@ public class TaskEditor extends Window {
 		return automationPanel;
 	}
 
-	// Checks if the tast requires human interaction
+	private VLayout prepareValidationPanel() {
+		VLayout validationPanel = new VLayout();
+		validationPanel.setWidth100();
+		validationPanel.setHeight100();
+
+		DynamicForm validationForm = new DynamicForm();
+		validationForm.setTitleOrientation(TitleOrientation.TOP);
+		validationForm.setNumCols(1);
+		validationForm.setValuesManager(vm);
+
+		TextAreaItem validation = ItemFactory.newTextAreaItemForAutomation("onValidation", "wftaskvalidationscript",
+				state.getOnValidation(), null, false);
+		validation.setWidth("*");
+		validation.setHeight(400);
+		validation.setWrapTitle(true);
+
+		validationForm.setItems(validation);
+
+		validationPanel.addMember(validationForm);
+
+		return validationPanel;
+	}
+
+	private VLayout prepareDueDatePanel() {
+		VLayout escalationPanel = new VLayout();
+		escalationPanel.setWidth100();
+		escalationPanel.setHeight100();
+
+		SpinnerItem duedateTimeItem = ItemFactory.newSpinnerItem("duedateNumber", "duedate",
+				this.state.getDueDateNumber());
+		duedateTimeItem.setWrapTitle(false);
+		duedateTimeItem.setDefaultValue(0);
+
+		SelectItem duedateTime = ItemFactory.newDueTimeSelector("duedateTime", "");
+		duedateTime.setWrapTitle(false);
+		duedateTime.setValue(this.state.getDueDateUnit());
+		duedateTime.setEndRow(true);
+
+		SpinnerItem remindTimeItem = ItemFactory.newSpinnerItem("remindtimeNumber", "remindtime",
+				this.state.getReminderNumber());
+		remindTimeItem.setDefaultValue(0);
+		remindTimeItem.setWrapTitle(false);
+
+		SelectItem remindTime = ItemFactory.newDueTimeSelector("remindTime", "");
+		remindTime.setWrapTitle(false);
+		remindTime.setValue(this.state.getReminderUnit());
+		remindTime.setEndRow(true);
+		if (Session.get().isDemo()) {
+			// In demo mode disable the remind setting because of this may
+			// send massive emails
+			remindTimeItem.setDisabled(true);
+			remindTime.setDisabled(true);
+		}
+
+		TextAreaItem onOverdue = ItemFactory.newTextAreaItemForAutomation("onOverdue", "execscriptontaskoverdue",
+				state.getOnOverdue(), null, false);
+		onOverdue.setWidth("*");
+		onOverdue.setHeight(400);
+		onOverdue.setColSpan(6);
+		onOverdue.setWrapTitle(false);
+		onOverdue.setTitleOrientation(TitleOrientation.TOP);
+		onOverdue.setDisabled(Session.get().isDemo());
+
+		DynamicForm escalationForm = new DynamicForm();
+		escalationForm.setTitleOrientation(TitleOrientation.LEFT);
+		escalationForm.setNumCols(6);
+		escalationForm.setValuesManager(vm);
+		escalationForm.setFields(duedateTimeItem, duedateTime, remindTimeItem, remindTime, onOverdue);
+
+		escalationPanel.setMembers(escalationForm);
+		return escalationPanel;
+	}
+
+	// Checks if the task requires human interaction
 	private boolean isHumanInteraction() {
 		try {
-			GUIValue[] parts = this.state.getParticipants();
-			return !(parts != null && parts.length == 1 && parts[0].getCode().equals("_workflow"));
+			return !(state.getCandidates().size() == 1 && state.getCandidates().get(0).getCode().equals("_workflow"));
 		} catch (Exception t) {
 			return true;
 		}
@@ -261,31 +339,32 @@ public class TaskEditor extends Window {
 		propertiesPanel.setHeight100();
 		propertiesPanel.addMember(taskForm);
 
-		// The vertical panel that contains the participants
-		VLayout participantsPanel = new VLayout();
-		propertiesPanel.addMember(participantsPanel);
+		// The vertical panel that contains the candidates
+		VLayout candidatesPanel = new VLayout();
+		propertiesPanel.addMember(candidatesPanel);
 
-		// Horizontal panel that contains the forms related to the participants
+		// Horizontal panel that contains the forms related to the candiadtes
 		HLayout formsPanel = new HLayout();
 		formsPanel.setMembersMargin(5);
 		formsPanel.setHeight(70);
 
-		RadioGroupItem humanInteraction = ItemFactory.newBooleanSelector("humanInteraction", "humaninteraction");
-		humanInteraction.setDefaultValue(isHumanInteraction ? "yes" : "no");
-		humanInteraction.setValue(isHumanInteraction);
-		humanInteraction.addChangedHandler((ChangedEvent event) -> {
-			if ("yes".equals(event.getValue())) {
-				participantsPanel.show();
+		ToggleItem humanInteraction = ItemFactory.newToggleItem("humanInteraction", "humaninteraction",
+				isHumanInteraction);
+		humanInteraction.setDefaultValue(true);
+		humanInteraction.addChangedHandler(changed -> {
+			if (Boolean.TRUE.equals(changed.getValue())) {
+				candidatesPanel.show();
 			} else
-				participantsPanel.hide();
+				candidatesPanel.hide();
 		});
 
 		if (state.getType() == GUIWFState.TYPE_TASK) {
 			taskForm.setNumCols(3);
+			taskDescr.setColSpan(3);
 			taskForm.setFields(taskName, taskColor, humanInteraction, taskDescr);
 		} else
 			taskForm.setFields(taskName, taskColor, taskDescr);
-		participantsPanel.addMembers(formsPanel);
+		candidatesPanel.addMembers(formsPanel);
 
 		addTaskItems(formsPanel);
 
@@ -293,7 +372,7 @@ public class TaskEditor extends Window {
 		spacer.setHeight(2);
 		spacer.setMargin(2);
 		spacer.setOverflow(Overflow.HIDDEN);
-		participantsPanel.addMember(spacer);
+		candidatesPanel.addMember(spacer);
 
 		VLayout addUsersAndGroupsPanel = new VLayout();
 		addUsersAndGroupsPanel.setMargin(3);
@@ -307,65 +386,65 @@ public class TaskEditor extends Window {
 		name.setHidden(true);
 
 		UserListGridField avatar = new UserListGridField();
-		participantsGrid = new RefreshableListGrid();
-		participantsGrid.setEmptyMessage(I18N.message("notitemstoshow"));
-		participantsGrid.setCanFreezeFields(true);
-		participantsGrid.setAutoFetchData(true);
-		participantsGrid.setSelectionType(SelectionStyle.MULTIPLE);
-		participantsGrid.setFilterOnKeypress(true);
-		participantsGrid.setShowFilterEditor(false);
-		participantsGrid.setShowHeader(false);
-		participantsGrid.setFields(name, avatar, label);
-		participantsGrid.addCellContextClickHandler(click -> {
+		candidatesGrid = new RefreshableListGrid();
+		candidatesGrid.setEmptyMessage(I18N.message("notitemstoshow"));
+		candidatesGrid.setCanFreezeFields(true);
+		candidatesGrid.setAutoFetchData(true);
+		candidatesGrid.setSelectionType(SelectionStyle.MULTIPLE);
+		candidatesGrid.setFilterOnKeypress(true);
+		candidatesGrid.setShowFilterEditor(false);
+		candidatesGrid.setShowHeader(false);
+		candidatesGrid.setFields(name, avatar, label);
+		candidatesGrid.addCellContextClickHandler(click -> {
 			Menu contextMenu = new Menu();
 			MenuItem delete = new MenuItem();
 			delete.setTitle(I18N.message("ddelete"));
-			delete.addClickHandler(itemClick -> participantsGrid.removeSelectedData());
+			delete.addClickHandler(itemClick -> candidatesGrid.removeSelectedData());
 
 			contextMenu.setItems(delete);
 			contextMenu.showContextMenu();
 			click.cancel();
 		});
 
-		SectionStackSection participantsSection = new SectionStackSection(I18N.message("participants"));
-		participantsSection.setCanCollapse(false);
-		participantsSection.setExpanded(true);
-		participantsSection.setItems(participantsGrid);
-		SectionStack participantsStack = new SectionStack();
-		participantsStack.setWidth100();
-		participantsStack.setHeight(220);
-		participantsStack.setSections(participantsSection);
+		SectionStackSection candidatesSection = new SectionStackSection(I18N.message("candidates"));
+		candidatesSection.setCanCollapse(false);
+		candidatesSection.setExpanded(true);
+		candidatesSection.setItems(candidatesGrid);
+		SectionStack candidatesStack = new SectionStack();
+		candidatesStack.setWidth100();
+		candidatesStack.setHeight(220);
+		candidatesStack.setSections(candidatesSection);
 
-		addUsersAndGroupsPanel.addMember(participantsStack);
-		addUsersAndGroupsPanel.addMember(prepareAddParticipantsForm());
-		participantsPanel.addMember(addUsersAndGroupsPanel);
+		addUsersAndGroupsPanel.addMember(candidatesStack);
+		addUsersAndGroupsPanel.addMember(prepareAddCandidatesForm());
+		candidatesPanel.addMember(addUsersAndGroupsPanel);
 
-		initParticipantsList();
+		initCandidatesList();
 
 		if (isHumanInteraction)
-			participantsPanel.show();
+			candidatesPanel.show();
 		else
-			participantsPanel.hide();
+			candidatesPanel.hide();
 
 		return propertiesPanel;
 	}
 
-	private DynamicForm prepareAddParticipantsForm() {
+	private DynamicForm prepareAddCandidatesForm() {
 		// Prepare the combo and button for adding a new user
-		DynamicForm participantsEditForm = new DynamicForm();
-		participantsEditForm.setTitleOrientation(TitleOrientation.LEFT);
-		participantsEditForm.setNumCols(6);
-		participantsEditForm.setWidth(1);
+		DynamicForm candidatesEditForm = new DynamicForm();
+		candidatesEditForm.setTitleOrientation(TitleOrientation.LEFT);
+		candidatesEditForm.setNumCols(6);
+		candidatesEditForm.setWidth(1);
 
 		SelectItem addUser = prepareAddUserSelector();
 
 		SelectItem addGroup = prepareAddGroupSelector();
 
-		// Prepare dynamic user participant
+		// Prepare dynamic user candidate
 		final TextItem addAttribute = prepareAddAttributeItem();
 
-		participantsEditForm.setItems(addUser, addGroup, addAttribute);
-		return participantsEditForm;
+		candidatesEditForm.setItems(addUser, addGroup, addAttribute);
+		return candidatesEditForm;
 	}
 
 	private TextItem prepareAddAttributeItem() {
@@ -380,11 +459,11 @@ public class TaskEditor extends Window {
 				return;
 
 			// Check if the digited attribute user is already present in the
-			// participants list
-			if (participantsGrid.find(new AdvancedCriteria("name", OperatorId.EQUALS, "att." + val)) != null)
+			// candidates list
+			if (candidatesGrid.find(new AdvancedCriteria("name", OperatorId.EQUALS, "att." + val)) != null)
 				return;
 			else
-				addParticipant("att." + val, val);
+				addCandidates("att." + val, val);
 			addAttribute.clearValue();
 		});
 		addAttribute.setIcons(addIcon);
@@ -402,12 +481,13 @@ public class TaskEditor extends Window {
 					return;
 
 				// Check if the selected user is already present in the
-				// participants list
-				if (participantsGrid.find(new AdvancedCriteria("name", OperatorId.EQUALS,
-						"g." + selectedRecord.getAttribute("name"))) != null)
+				// candidates list
+				if (candidatesGrid.find(new AdvancedCriteria("name", OperatorId.EQUALS,
+						GROUP_PREFIX + selectedRecord.getAttribute("name"))) != null)
 					return;
 				else
-					addParticipant("g." + selectedRecord.getAttribute("name"), selectedRecord.getAttribute("name"));
+					addCandidates(GROUP_PREFIX + selectedRecord.getAttribute("name"),
+							selectedRecord.getAttribute("name"));
 				addGroup.clearValue();
 			}
 		});
@@ -426,11 +506,11 @@ public class TaskEditor extends Window {
 
 				// Check if the selected user is already present in the
 				// rights table
-				if (participantsGrid.find(new AdvancedCriteria("name", OperatorId.EQUALS,
+				if (candidatesGrid.find(new AdvancedCriteria("name", OperatorId.EQUALS,
 						selectedRecord.getAttribute("username"))) != null)
 					return;
 				else
-					addParticipant(selectedRecord.getAttribute("username"), selectedRecord.getAttribute(LABEL));
+					addCandidates(selectedRecord.getAttribute("username"), selectedRecord.getAttribute(LABEL));
 				addUser.clearValue();
 			}
 		});
@@ -439,42 +519,9 @@ public class TaskEditor extends Window {
 
 	private void addTaskItems(HLayout formsPanel) {
 		if (state.getType() == GUIWFState.TYPE_TASK) {
-			SpinnerItem duedateTimeItem = ItemFactory.newSpinnerItem("duedateNumber", "duedate",
-					this.state.getDueDateNumber());
-			duedateTimeItem.setWrapTitle(false);
-			duedateTimeItem.setDefaultValue(0);
-
-			SelectItem duedateTime = ItemFactory.newDueTimeSelector("duedateTime", "");
-			duedateTime.setWrapTitle(false);
-			duedateTime.setValue(this.state.getDueDateUnit());
-
-			SpinnerItem remindTimeItem = ItemFactory.newSpinnerItem("remindtimeNumber", "remindtime",
-					this.state.getReminderNumber());
-			remindTimeItem.setDefaultValue(0);
-			remindTimeItem.setWrapTitle(false);
-
-			SelectItem remindTime = ItemFactory.newDueTimeSelector("remindTime", "");
-			remindTime.setWrapTitle(false);
-			remindTime.setValue(this.state.getReminderUnit());
-			if (Session.get().isDemo()) {
-				// In demo mode disable the remind setting because of this may
-				// send massive emails
-				remindTimeItem.setDisabled(true);
-				remindTime.setDisabled(true);
-			}
-
-			DynamicForm escalationForm = new DynamicForm();
-			escalationForm.setGroupTitle(I18N.message("escalationmanagement"));
-			escalationForm.setIsGroup(true);
-			escalationForm.setTitleOrientation(TitleOrientation.LEFT);
-			escalationForm.setNumCols(4);
-			escalationForm.setColWidths("35", "35", "50", "130");
-			escalationForm.setValuesManager(vm);
-			escalationForm.setFields(duedateTimeItem, duedateTime, remindTimeItem, remindTime);
-
-			RadioGroupItem requiresNote = ItemFactory.newBooleanSelector("requiresNote", "requirenoteatcompletion");
+			ToggleItem requiresNote = ItemFactory.newToggleItem("requiresNote", "requirenoteatcompletion",
+					this.state.isRequiresNote());
 			requiresNote.setWrapTitle(false);
-			requiresNote.setDefaultValue(this.state.isRequiresNote() ? "yes" : "no");
 
 			SpinnerItem minNoteSize = ItemFactory.newSpinnerItem("minnotesize",
 					this.state.getMinNoteSize() != null && this.state.getMinNoteSize() > 0 ? this.state.getMinNoteSize()
@@ -494,37 +541,37 @@ public class TaskEditor extends Window {
 			mandatoryNoteForm.setValuesManager(vm);
 			mandatoryNoteForm.setFields(requiresNote, minNoteSize);
 
-			formsPanel.setMembers(escalationForm, mandatoryNoteForm);
+			formsPanel.setMembers(mandatoryNoteForm);
 		}
 	}
 
-	private void initParticipantsList() {
-		// Initialize the participants list
+	private void initCandidatesList() {
+		// Initialize the candidates list
 		try {
-			if (this.state.getParticipants() != null) {
+			if (this.state.getCandidates() != null) {
 				ArrayList<ListGridRecord> records = new ArrayList<>();
 
-				for (GUIValue part : this.state.getParticipants()) {
+				for (GUIValue part : this.state.getCandidates()) {
 					if (part.getCode() == null || part.getValue() == null)
 						continue;
 
-					ListGridRecord rec = createParticipantRecord(part.getCode(), part.getValue());
+					ListGridRecord rec = createCandidateRecord(part.getCode(), part.getValue());
 					records.add(rec);
 				}
 
 				if (!records.isEmpty())
-					participantsGrid.setRecords(records.toArray(new ListGridRecord[0]));
+					candidatesGrid.setRecords(records.toArray(new ListGridRecord[0]));
 			}
 		} catch (Exception t) {
 			// Nothing to do
 		}
 	}
 
-	private ListGridRecord createParticipantRecord(String name, String label) {
+	private ListGridRecord createCandidateRecord(String name, String label) {
 		ListGridRecord rec = new ListGridRecord();
 		rec.setAttribute("name", name);
 		rec.setAttribute(LABEL, label);
-		if (name.startsWith("g."))
+		if (name.startsWith(GROUP_PREFIX))
 			rec.setAttribute(AVATAR, "group");
 		else if (name.startsWith("att."))
 			rec.setAttribute(AVATAR, "attribute");
@@ -534,58 +581,67 @@ public class TaskEditor extends Window {
 	}
 
 	/**
-	 * Refresh the task's users participants list.
+	 * Refresh the task's users candidates list.
 	 */
-	private void addParticipant(String entityCode, String entityLabel) {
+	private void addCandidates(String entityCode, String entityLabel) {
 		if (entityCode != null && entityLabel != null)
-			participantsGrid.getDataAsRecordList().add(createParticipantRecord(entityCode, entityLabel));
+			candidatesGrid.getDataAsRecordList().add(createCandidateRecord(entityCode, entityLabel));
 	}
 
-	@SuppressWarnings("unchecked")
 	private void onSave() {
-		Map<String, Object> values = vm.getValues();
-		boolean humanInteraction = "yes".equals(values.get("humanInteraction"));
+		boolean humanInteraction = Boolean.parseBoolean(vm.getValueAsString("humanInteraction"));
 
 		if (Boolean.FALSE.equals(vm.validate()) && humanInteraction)
 			return;
 
-		// Remove the ' because of the WF engine would go in error saving into the DB
-		TaskEditor.this.state.setName(values.get("taskName").toString().trim().replace("'", ""));
-		TaskEditor.this.state.setDisplay((String) values.get("taskColor"));
-		TaskEditor.this.state.setDescription((String) values.get("taskDescr"));
-		TaskEditor.this.state.setOnCreation((String) values.get("onCreation"));
+		// Remove the ' because of the WF engine would go in error saving into
+		// the DB
+		TaskEditor.this.state.setName(vm.getValueAsString("taskName").trim().replace("'", ""));
+		TaskEditor.this.state.setDisplay(vm.getValueAsString("taskColor"));
+		TaskEditor.this.state.setDescription(vm.getValueAsString("taskDescr"));
+		TaskEditor.this.state.setOnCreation(vm.getValueAsString("onCreation"));
 		TaskEditor.this.widget.setContents("<b>" + state.getName() + "</b>");
 		TaskEditor.this.widget.getDrawingPanel().getDiagramController().update();
-		TaskEditor.this.state.setCreationMessageTemplate((String) values.get("creationMessageTemplate"));
+		TaskEditor.this.state.setCreationMessageTemplate(vm.getValueAsString("creationMessageTemplate"));
 
 		if (state.getType() == GUIWFState.TYPE_TASK) {
-			TaskEditor.this.state.setRequiresNote("yes".equals(values.get("requiresNote")));
-			TaskEditor.this.state.setMinNoteSize((Integer) values.get("minnotesize"));
-			TaskEditor.this.state.setDueDateNumber((Integer) values.get("duedateNumber"));
-			TaskEditor.this.state.setDueDateUnit((String) values.get("duedateTime"));
-			TaskEditor.this.state.setReminderNumber((Integer) values.get("remindtimeNumber"));
-			TaskEditor.this.state.setReminderUnit((String) values.get("remindTime"));
-			TaskEditor.this.state.setOnAssignment((String) values.get("onAssignment"));
-			TaskEditor.this.state.setOnCompletion((String) values.get("onCompletion"));
-			TaskEditor.this.state.setAssignmentMessageTemplate((String) values.get("assignmentMessageTemplate"));
-			TaskEditor.this.state.setReminderMessageTemplate((String) values.get("reminderMessageTemplate"));
-			TaskEditor.this.state.setCompletionMessageTemplate((String) values.get("completionMessageTemplate"));
+			TaskEditor.this.state.setRequiresNote(Boolean.valueOf(vm.getValueAsString("requiresNote")));
+			TaskEditor.this.state.setMinNoteSize((Integer) vm.getValue("minnotesize"));
+			TaskEditor.this.state.setDueDateNumber((Integer) vm.getValue("duedateNumber"));
+			TaskEditor.this.state.setDueDateUnit(vm.getValueAsString("duedateTime"));
+			TaskEditor.this.state.setReminderNumber((Integer) vm.getValue("remindtimeNumber"));
+			TaskEditor.this.state.setReminderUnit(vm.getValueAsString("remindTime"));
+			TaskEditor.this.state.setOnAssignment(vm.getValueAsString("onAssignment"));
+			TaskEditor.this.state.setOnCompletion(vm.getValueAsString("onCompletion"));
+			TaskEditor.this.state.setOnOverdue(vm.getValueAsString("onOverdue"));
+			TaskEditor.this.state.setOnValidation(vm.getValueAsString("onValidation"));
+			TaskEditor.this.state.setAssignmentMessageTemplate(vm.getValueAsString("assignmentMessageTemplate"));
+			TaskEditor.this.state.setReminderMessageTemplate(vm.getValueAsString("reminderMessageTemplate"));
+			TaskEditor.this.state.setCompletionMessageTemplate(vm.getValueAsString("completionMessageTemplate"));
 
 			if (!humanInteraction) {
-				participantsGrid.getRecordList().removeList(participantsGrid.getRecordList().toArray());
-				participantsGrid.getRecordList().add(createParticipantRecord("_workflow", "Workflow Engine"));
+				candidatesGrid.getRecordList().removeList(candidatesGrid.getRecordList().toArray());
+				candidatesGrid.getRecordList().add(createCandidateRecord("_workflow", "Workflow Engine"));
 			}
 		}
 
-		ArrayList<GUIValue> participants = new ArrayList<>();
-		for (ListGridRecord rec : participantsGrid.getRecords())
-			participants.add(new GUIValue(rec.getAttributeAsString("name"), rec.getAttributeAsString(LABEL)));
-		TaskEditor.this.state.setParticipants(participants.toArray(new GUIValue[0]));
+		ArrayList<GUIValue> candidates = new ArrayList<>();
+		for (ListGridRecord rec : candidatesGrid.getRecords())
+			candidates.add(new GUIValue(rec.getAttributeAsString("name"), rec.getAttributeAsString(LABEL)));
+		TaskEditor.this.state.setCandidates(candidates);
 
 		if (humanInteraction && state.getType() == GUIWFState.TYPE_TASK
-				&& (TaskEditor.this.state.getParticipants() == null
-						|| TaskEditor.this.state.getParticipants().length == 0)) {
-			SC.warn(I18N.message("workflowtaskparticipantatleast"));
-		}
+				&& TaskEditor.this.state.getCandidates().isEmpty())
+			SC.warn(I18N.message("workflowtaskcandidateatleast"));
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

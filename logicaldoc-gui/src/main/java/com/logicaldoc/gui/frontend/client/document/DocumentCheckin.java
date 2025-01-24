@@ -1,6 +1,8 @@
 package com.logicaldoc.gui.frontend.client.document;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import java.util.Arrays;
+
+import com.logicaldoc.gui.common.client.IgnoreAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIDocument;
 import com.logicaldoc.gui.common.client.i18n.I18N;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
@@ -29,7 +31,7 @@ public class DocumentCheckin extends Window {
 
 	private static final String MAJORVERSION = "majorversion";
 
-	private IButton sendButton;
+	private IButton submitButton;
 
 	private Upload uploader;
 
@@ -65,7 +67,7 @@ public class DocumentCheckin extends Window {
 		filenameItem.setWrapTitle(false);
 		filenameItem.addChangedHandler((ChangedEvent event) -> {
 			if (Boolean.FALSE.equals(filenameItem.getValueAsBoolean()))
-				sendButton.setDisabled(false);
+				submitButton.setDisabled(false);
 		});
 
 		TextItem commentItem = ItemFactory.newTextItem("comment", null);
@@ -75,37 +77,26 @@ public class DocumentCheckin extends Window {
 
 		form.setItems(versionItem, filenameItem, commentItem);
 
-		sendButton = new IButton(I18N.message("send"));
-		sendButton.addClickHandler((com.smartgwt.client.widgets.events.ClickEvent event) -> onSend());
-		sendButton.setDisabled(true);
+		submitButton = new IButton(I18N.message("submit"));
+		submitButton.addClickHandler((com.smartgwt.client.widgets.events.ClickEvent event) -> onSubmit());
+		submitButton.setDisabled(true);
 
 		VLayout layout = new VLayout();
 		layout.setMembersMargin(5);
 		layout.setWidth100();
 
 		layout.addMember(form);
-		uploader = new Upload(sendButton);
+		uploader = new Upload(submitButton);
 		layout.addMember(uploader);
-		layout.addMember(sendButton);
+		layout.addMember(submitButton);
 
 		addItem(layout);
 
 		// Just to clean the upload folder
-		DocumentService.Instance.get().cleanUploadedFileFolder(new AsyncCallback<Void>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				// Nothing to do
-			}
-
-			@Override
-			public void onSuccess(Void result) {
-				// Nothing to do
-			}
-		});
+		DocumentService.Instance.get().cleanUploadedFileFolder(new IgnoreAsyncCallback<>());
 	}
 
-	public void onSend() {
+	public void onSubmit() {
 		if (uploader.getUploadedFile() == null) {
 			SC.warn(I18N.message("filerequired"));
 			return;
@@ -114,15 +105,15 @@ public class DocumentCheckin extends Window {
 		if (Boolean.FALSE.equals(vm.validate()))
 			return;
 
-		if ("true".equals(vm.getValueAsString(CHECKFILENAME)) && !uploader.getUploadedFile().equals(fileName)) {
-			sendButton.setDisabled(true);
+		if (Boolean.parseBoolean(vm.getValueAsString(CHECKFILENAME)) && !uploader.getUploadedFile().equals(fileName)) {
+			submitButton.setDisabled(true);
 			SC.warn(I18N.message("nosamefilename"));
 			return;
 		}
 
 		document.setComment(vm.getValueAsString("comment"));
-		UpdateDialog bulk = new UpdateDialog(new Long[] { document.getId() }, document, UpdateDialog.CHECKIN,
-				"true".equals(vm.getValueAsString(MAJORVERSION)));
+		UpdateDialog bulk = new UpdateDialog(Arrays.asList(document.getId()), document, UpdateDialog.CHECKIN,
+				Boolean.valueOf(vm.getValueAsString(MAJORVERSION)));
 		bulk.show();
 		destroy();
 	}
@@ -132,6 +123,16 @@ public class DocumentCheckin extends Window {
 	}
 
 	public boolean getImportZip() {
-		return "true".equals(vm.getValueAsString("zip"));
+		return Boolean.valueOf(vm.getValueAsString("zip"));
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

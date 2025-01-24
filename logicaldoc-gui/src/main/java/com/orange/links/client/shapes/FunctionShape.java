@@ -47,10 +47,10 @@ public class FunctionShape extends AbstractShape {
 	}
 
 	public boolean isMouseNearSelectableArea(Point mousePoint) {
-		if (widget instanceof StateWidget) {
-			if (((StateWidget) widget).isReadonly())
+		if (widget instanceof StateWidget state) {
+			if (state.isReadonly())
 				return false;
-			if (((StateWidget) widget).getWfState().getType() == GUIWFState.TYPE_JOIN) {
+			if (state.getWFState().getType() == GUIWFState.TYPE_JOIN) {
 				// just one outcoming connection for a join node
 				for (Connection con : getConnections()) {
 					if (con.getStartShape().equals(this))
@@ -80,7 +80,7 @@ public class FunctionShape extends AbstractShape {
 	}
 
 	public Couple<Direction, Point> getSelectableArea(Point p) {
-		if (widget instanceof StateWidget && ((StateWidget) widget).isEnd())
+		if (widget instanceof StateWidget state && state.isEnd())
 			return null;
 
 		// Center of the selectable areas
@@ -112,5 +112,15 @@ public class FunctionShape extends AbstractShape {
 	@Override
 	public void draw() {
 		setSynchronized(true);
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

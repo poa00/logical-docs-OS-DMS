@@ -1,9 +1,12 @@
 package com.logicaldoc.webservice.rest.endpoint;
 
+import java.util.List;
+
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 
 import org.slf4j.Logger;
@@ -40,17 +43,26 @@ public class RestSystemService extends SoapSystemService implements SystemServic
 	@GET
 	@Path("/getStatistics")
 	@Operation(summary = "Get system statistics", description = "Retrieves the system statistics")
-	public WSParameter[] getStatistics() throws AuthenticationException, WebserviceException, PersistenceException {
-		String sid = validateSession();
+	public List<WSParameter> getStatistics() throws AuthenticationException, WebserviceException, PersistenceException {
+		String sid = validateSessionREST();
 		return super.getStatistics(sid);
+	}
+	
+	@Override
+	@GET
+	@Path("/getTenantStatistics")
+	@Operation(summary = "Get tenant statistics", description = "Retrieves the statistics of a tenant")
+	public List<WSParameter> getTenantStatistics(@QueryParam("tenantId") long tenantId) throws AuthenticationException, WebserviceException, PersistenceException {
+		String sid = validateSessionREST();
+		return super.getTenantStatistics(sid, tenantId);
 	}
 
 	@Override
 	@GET
 	@Path("/getLanguages")
 	@Operation(summary = "Get enabled languages", description = "Retrieves the languages enabled in the server")
-	public String[] getLanguages() {
-		String sid = validateSession();
+	public List<String> getLanguages() {
+		String sid = validateSessionREST();
 		return super.getLanguages(sid);
 	}
 }

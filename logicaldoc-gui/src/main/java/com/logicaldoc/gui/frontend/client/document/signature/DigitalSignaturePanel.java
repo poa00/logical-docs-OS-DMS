@@ -1,17 +1,18 @@
 package com.logicaldoc.gui.frontend.client.document.signature;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
-import com.logicaldoc.gui.common.client.Constants;
+import java.util.Arrays;
+
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
+import com.logicaldoc.gui.common.client.beans.GUIAccessControlEntry;
 import com.logicaldoc.gui.common.client.beans.GUIDocument;
 import com.logicaldoc.gui.common.client.data.DocumentHistoryDS;
+import com.logicaldoc.gui.common.client.grid.DateListGridField;
+import com.logicaldoc.gui.common.client.grid.UserListGridField;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.common.client.util.Util;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.UserListGridField;
 import com.logicaldoc.gui.frontend.client.document.DocumentDetailTab;
 import com.logicaldoc.gui.frontend.client.services.SignService;
 import com.smartgwt.client.types.TitleOrientation;
@@ -80,7 +81,7 @@ public class DigitalSignaturePanel extends DocumentDetailTab {
 		visualPositioning.setTitle(I18N.message("visualpositioning"));
 		visualPositioning.setDisabled(true);
 
-		String url = Util.contextPath() + "export-keystore?cert=true&tenantId=" + Session.get().getTenantId();
+		String url = Util.contextPath() + "export-keystore?cert=root&tenantId=" + Session.get().getTenantId();
 		StaticTextItem rootCert = ItemFactory.newStaticTextItem("rootcertificate",
 				"<a href='" + url + "' target='_blank'>" + I18N.message("downloadrootcert") + "</a>");
 		rootCert.setRequired(true);
@@ -103,16 +104,16 @@ public class DigitalSignaturePanel extends DocumentDetailTab {
 
 			if (Boolean.TRUE.equals(visualPositioning.getValueAsBoolean())) {
 				VisualPositioningDigitalSignatureDialog dialog = new VisualPositioningDigitalSignatureDialog(
-						new Long[] { document.getId() }, form.getValueAsString(REASON));
+						Arrays.asList(document.getId()), form.getValueAsString(REASON));
 				dialog.show();
 			} else {
 				LD.contactingServer();
-				SignService.Instance.get().signDocuments(new Long[] { document.getId() }, form.getValueAsString(REASON),
-						1, null, null, null, new AsyncCallback<Void>() {
+				SignService.Instance.get().signDocuments(Arrays.asList(document.getId()), form.getValueAsString(REASON),
+						1, null, null, null, new DefaultAsyncCallback<>() {
 							@Override
 							public void onFailure(Throwable caught) {
 								LD.clearPrompt();
-								GuiLog.serverError(caught);
+								super.onFailure(caught);
 							}
 
 							@Override
@@ -124,7 +125,7 @@ public class DigitalSignaturePanel extends DocumentDetailTab {
 			}
 		});
 
-		if (document.getFolder().hasPermission(Constants.PERMISSION_SIGN))
+		if (document.getFolder().hasPermission(GUIAccessControlEntry.PERMISSION_SIGN))
 			form.setItems(sign, reason, visualPositioning, rootCert);
 		else {
 			form.setItems(rootCert);
@@ -133,17 +134,22 @@ public class DigitalSignaturePanel extends DocumentDetailTab {
 		container.addMember(list);
 		container.addMember(form);
 
-		SignService.Instance.get().isVisualSignatureEnabled(new AsyncCallback<Boolean>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
+		SignService.Instance.get().isVisualSignatureEnabled(new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(Boolean enabled) {
 				visualPositioning.setDisabled(!enabled);
 			}
 		});
+	}
+	
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+	
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

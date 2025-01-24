@@ -6,7 +6,7 @@ import java.io.InputStream;
 import org.apache.commons.io.FileUtils;
 
 import com.logicaldoc.core.conversion.FormatConverterManager;
-import com.logicaldoc.core.store.Storer;
+import com.logicaldoc.core.store.Store;
 import com.logicaldoc.util.Context;
 import com.logicaldoc.util.io.FileUtil;
 
@@ -31,19 +31,18 @@ public class CatchAllParser extends AbstractParser {
 	 */
 	private void parse2(ParseParameters parameters, StringBuilder content) {
 		try {
-			FormatConverterManager manager = (FormatConverterManager) Context.get()
-					.getBean(FormatConverterManager.class);
+			FormatConverterManager manager = Context.get(FormatConverterManager.class);
 			manager.convertToPdf(parameters.getDocument(), parameters.getFileVersion(), null);
 
-			Storer storer = (Storer) Context.get().getBean(Storer.class);
-			String pdfResource = storer
+			Store store = Context.get(Store.class);
+			String pdfResource = store
 					.getResourceName(parameters.getDocument(),
 							parameters.getFileVersion() != null ? parameters.getFileVersion()
 									: parameters.getDocument().getFileVersion(),
 							FormatConverterManager.PDF_CONVERSION_SUFFIX);
-			if (storer.exists(parameters.getDocument().getId(), pdfResource)) {
+			if (store.exists(parameters.getDocument().getId(), pdfResource)) {
 				Parser parser = ParserFactory.getParser("pdf");
-				content.append(parser.parse(storer.getStream(parameters.getDocument().getId(), pdfResource),
+				content.append(parser.parse(store.getStream(parameters.getDocument().getId(), pdfResource),
 						new ParseParameters(null, "output.pdf", null, parameters.getEncoding(), parameters.getLocale(),
 								parameters.getTenant())));
 			} else
@@ -58,7 +57,7 @@ public class CatchAllParser extends AbstractParser {
 	 * Parses without document specification
 	 */
 	private void parse1(InputStream input, ParseParameters parameters, StringBuilder content) {
-		FormatConverterManager manager = (FormatConverterManager) Context.get().getBean(FormatConverterManager.class);
+		FormatConverterManager manager = Context.get(FormatConverterManager.class);
 		File inputFile = null;
 		File outputPdf = null;
 		try {
@@ -82,9 +81,9 @@ public class CatchAllParser extends AbstractParser {
 			log.error(t.getMessage(), t);
 		} finally {
 			if (inputFile != null && inputFile.exists())
-				FileUtil.strongDelete(inputFile);
+				FileUtil.delete(inputFile);
 			if (outputPdf != null && outputPdf.exists())
-				FileUtil.strongDelete(outputPdf);
+				FileUtil.delete(outputPdf);
 		}
 	}
 }

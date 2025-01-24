@@ -1,11 +1,14 @@
 package com.logicaldoc.gui.frontend.client.metadata.template;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import java.util.ArrayList;
+import java.util.List;
+
 import com.logicaldoc.gui.common.client.Feature;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIValue;
 import com.logicaldoc.gui.common.client.data.AttributeOptionsDS;
+import com.logicaldoc.gui.common.client.grid.IdListGridField;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.GridUtil;
 import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.frontend.client.services.AttributeSetService;
@@ -87,13 +90,7 @@ public class Options extends com.smartgwt.client.widgets.Window {
 		importCsv.setTitle(I18N.message("iimport"));
 		importCsv.setTooltip(I18N.message("importfromcsv"));
 		importCsv.addClickHandler(
-				event -> DocumentService.Instance.get().cleanUploadedFileFolder(new AsyncCallback<Void>() {
-
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				event -> DocumentService.Instance.get().cleanUploadedFileFolder(new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Void arg0) {
 						OptionsUploader uploader = new OptionsUploader(Options.this);
@@ -130,8 +127,7 @@ public class Options extends com.smartgwt.client.widgets.Window {
 	}
 
 	private void prepareGrid() {
-		ListGridField id = new ListGridField("id", 50);
-		id.setHidden(true);
+		ListGridField id = new IdListGridField();
 
 		ListGridField value = new ListGridField(VALUE, I18N.message(VALUE));
 		value.setWidth("*");
@@ -179,19 +175,12 @@ public class Options extends com.smartgwt.client.widgets.Window {
 	 */
 	private void onSave() {
 		Record[] records = list.getRecords();
-		GUIValue[] values = new GUIValue[records.length];
-		int i = 0;
+		List<GUIValue> values = new ArrayList<>();
 		for (Record rec : records)
-			values[i++] = new GUIValue(rec.getAttributeAsString(CATEGORY), rec.getAttributeAsString(VALUE));
+			values.add(new GUIValue(rec.getAttributeAsString(CATEGORY), rec.getAttributeAsString(VALUE)));
 
 		LD.contactingServer();
-		AttributeSetService.Instance.get().saveOptions(setId, attribute, values, new AsyncCallback<Void>() {
-			@Override
-			public void onFailure(Throwable caught) {
-				LD.clearPrompt();
-				GuiLog.serverError(caught);
-			}
-
+		AttributeSetService.Instance.get().saveOptions(setId, attribute, values, new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(Void arg0) {
 				LD.clearPrompt();
@@ -207,16 +196,11 @@ public class Options extends com.smartgwt.client.widgets.Window {
 		final ListGridRecord[] selection = list.getSelectedRecords();
 		if (selection == null || selection.length == 0)
 			return;
-		final String[] values = new String[selection.length];
+		List<String> values = new ArrayList<>();
 		for (int i = 0; i < selection.length; i++)
-			values[i] = selection[i].getAttributeAsString(VALUE);
+			values.add(selection[i].getAttributeAsString(VALUE));
 
-		AttributeSetService.Instance.get().deleteOptions(setId, attribute, values, new AsyncCallback<Void>() {
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
+		AttributeSetService.Instance.get().deleteOptions(setId, attribute, values, new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(Void arg0) {
 				list.removeSelectedData();
@@ -251,5 +235,15 @@ public class Options extends com.smartgwt.client.widgets.Window {
 
 	public long getSetId() {
 		return setId;
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

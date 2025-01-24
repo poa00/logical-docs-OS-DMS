@@ -12,23 +12,21 @@ import com.dropbox.core.DbxException;
 import com.dropbox.core.v2.files.FileMetadata;
 import com.dropbox.core.v2.files.FolderMetadata;
 import com.dropbox.core.v2.files.Metadata;
+import com.logicaldoc.core.PersistenceException;
+import com.logicaldoc.util.security.StringEncrypter.EncryptionException;
 
 public class DropBoxTestBench {
 
-	public static void main(String[] args) throws IOException, URISyntaxException, DbxException {
-		String accessToken = "****access_token****";
-
-		Dropbox client = new Dropbox();
-		boolean entered = client.login(accessToken);
+	public static void main(String[] args) throws IOException, DbxException, PersistenceException, EncryptionException {
+		Dropbox client = new Dropbox(1L);
+		boolean entered = client.login();
 		System.out.println("entered " + entered);
 		System.out.println(client.getAccountName());
 
-		if (!entered)
-			accessToken = authorization();
 
 		Metadata root = client.get("/");
-		System.out.println(""+root);
-		
+		System.out.println("" + root);
+
 		List<Metadata> entries = client.list("/");
 		for (Metadata entry : entries) {
 			if (entry instanceof FolderMetadata)
@@ -47,8 +45,8 @@ public class DropBoxTestBench {
 		client.uploadFile(file, "/test/" + file.getName());
 	}
 
-	public static String authorization() throws IOException, URISyntaxException {
-		Dropbox client = new Dropbox();
+	public static String authorization() throws IOException, URISyntaxException, PersistenceException, EncryptionException {
+		Dropbox client = new Dropbox(1L);
 
 		// This is for authorizing the LogicalDOC application just the first
 		// time

@@ -3,6 +3,7 @@ package com.logicaldoc.web.service;
 import java.io.File;
 import java.sql.Timestamp;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
@@ -28,10 +29,10 @@ import com.logicaldoc.core.metadata.validation.ValidationException;
 import com.logicaldoc.core.security.Permission;
 import com.logicaldoc.core.security.Session;
 import com.logicaldoc.core.security.Session.Log;
-import com.logicaldoc.core.security.User;
 import com.logicaldoc.core.security.authentication.InvalidSessionException;
 import com.logicaldoc.core.security.authorization.PermissionException;
-import com.logicaldoc.core.security.dao.UserDAO;
+import com.logicaldoc.core.security.user.User;
+import com.logicaldoc.core.security.user.UserDAO;
 import com.logicaldoc.core.threading.NotifyingThread;
 import com.logicaldoc.core.threading.ThreadPools;
 import com.logicaldoc.gui.common.client.AccessDeniedException;
@@ -42,6 +43,7 @@ import com.logicaldoc.gui.common.client.ServerValidationException;
 import com.logicaldoc.gui.common.client.beans.GUIAttribute;
 import com.logicaldoc.i18n.I18N;
 import com.logicaldoc.util.Context;
+import com.logicaldoc.util.time.JulianCalendarUtil;
 import com.logicaldoc.web.UploadServlet;
 import com.logicaldoc.web.util.LongRunningOperationCompleteListener;
 import com.logicaldoc.web.util.ServletUtil;
@@ -73,14 +75,26 @@ public abstract class AbstractRemoteService extends RemoteServiceServlet {
 	}
 
 	protected Map<String, File> getUploadedFiles(String sid) {
-		return UploadServlet.getReceivedFiles(sid);
+		return UploadServlet.getUploads(sid);
 	}
 
-	protected Session validateSession(HttpServletRequest request) throws InvalidSessionServerException {
+	public void setThreadRequest(HttpServletRequest request) {
+		synchronized (this) {
+			if (perThreadRequest == null)
+				perThreadRequest = new ThreadLocal<HttpServletRequest>();
+			perThreadRequest.set(request);
+		}
+	}
+
+	protected Session validateSession() throws InvalidSessionServerException {
+		return validateSession(getThreadLocalRequest());
+	}
+
+	private Session validateSession(HttpServletRequest request) throws InvalidSessionServerException {
 		try {
 			return ServletUtil.validateSession(request);
 		} catch (InvalidSessionException e) {
-			throw new InvalidSessionServerException(e.getMessage());
+			throw new InvalidSessionServerException(e.getMessage(), e);
 		}
 	}
 
@@ -149,10 +163,31 @@ public abstract class AbstractRemoteService extends RemoteServiceServlet {
 		}
 	}
 
-	protected void checkPermission(Permission permission, User user, long folderId) throws AccessDeniedException {
-		FolderDAO dao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+	/**
+	 * Check if a specific menu is accessible by the user in the current session
+	 * 
+	 * @param menuId identifier of the menus
+	 * 
+	 * @return the current session
+	 * 
+	 * @throws InvalidSessionServerException the session does not exist or is
+	 *         expired
+	 * @throws AccessDeniedException the user cannot access any menu
+	 */
+	protected Session checkMenu(long menuId) throws InvalidSessionServerException, AccessDeniedException {
 		try {
-			if (!dao.isPermissionEnabled(permission, folderId, user.getId())) {
+			return ServletUtil.checkMenu(getThreadLocalRequest(), menuId);
+		} catch (InvalidSessionException e) {
+			throw new InvalidSessionServerException(e.getMessage());
+		} catch (ServletException e) {
+			throw new AccessDeniedException(e.getMessage());
+		}
+	}
+
+	protected void checkPermission(Permission permission, User user, long folderId) throws AccessDeniedException {
+		FolderDAO dao = Context.get(FolderDAO.class);
+		try {
+			if (!dao.isPermissionAllowed(permission, folderId, user.getId())) {
 				String message = String.format("User %s doesn't have permission %s on folder %s", user.getUsername(),
 						permission.getName(), folderId);
 				throw new AccessDeniedException(message);
@@ -174,24 +209,31 @@ public abstract class AbstractRemoteService extends RemoteServiceServlet {
 	protected User getSessionUser(String sid) throws InvalidSessionServerException {
 		Session session = validateSession(sid);
 		User user = (User) session.getDictionary().get(USER);
-		UserDAO userDao = (UserDAO) Context.get().getBean(UserDAO.class);
-		userDao.initialize(user);
+		initUser(user);
 		return user;
+	}
+
+	private void initUser(User user) {
+		try {
+			UserDAO userDao = Context.get(UserDAO.class);
+			userDao.initialize(user);
+		} catch (PersistenceException e) {
+			log.warn(e.getMessage(), e);
+		}
 	}
 
 	protected User getSessionUser(HttpServletRequest request) throws InvalidSessionServerException {
 		Session session = validateSession(request);
 		User user = (User) session.getDictionary().get(USER);
-		UserDAO userDao = (UserDAO) Context.get().getBean(UserDAO.class);
-		userDao.initialize(user);
+		initUser(user);
 		return user;
 	}
 
-	protected Object throwServerException(Session session, Logger logger, Throwable t) throws ServerException {
+	protected <R> R throwServerException(Session session, Logger logger, Throwable throwable) throws ServerException {
 		if (logger != null)
-			logger.error(t.getMessage(), t);
+			logger.error(throwable.getMessage(), throwable);
 
-		String message = t.getMessage();
+		String message = throwable.getMessage();
 		if (session != null) {
 			Log lastError = session.getLastError();
 			if (lastError != null) {
@@ -203,23 +245,22 @@ public abstract class AbstractRemoteService extends RemoteServiceServlet {
 		if (message != null)
 			message = message.replace("com.logicaldoc.", "").replace("java.lang.", "");
 
-		if (session != null
-				&& (t instanceof org.hibernate.TransactionException || t instanceof org.hibernate.HibernateException
-						|| t instanceof org.springframework.transaction.TransactionSystemException)) {
+		if (session != null && (throwable instanceof org.hibernate.TransactionException
+				|| throwable instanceof org.hibernate.HibernateException
+				|| throwable instanceof org.springframework.transaction.TransactionSystemException)) {
 			message = I18N.message("dberrorretry", session.getUser().getLocale());
 		}
 
-		if (t instanceof ValidationException) {
+		if (throwable instanceof ValidationException ie) {
 			// Translate a validation error
-			ValidationException ie = (ValidationException) t;
 			throw new ServerValidationException(ie.getMessage(),
 					ie.getErrors().values().stream()
 							.map(e -> new ServerValidationError(e.getAttribute(), e.getLabel(), e.getDescription()))
-							.collect(Collectors.toList()).toArray(new ServerValidationError[0]));
-		} else if (t instanceof PermissionException) {
-			throw new AccessDeniedException(t.getMessage());
-		} else if (t instanceof ServerException) {
-			throw (ServerException) t;
+							.collect(Collectors.toList()) .toArray(new ServerValidationError[0]));
+		} else if (throwable instanceof PermissionException) {
+			throw new AccessDeniedException(throwable.getMessage());
+		} else if (throwable instanceof ServerException se) {
+			throw se;
 		} else
 			throw new ServerException(message);
 	}
@@ -262,7 +303,7 @@ public abstract class AbstractRemoteService extends RemoteServiceServlet {
 	 */
 	protected boolean executeLongRunningOperation(String name, Runnable runnable, Session session)
 			throws ServerException {
-		ThreadPools pools = (ThreadPools) Context.get().getBean(ThreadPools.class);
+		ThreadPools pools = Context.get(ThreadPools.class);
 
 		/*
 		 * Build the notifying thread and schedule for immediate execution (1ms
@@ -304,24 +345,24 @@ public abstract class AbstractRemoteService extends RemoteServiceServlet {
 	 * @param template The template to consider
 	 * @param extensibleObject The GUI object to consider
 	 * 
-	 * @return The array of attributes
+	 * @return The list of attributes
 	 */
-	protected GUIAttribute[] prepareGUIAttributes(Template template, ExtensibleObject extensibleObject) {
-		TemplateDAO tDao = (TemplateDAO) Context.get().getBean(TemplateDAO.class);
+	protected List<GUIAttribute> prepareGUIAttributes(Template template, ExtensibleObject extensibleObject) {
+		TemplateDAO tDao = Context.get(TemplateDAO.class);
 		tDao.initialize(template);
 
 		List<GUIAttribute> attributes = new ArrayList<>();
 		if (template == null || template.getAttributes() == null || template.getAttributes().isEmpty())
-			return new GUIAttribute[0];
+			return new ArrayList<>();
 		try {
 			for (String attrName : template.getAttributeNames())
 				attributes.add(prepareGUIAttribute(attrName, template, attributes, extensibleObject));
 
 			Collections.sort(attributes);
-			return attributes.toArray(new GUIAttribute[0]);
+			return attributes;
 		} catch (Exception t) {
 			log.error(t.getMessage(), t);
-			return new GUIAttribute[0];
+			return new ArrayList<>();
 		}
 	}
 
@@ -345,7 +386,7 @@ public abstract class AbstractRemoteService extends RemoteServiceServlet {
 		att.setBooleanValue(templateExtAttr.getBooleanValue());
 		att.setDoubleValue(templateExtAttr.getDoubleValue());
 		att.setDateValue(templateExtAttr.getDateValue());
-		att.setOptions(new String[] { templateExtAttr.getStringValue() });
+		att.setOptions(Arrays.asList(templateExtAttr.getStringValue()));
 
 		if (extensibleObject != null) {
 			Attribute attribute = extensibleObject.getAttribute(attrName);
@@ -396,7 +437,34 @@ public abstract class AbstractRemoteService extends RemoteServiceServlet {
 	}
 
 	private void normalizeDate(GUIAttribute att) {
-		if (att.getValue() instanceof Date)
-			att.setValue(convertToDate((Date) att.getValue()));
+		if (att.getValue() instanceof Date date) {
+			att.setValue(convertToDate(date));
+		}
+	}
+
+	/**
+	 * Converts into Gregorian date in case it is before Oct 4th 1582
+	 * 
+	 * @param date the date to treat
+	 * 
+	 * @return the converted date
+	 */
+	protected static final Date fixDateForDB(Date date) {
+		if (date != null && JulianCalendarUtil.isJulianDate(date))
+			date = JulianCalendarUtil.toGregorian(date);
+		return date;
+	}
+
+	/**
+	 * Converts into Julian date in case it is before Oct 4th 1582
+	 * 
+	 * @param date the date to treat
+	 * 
+	 * @return the converted date
+	 */
+	protected static final Date fixDateForGUI(Date date) {
+		if (date != null && JulianCalendarUtil.isJulianDate(date))
+			date = JulianCalendarUtil.toJulian(date);
+		return date;
 	}
 }

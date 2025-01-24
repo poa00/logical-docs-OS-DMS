@@ -1,5 +1,7 @@
 package com.logicaldoc.gui.frontend.client.services;
 
+import java.util.List;
+
 import com.google.gwt.core.client.GWT;
 import com.google.gwt.user.client.rpc.RemoteService;
 import com.google.gwt.user.client.rpc.RemoteServiceRelativePath;
@@ -24,14 +26,14 @@ public interface UpdateService extends RemoteService {
 	 * 
 	 * @return List of informations about the available update package or null
 	 */
-	public GUIParameter[] checkUpdate();
+	public List<GUIParameter> checkUpdate();
 
 	/**
 	 * Check if the current installation has patches available
 	 * 
 	 * @return List of available patches
 	 */
-	public GUIPatch[] checkPatch();
+	public List<GUIPatch> checkPatch();
 
 	void downloadUpdate(String id, String fileName, long fileSize);
 
@@ -68,7 +70,7 @@ public interface UpdateService extends RemoteService {
 	 * 
 	 * @throws ServerException an error happened in the server application
 	 */
-	public String[] getUpdateNotes(String updateFileName) throws ServerException;
+	public List<String> getUpdateNotes(String updateFileName) throws ServerException;
 
 	/**
 	 * Retrieves more informations from the patch
@@ -79,14 +81,14 @@ public interface UpdateService extends RemoteService {
 	 * 
 	 * @throws ServerException an error happened in the server application
 	 */
-	public String[] getPatchNotes(String patchFileName) throws ServerException;
+	public List<String> getPatchNotes(String patchFileName) throws ServerException;
 
 	/**
 	 * Checks the status of the current download process
 	 * 
 	 * @return download status code and download progress
 	 */
-	public int[] checkDownloadStatus();
+	public List<Integer> checkDownloadStatus();
 
 	/**
 	 * Loads a new update package
@@ -96,6 +98,15 @@ public interface UpdateService extends RemoteService {
 	 * @throws ServerException an error happened in the server application
 	 */
 	public String loadUpdate() throws ServerException;
+	
+	/**
+	 * Deletes a local update package
+	 * 
+	 * @param updateFileName The update file to delete
+	 * 
+	 * @throws ServerException an error happened in the server application
+	 */
+	public void deleteUpdate(String updateFileName) throws ServerException;
 
 	/**
 	 * Loads a new patch
@@ -106,6 +117,15 @@ public interface UpdateService extends RemoteService {
 	 */
 	public String loadPatch() throws ServerException;
 
+	/**
+	 * Deletes a local patch
+	 * 
+	 * @param patchFileName The patch file to delete
+	 * 
+	 * @throws ServerException an error happened in the server application
+	 */
+	public void deletePatch(String patchFileName) throws ServerException;
+	
 	public static class Instance {
 		private static UpdateServiceAsync inst;
 

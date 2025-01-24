@@ -3,7 +3,7 @@ package com.logicaldoc.gui.frontend.client.settings.gui;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIParameter;
 import com.logicaldoc.gui.common.client.i18n.I18N;
@@ -273,13 +273,7 @@ public class GUIGridsPanel extends VLayout {
 		Session.get().setConfig(param.getName(), param.getValue());
 
 		// Save all
-		SettingService.Instance.get().saveSettings(parameters.toArray(new GUIParameter[0]), new AsyncCallback<Void>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
+		SettingService.Instance.get().saveSettings(parameters, new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(Void arg0) {
 				GuiLog.info(I18N.message("settingssaved"), null);
@@ -330,5 +324,15 @@ public class GUIGridsPanel extends VLayout {
 		parameters.add(param);
 		Session.get().setConfig(param.getName(), param.getValue());
 		return parameters;
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

@@ -1,6 +1,7 @@
 package com.logicaldoc.core.contact;
 
-import java.io.FileNotFoundException;
+import static org.junit.Assert.assertEquals;
+
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.List;
@@ -9,8 +10,8 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.logicaldoc.core.AbstractCoreTestCase;
-
-import junit.framework.Assert;
+import com.logicaldoc.core.PersistenceException;
+import com.logicaldoc.util.plugin.PluginException;
 
 /**
  * Test case for <code>HibernateContactDAO</code>
@@ -24,7 +25,7 @@ public class HibernateContactDAOTest extends AbstractCoreTestCase {
 	private ContactDAO dao;
 
 	@Before
-	public void setUp() throws FileNotFoundException, IOException, SQLException {
+	public void setUp() throws IOException, SQLException, PluginException {
 		super.setUp();
 		// Retrieve the instance under test from spring context. Make sure that
 		// it is an HibernateContactDAO
@@ -32,14 +33,14 @@ public class HibernateContactDAOTest extends AbstractCoreTestCase {
 	}
 
 	@Test
-	public void testFindByUser() {
+	public void testFindByUser() throws PersistenceException {
 		List<Contact> contacts = dao.findByUser(null, null);
-		Assert.assertEquals(1, contacts.size());
+		assertEquals(1, contacts.size());
 		contacts = dao.findByUser(1L, null);
-		Assert.assertEquals(2, contacts.size());
+		assertEquals(2, contacts.size());
 		contacts = dao.findByUser(1L, "alessandro@acme.com");
-		Assert.assertEquals(1, contacts.size());
+		assertEquals(1, contacts.size());
 		contacts = dao.findByUser(1L, "xxx");
-		Assert.assertEquals(0, contacts.size());
+		assertEquals(0, contacts.size());
 	}
 }

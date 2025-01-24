@@ -17,12 +17,10 @@ import org.springframework.jdbc.core.RowMapper;
 import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.document.AbstractDocument;
 import com.logicaldoc.core.document.Document;
-import com.logicaldoc.core.document.dao.DocumentDAO;
+import com.logicaldoc.core.document.DocumentDAO;
 import com.logicaldoc.core.folder.Folder;
 import com.logicaldoc.core.security.Session;
-import com.logicaldoc.core.util.IconSelector;
 import com.logicaldoc.util.Context;
-import com.logicaldoc.util.io.FileUtil;
 
 /**
  * This servlet is responsible for locked documents data retrieval
@@ -40,7 +38,7 @@ public class LockedDocsDataServlet extends AbstractDataServlet {
 
 		Long userId = request.getParameter("userId") != null ? Long.parseLong(request.getParameter("userId")) : null;
 
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
 		DateFormat df = getDateFormat();
 
 		PrintWriter writer = response.getWriter();
@@ -64,7 +62,6 @@ public class LockedDocsDataServlet extends AbstractDataServlet {
 			query.append(Long.toString(userId));
 		}
 
-		@SuppressWarnings("unchecked")
 		List<Document> records = docDao.query(query.toString(), new RowMapper<Document>() {
 			public Document mapRow(ResultSet rs, int rowNum) throws SQLException {
 				Document doc = new Document();
@@ -106,9 +103,7 @@ public class LockedDocsDataServlet extends AbstractDataServlet {
 				writer.print("<customId><![CDATA[" + doc.getCustomId() + "]]></customId>");
 			else
 				writer.print("<customId> </customId>");
-			writer.print("<icon>"
-					+ FileUtil.getBaseName(IconSelector.selectIcon(doc.getType(), doc.getDocRef() != null))
-					+ "</icon>");
+			writer.print("<icon>" + doc.getIcon() + "</icon>");
 			writer.print("<version>" + doc.getVersion() + "</version>");
 			writer.print("<fileVersion>" + doc.getFileVersion() + "</fileVersion>");
 			writer.print("<lastModified>" + df.format(doc.getLastModified()) + "</lastModified>");

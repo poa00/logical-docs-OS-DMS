@@ -1,10 +1,10 @@
 package com.logicaldoc.gui.common.client.log;
 
 import com.logicaldoc.gui.common.client.beans.GUIEvent;
+import com.logicaldoc.gui.common.client.grid.DateListGridField;
 import com.logicaldoc.gui.common.client.i18n.I18N;
 import com.logicaldoc.gui.common.client.util.AwesomeFactory;
 import com.logicaldoc.gui.common.client.util.LD;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField;
 import com.smartgwt.client.types.HeaderControls;
 import com.smartgwt.client.types.SortDirection;
 import com.smartgwt.client.widgets.HeaderControl;
@@ -92,5 +92,30 @@ public class MessagesWindow extends Window {
 
 	public static MessagesWindow get() {
 		return instance;
+	}
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = super.hashCode();
+		result = prime * result + ((grid == null) ? 0 : grid.hashCode());
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (!super.equals(obj))
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		MessagesWindow other = (MessagesWindow) obj;
+		if (grid == null) {
+			if (other.grid != null)
+				return false;
+		} else if (!grid.equals(other.grid))
+			return false;
+		return true;
 	}
 }

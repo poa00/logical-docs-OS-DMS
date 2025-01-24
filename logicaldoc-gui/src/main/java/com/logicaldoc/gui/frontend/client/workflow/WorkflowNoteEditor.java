@@ -1,8 +1,7 @@
 package com.logicaldoc.gui.frontend.client.workflow;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.frontend.client.services.WorkflowService;
 import com.smartgwt.client.types.HeaderControls;
@@ -12,7 +11,7 @@ import com.smartgwt.client.widgets.form.fields.ButtonItem;
 import com.smartgwt.client.widgets.form.fields.RichTextItem;
 
 /**
- * This is the form used to edit a note in a workflow
+ * This is the form used to add a note in a workflow
  * 
  * @author Marco Meschieri - LogicalDOC
  * @since 7.6
@@ -55,18 +54,23 @@ public class WorkflowNoteEditor extends Window {
 	private void onSave() {
 		if (!noteForm.validate())
 			return;
-		WorkflowService.Instance.get().addNote(parentDialog.getWorkflow().getSelectedTask().getId(),
-				message.getValue().toString(), new AsyncCallback<Long>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+		WorkflowService.Instance.get().addNote(parentDialog.getWorkflow().getSelectedTask().getId(), null,
+				message.getValue().toString(), new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Long noteId) {
 						parentDialog.onNewNote();
 						destroy();
 					}
 				});
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

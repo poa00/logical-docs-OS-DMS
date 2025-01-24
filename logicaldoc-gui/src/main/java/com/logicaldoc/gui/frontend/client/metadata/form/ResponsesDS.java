@@ -57,7 +57,6 @@ public class ResponsesDS extends DataSource {
 		fields.add(filename);
 		fields.add(created);
 		fields.add(respondent);
-
 		fields.add(template);
 		fields.add(language);
 
@@ -67,7 +66,6 @@ public class ResponsesDS extends DataSource {
 			ext.setCanFilter(true);
 
 			GUIAttribute attDef = Session.get().getInfo().getAttributeDefinition(name);
-
 			if (attDef != null) {
 				if (attDef.getType() == GUIAttribute.TYPE_DATE) {
 					ext.setType(FieldType.DATE);
@@ -78,10 +76,13 @@ public class ResponsesDS extends DataSource {
 				} else if (attDef.getType() == GUIAttribute.TYPE_DOUBLE) {
 					ext.setType(FieldType.FLOAT);
 					ext.setCanFilter(false);
+				} else if (attDef.isSection()) {
+					continue;
 				}
 			}
 
-			fields.add(ext);
+			if (!form.getAttribute(name).isSection())
+				fields.add(ext);
 		}
 
 		setFields(fields.toArray(new DataSourceField[0]));

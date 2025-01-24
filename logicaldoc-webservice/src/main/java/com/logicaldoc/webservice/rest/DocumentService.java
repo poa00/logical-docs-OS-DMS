@@ -22,10 +22,12 @@ import org.apache.cxf.jaxrs.ext.multipart.Attachment;
 import org.apache.cxf.jaxrs.ext.multipart.Multipart;
 
 import com.logicaldoc.core.PersistenceException;
-import com.logicaldoc.core.parser.ParseException;
+import com.logicaldoc.core.parser.ParsingException;
 import com.logicaldoc.core.security.authentication.AuthenticationException;
 import com.logicaldoc.core.security.authorization.PermissionException;
+import com.logicaldoc.core.security.authorization.UnexistingResourceException;
 import com.logicaldoc.webservice.WebserviceException;
+import com.logicaldoc.webservice.model.WSAccessControlEntry;
 import com.logicaldoc.webservice.model.WSDocument;
 import com.logicaldoc.webservice.model.WSLink;
 import com.logicaldoc.webservice.model.WSNote;
@@ -68,9 +70,10 @@ public interface DocumentService {
 	 * @param docId identifier of the document
 	 * @return the document object representation
 	 * 
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
-	 * @throws PermissionException The current user does not have enough permissions
+	 * @throws PermissionException The current user does not have enough
+	 *         permissions
 	 * @throws AuthenticationException Invalid credentials
 	 */
 	@GET
@@ -84,9 +87,10 @@ public interface DocumentService {
 	 * 
 	 * @param docId identifier of the document
 	 * 
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
-	 * @throws PermissionException The current user does not have enough permissions
+	 * @throws PermissionException The current user does not have enough
+	 *         permissions
 	 * @throws AuthenticationException Invalid credentials
 	 */
 	@POST
@@ -189,9 +193,10 @@ public interface DocumentService {
 	 * 
 	 * @param docId identifier of the document to delete
 	 * 
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
-	 * @throws PermissionException The current user does not have enough permissions
+	 * @throws PermissionException The current user does not have enough
+	 *         permissions
 	 * @throws AuthenticationException Invalid credentials
 	 */
 	@DELETE
@@ -206,16 +211,44 @@ public interface DocumentService {
 	 * 
 	 * @return array of documents contained in the folder
 	 * 
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
-	 * @throws PermissionException The current user does not have enough permissions
+	 * @throws PermissionException The current user does not have enough
+	 *         permissions
 	 * @throws AuthenticationException Invalid credentials
 	 */
 	@GET
 	@Path("/list")
 	@Produces({ MediaType.APPLICATION_JSON })
-	WSDocument[] list(@QueryParam("folderId")
+	List<WSDocument> list(@QueryParam("folderId")
 	long folderId) throws AuthenticationException, PermissionException, WebserviceException, PersistenceException;
+	
+	/**
+	 * Gets the documents in a specific folder
+	 * 
+	 * @param folderId The folder id
+	 * @param fileName Optional file name filter
+	 * @param sort Optional sort criteria
+	 * @param page Optional page number
+	 * @param max Optional maximum number of elements per page
+	 * 
+	 * @return Collection of documents
+	 * 
+	 * @throws PersistenceException Error in the database
+	 * @throws WebserviceException Error in the webservice
+	 * @throws AuthenticationException Invalid session
+	 * @throws PermissionException The user does not have the required
+	 *         permission
+	 */
+	@GET
+	@Path("/listPaginated")
+	@Produces({ MediaType.APPLICATION_JSON })
+	List<WSDocument> listPaginated(@QueryParam("folderId")
+	long folderId, @QueryParam("fileName")
+	String fileName, @QueryParam("sort")
+	String sort, @QueryParam("page")
+	Integer page, @QueryParam("max")
+	Integer max) throws AuthenticationException, PermissionException, WebserviceException, PersistenceException;
 
 	/**
 	 * Lists the documents in a folder
@@ -225,14 +258,15 @@ public interface DocumentService {
 	 * 
 	 * @return array of documents contained in the folder
 	 * 
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
-	 * @throws PermissionException The current user does not have enough permissions
+	 * @throws PermissionException The current user does not have enough
+	 *         permissions
 	 * @throws AuthenticationException Invalid credentials
 	 */
 	@GET
 	@Path("/listDocuments")
-	WSDocument[] listDocuments(@QueryParam("folderId")
+	List<WSDocument> listDocuments(@QueryParam("folderId")
 	long folderId, @QueryParam("fileName")
 	String fileName) throws AuthenticationException, PermissionException, WebserviceException, PersistenceException;
 
@@ -242,14 +276,17 @@ public interface DocumentService {
 	 * 
 	 * @param document the document to update
 	 * 
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
-	 * @throws PermissionException The current user does not have enough permissions
-	 * @throws AuthenticationException Invalid credentials 
+	 * @throws PermissionException The current user does not have enough
+	 *         permissions
+	 * @throws AuthenticationException Invalid credentials
+	 * @throws UnexistingResourceException The specified document does not exist
 	 */
 	@PUT
 	@Path("/update")
-	void update(WSDocument document) throws AuthenticationException, PermissionException, WebserviceException, PersistenceException;
+	void update(WSDocument document) throws AuthenticationException, PermissionException, WebserviceException,
+			PersistenceException, UnexistingResourceException;
 
 	/**
 	 * Retrieves the file content of a document.
@@ -259,16 +296,18 @@ public interface DocumentService {
 	 * @return the contents
 	 * 
 	 * @throws IOException I/O error
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
-	 * @throws PermissionException The current user does not have enough permissions
-	 * @throws AuthenticationException Invalid credentials 
+	 * @throws PermissionException The current user does not have enough
+	 *         permissions
+	 * @throws AuthenticationException Invalid credentials
 	 */
 	@GET
 	@Path("/getContent")
 	@Produces(MediaType.APPLICATION_OCTET_STREAM)
 	DataHandler getContent(@QueryParam("docId")
-	long docId) throws AuthenticationException, PermissionException, WebserviceException, PersistenceException, IOException;
+	long docId)
+			throws AuthenticationException, PermissionException, WebserviceException, PersistenceException, IOException;
 
 	/**
 	 * Retrieves the file content of a version.
@@ -279,17 +318,19 @@ public interface DocumentService {
 	 * @return the contents
 	 * 
 	 * @throws IOException I/O error
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
-	 * @throws PermissionException The current user does not have enough permissions
-	 * @throws AuthenticationException Invalid credentials 
+	 * @throws PermissionException The current user does not have enough
+	 *         permissions
+	 * @throws AuthenticationException Invalid credentials
 	 */
 	@GET
 	@Path("/getVersionContent")
 	@Produces(MediaType.APPLICATION_OCTET_STREAM)
 	DataHandler getVersionContent(@QueryParam("docId")
 	long docId, @QueryParam("version")
-	String version) throws AuthenticationException, PermissionException, WebserviceException, PersistenceException, IOException;
+	String version)
+			throws AuthenticationException, PermissionException, WebserviceException, PersistenceException, IOException;
 
 	/**
 	 * Adds a new note for the given document
@@ -299,26 +340,29 @@ public interface DocumentService {
 	 * 
 	 * @return the added note
 	 * 
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
-	 * @throws PermissionException The current user does not have enough permissions
-	 * @throws AuthenticationException Invalid credentials 
+	 * @throws PermissionException The current user does not have enough
+	 *         permissions
+	 * @throws AuthenticationException Invalid credentials
+	 * @throws UnexistingResourceException The specified document does not exist
 	 */
 	@POST
 	@Path("/addNote")
 	@Consumes({ MediaType.APPLICATION_FORM_URLENCODED })
 	public WSNote addNote(@FormParam("docId")
 	long docId, @FormParam("note")
-	String note) throws AuthenticationException, PermissionException, WebserviceException, PersistenceException;
+	String note) throws AuthenticationException, PermissionException, WebserviceException, PersistenceException,
+			UnexistingResourceException;
 
 	/**
 	 * Deletes a new note by note identifier
 	 * 
 	 * @param noteId identifier of the note
 	 * 
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
-	 * @throws AuthenticationException Invalid credentials 
+	 * @throws AuthenticationException Invalid credentials
 	 */
 	@DELETE
 	@Path("/deleteNote")
@@ -330,17 +374,20 @@ public interface DocumentService {
 	 * 
 	 * @param docId identifier of the document
 	 *
-	 * @return array of notes
+	 * @return List of notes
 	 * 
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
-	 * @throws PermissionException The current user does not have enough permissions
-	 * @throws AuthenticationException Invalid credentials 
+	 * @throws PermissionException The current user does not have enough
+	 *         permissions
+	 * @throws AuthenticationException Invalid credentials
+	 * @throws UnexistingResourceException The specified document does not exist
 	 */
 	@GET
 	@Path("/getNotes")
-	public WSNote[] getNotes(@QueryParam("docId")
-	long docId) throws AuthenticationException, PermissionException, WebserviceException, PersistenceException;
+	public List<WSNote> getNotes(@QueryParam("docId")
+	long docId) throws AuthenticationException, PermissionException, WebserviceException, PersistenceException,
+			UnexistingResourceException;
 
 	/**
 	 * Puts a new rating on the given document
@@ -350,16 +397,19 @@ public interface DocumentService {
 	 * 
 	 * @return the voted document
 	 * 
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
-	 * @throws PermissionException The current user does not have enough permissions
+	 * @throws PermissionException The current user does not have enough
+	 *         permissions
 	 * @throws AuthenticationException Invalid credentials
+	 * @throws UnexistingResourceException The specified document does not exist
 	 */
 	@PUT
 	@Path("/rateDocument")
 	public WSRating rateDocument(@QueryParam("docId")
 	long docId, @QueryParam("vote")
-	int vote) throws AuthenticationException, PermissionException, WebserviceException, PersistenceException;
+	int vote) throws AuthenticationException, PermissionException, WebserviceException, PersistenceException,
+			UnexistingResourceException;
 
 	/**
 	 * Gets all the ratings of the given document
@@ -368,15 +418,18 @@ public interface DocumentService {
 	 * 
 	 * @return the ratings
 	 * 
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
-	 * @throws PermissionException The current user does not have enough permissions
-	 * @throws AuthenticationException Invalid credentials 
+	 * @throws PermissionException The current user does not have enough
+	 *         permissions
+	 * @throws AuthenticationException Invalid credentials
+	 * @throws UnexistingResourceException The specified document does not exist
 	 */
 	@GET
 	@Path("/getRatings")
-	public WSRating[] getRatings(@QueryParam("docId")
-	long docId) throws AuthenticationException, PermissionException, WebserviceException, PersistenceException;
+	public List<WSRating> getRatings(@QueryParam("docId")
+	long docId) throws AuthenticationException, PermissionException, WebserviceException, PersistenceException,
+			UnexistingResourceException;
 
 	/**
 	 * Deletes a version by document identifier and version ID. You can not
@@ -387,9 +440,9 @@ public interface DocumentService {
 	 * 
 	 * @return the latest version of the document
 	 * 
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
-	 * @throws AuthenticationException Invalid credentials 
+	 * @throws AuthenticationException Invalid credentials
 	 */
 	@DELETE
 	@Path("/deleteVersion")
@@ -403,30 +456,36 @@ public interface DocumentService {
 	 * @param docId The document id
 	 * @param folderId Identifier of the new document's folder
 	 * 
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
-	 * @throws PermissionException The current user does not have enough permissions
-	 * @throws AuthenticationException Invalid credentials 
+	 * @throws PermissionException The current user does not have enough
+	 *         permissions
+	 * @throws AuthenticationException Invalid credentials
+	 * @throws UnexistingResourceException The requested document does not exist
 	 */
 	@PUT
 	@Path("/move")
 	public void move(@QueryParam("docId")
 	long docId, @QueryParam("folderId")
-	long folderId) throws AuthenticationException, PermissionException, WebserviceException, PersistenceException;
+	long folderId) throws AuthenticationException, PermissionException, WebserviceException, PersistenceException,
+			UnexistingResourceException;
 
 	/**
 	 * Copies a document into another folder
 	 * 
 	 * @param docId The document id
 	 * @param folderId Identifier of the new document's folder
+	 * @param links If links must be copied too
+	 * @param notes If notes and annotations must be copied too
 	 *
 	 * @return The new copy
 	 * 
 	 * @throws IOException I/O error
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
-	 * @throws PermissionException The current user does not have enough permissions
-	 * @throws AuthenticationException Invalid credentials 
+	 * @throws PermissionException The current user does not have enough
+	 *         permissions
+	 * @throws AuthenticationException Invalid credentials
 	 */
 	@PUT
 	@Path("/copy")
@@ -438,7 +497,11 @@ public interface DocumentService {
 			@ApiResponse(responseCode = "500", description = "Generic error, see the response message") })
 	public WSDocument copy(@QueryParam("docId")
 	long docId, @QueryParam("folderId")
-	long folderId) throws AuthenticationException, PermissionException, WebserviceException, PersistenceException, IOException;
+	long folderId, @QueryParam("links")
+	boolean links, @QueryParam("notes")
+	boolean notes, @QueryParam("security")
+	boolean security)
+			throws AuthenticationException, PermissionException, WebserviceException, PersistenceException, IOException;
 
 	/**
 	 * Creates the thumbail of the given document; if the thumbnail was already
@@ -449,9 +512,9 @@ public interface DocumentService {
 	 * @param type The thumbnail type(eg: thumbnail, tile, mobile)
 	 * 
 	 * @throws IOException I/O error
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
-	 * @throws AuthenticationException Invalid credentials 
+	 * @throws AuthenticationException Invalid credentials
 	 */
 	@PUT
 	@Path("/createThumbnail")
@@ -470,10 +533,11 @@ public interface DocumentService {
 	 * @return image content
 	 * 
 	 * @throws IOException I/O error
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
-	 * @throws PermissionException The current user does not have enough permissions
-	 * @throws AuthenticationException Invalid credentials 
+	 * @throws PermissionException The current user does not have enough
+	 *         permissions
+	 * @throws AuthenticationException Invalid credentials
 	 */
 	@GET
 	@Path("/thumbnail/{type}/{docpath:.*}")
@@ -481,7 +545,8 @@ public interface DocumentService {
 	public DataHandler getThumbnail(@PathParam("type")
 	String type, @PathParam("docpath")
 	String docPath, @PathParam("docpath")
-	List<PathSegment> docPathList) throws AuthenticationException, WebserviceException, PersistenceException, IOException, PermissionException;
+	List<PathSegment> docPathList)
+			throws AuthenticationException, WebserviceException, PersistenceException, IOException, PermissionException;
 
 	/**
 	 * Creates the PDF conversion of the given document; if the PDF conversion
@@ -491,16 +556,18 @@ public interface DocumentService {
 	 * @param fileVersion The specific file version(it can be empty)
 	 * 
 	 * @throws IOException I/O error
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
-	 * @throws PermissionException The current user does not have enough permissions
-	 * @throws AuthenticationException Invalid credentials 
+	 * @throws PermissionException The current user does not have enough
+	 *         permissions
+	 * @throws AuthenticationException Invalid credentials
 	 */
 	@PUT
 	@Path("/createPdf")
 	public void createPdf(@QueryParam("docId")
 	long docId, @QueryParam("fileVersion")
-	String fileVersion) throws AuthenticationException, PermissionException, WebserviceException, PersistenceException, IOException;
+	String fileVersion)
+			throws AuthenticationException, PermissionException, WebserviceException, PersistenceException, IOException;
 
 	/**
 	 * Promotes an old version to the current default one. If you promote a
@@ -511,16 +578,19 @@ public interface DocumentService {
 	 * @param version the version
 	 * 
 	 * @throws IOException I/O error
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
-	 * @throws PermissionException The current user does not have enough permissions
-	 * @throws AuthenticationException Invalid credentials 
+	 * @throws PermissionException The current user does not have enough
+	 *         permissions
+	 * @throws AuthenticationException Invalid credentials
+	 * @throws UnexistingResourceException The specified document does not exist
 	 */
 	@PUT
 	@Path("/promoteVersion")
 	public void promoteVersion(@QueryParam("docId")
 	long docId, @QueryParam("version")
-	String version) throws AuthenticationException, PermissionException, WebserviceException, PersistenceException, IOException;
+	String version) throws AuthenticationException, PermissionException, WebserviceException, PersistenceException,
+			IOException, UnexistingResourceException;
 
 	/**
 	 * Renames the title of an existing document with the given identifier.
@@ -528,16 +598,19 @@ public interface DocumentService {
 	 * @param docId The document id
 	 * @param name The new document filename
 	 * 
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
-	 * @throws PermissionException The current user does not have enough permissions
-	 * @throws AuthenticationException Invalid credentials 
+	 * @throws PermissionException The current user does not have enough
+	 *         permissions
+	 * @throws AuthenticationException Invalid credentials
+	 * @throws UnexistingResourceException The specified document does not exist
 	 */
 	@PUT
 	@Path("/rename")
 	public void rename(@QueryParam("docId")
 	long docId, @QueryParam("name")
-	String name) throws AuthenticationException, PermissionException, WebserviceException, PersistenceException;
+	String name) throws AuthenticationException, PermissionException, WebserviceException, PersistenceException,
+			UnexistingResourceException;
 
 	/**
 	 * Gets the version history of an existing document with the given
@@ -547,15 +620,18 @@ public interface DocumentService {
 	 * 
 	 * @return Array of versions
 	 * 
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
-	 * @throws PermissionException The current user does not have enough permissions
-	 * @throws AuthenticationException Invalid credentials 
+	 * @throws PermissionException The current user does not have enough
+	 *         permissions
+	 * @throws AuthenticationException Invalid credentials
+	 * @throws UnexistingResourceException The specified document does not exist
 	 */
 	@GET
 	@Path("/getVersions")
-	public WSDocument[] getVersions(@QueryParam("docId")
-	long docId) throws AuthenticationException, PermissionException, WebserviceException, PersistenceException;
+	public List<WSDocument> getVersions(@QueryParam("docId")
+	long docId) throws AuthenticationException, PermissionException, WebserviceException, PersistenceException,
+			UnexistingResourceException;
 
 	/**
 	 * Creates a new document alias for the given document inside a specified
@@ -568,14 +644,16 @@ public interface DocumentService {
 	 * 
 	 * @return The value object containing the document's metadata
 	 * 
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
-	 * @throws PermissionException The current user does not have enough permissions
-	 * @throws AuthenticationException Invalid credentials 
+	 * @throws PermissionException The current user does not have enough
+	 *         permissions
+	 * @throws AuthenticationException Invalid credentials
 	 */
 	@POST
 	@Path("/createAlias")
-	public WSDocument createAlias(long docId, long folderId, String type) throws AuthenticationException, PermissionException, WebserviceException, PersistenceException;
+	public WSDocument createAlias(long docId, long folderId, String type)
+			throws AuthenticationException, PermissionException, WebserviceException, PersistenceException;
 
 	/**
 	 * Creates a new download ticket
@@ -589,16 +667,18 @@ public interface DocumentService {
 	 * 
 	 * @return the download ticket
 	 * 
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
-	 * @throws AuthenticationException Invalid credentials 
-	 * @throws PermissionException  The user does not have the download permission
+	 * @throws AuthenticationException Invalid credentials
+	 * @throws PermissionException The user does not have the download
+	 *         permission
 	 */
 	@POST
 	@Path("/createDownloadTicket")
 	@Consumes({ MediaType.APPLICATION_FORM_URLENCODED })
 	public String createDownloadTicket(long docId, String suffix, Integer expireHours, String expireDate,
-			Integer maxDownloads) throws AuthenticationException, WebserviceException, PersistenceException, PermissionException;
+			Integer maxDownloads)
+			throws AuthenticationException, WebserviceException, PersistenceException, PermissionException;
 
 	/**
 	 * Creates a new download ticket
@@ -613,25 +693,27 @@ public interface DocumentService {
 	 * 
 	 * @return the download ticket
 	 * 
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
-	 * @throws AuthenticationException Invalid credentials 
-	 * @throws PermissionException  The user does not have the download permission
+	 * @throws AuthenticationException Invalid credentials
+	 * @throws PermissionException The user does not have the download
+	 *         permission
 	 */
 	@POST
 	@Path("/createViewTicket")
 	@Consumes({ MediaType.APPLICATION_FORM_URLENCODED })
 	public String createViewTicket(long docId, String suffix, Integer expireHours, String expireDate,
-			Integer maxDownloads, Integer maxViews) throws AuthenticationException, WebserviceException, PersistenceException, PermissionException;
-	
+			Integer maxDownloads, Integer maxViews)
+			throws AuthenticationException, WebserviceException, PersistenceException, PermissionException;
+
 	/**
 	 * Removes an existing link
 	 * 
 	 * @param id ID of the link
 	 * 
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
-	 * @throws AuthenticationException Invalid credentials 
+	 * @throws AuthenticationException Invalid credentials
 	 */
 	@DELETE
 	@Path("/deleteLink")
@@ -641,15 +723,16 @@ public interface DocumentService {
 	 * Gets the aliases of the given document
 	 * 
 	 * @param docId The master document ID
-	 * @return Arrays of aliases
+	 * @return List of aliases
 	 * 
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
-	 * @throws AuthenticationException Invalid credentials 
+	 * @throws AuthenticationException Invalid credentials
 	 */
 	@GET
 	@Path("/getAliases")
-	public WSDocument[] getAliases(long docId) throws AuthenticationException, WebserviceException, PersistenceException;
+	public List<WSDocument> getAliases(long docId)
+			throws AuthenticationException, WebserviceException, PersistenceException;
 
 	/**
 	 * Gets document metadata of an existing document with the given custom
@@ -659,14 +742,16 @@ public interface DocumentService {
 	 * 
 	 * @return A value object containing the document's metadata
 	 * 
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
-	 * @throws PermissionException The current user does not have enough permissions
-	 * @throws AuthenticationException Invalid credentials 
+	 * @throws PermissionException The current user does not have enough
+	 *         permissions
+	 * @throws AuthenticationException Invalid credentials
 	 */
 	@GET
 	@Path("/getDocumentByCustomId")
-	public WSDocument getDocumentByCustomId(String customId) throws AuthenticationException, PermissionException, WebserviceException, PersistenceException;
+	public WSDocument getDocumentByCustomId(String customId)
+			throws AuthenticationException, PermissionException, WebserviceException, PersistenceException;
 
 	/**
 	 * Gets document metadata of a collection of existing documents with the
@@ -676,13 +761,14 @@ public interface DocumentService {
 	 * 
 	 * @return the list of documents
 	 * 
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
-	 * @throws AuthenticationException Invalid credentials 
+	 * @throws AuthenticationException Invalid credentials
 	 */
 	@GET
 	@Path("/getDocuments")
-	public WSDocument[] getDocuments(Long[] docIds) throws AuthenticationException, WebserviceException, PersistenceException;
+	public List<WSDocument> getDocuments(List<Long> docIds)
+			throws AuthenticationException, WebserviceException, PersistenceException;
 
 	/**
 	 * Gets the document's text stored in the full-text index
@@ -691,29 +777,31 @@ public interface DocumentService {
 	 * 
 	 * @return The requested document's text
 	 * 
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
-	 * @throws AuthenticationException Invalid credentials 
+	 * @throws AuthenticationException Invalid credentials
 	 */
 	@GET
 	@Path("/getExtractedText")
 	@Produces({ MediaType.TEXT_PLAIN })
-	public String getExtractedText(long docId) throws AuthenticationException, WebserviceException, PersistenceException;
+	public String getExtractedText(long docId)
+			throws AuthenticationException, WebserviceException, PersistenceException;
 
 	/**
 	 * Lists of last modified documents of the current session
 	 * 
 	 * @param maxHits Maximum number of returned records
 	 * 
-	 * @return Array of documents
+	 * @return List of documents
 	 * 
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
-	 * @throws AuthenticationException Invalid credentials 
+	 * @throws AuthenticationException Invalid credentials
 	 */
 	@GET
 	@Path("/getRecentDocuments")
-	public WSDocument[] getRecentDocuments(Integer maxHits) throws AuthenticationException, WebserviceException, PersistenceException;
+	public List<WSDocument> getRecentDocuments(Integer maxHits)
+			throws AuthenticationException, WebserviceException, PersistenceException;
 
 	/**
 	 * Gets all the links of a specific document
@@ -722,14 +810,16 @@ public interface DocumentService {
 	 * 
 	 * @return The new links of the document
 	 * 
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
-	 * @throws PermissionException The current user does not have enough permissions
-	 * @throws AuthenticationException Invalid credentials 
+	 * @throws PermissionException The current user does not have enough
+	 *         permissions
+	 * @throws AuthenticationException Invalid credentials
 	 */
 	@GET
 	@Path("/getLinks")
-	public WSLink[] getLinks(long docId) throws AuthenticationException, PermissionException, WebserviceException, PersistenceException;
+	public List<WSLink> getLinks(long docId)
+			throws AuthenticationException, PermissionException, WebserviceException, PersistenceException;
 
 	/**
 	 * Gets the content of a resource associated to the given document.
@@ -742,28 +832,17 @@ public interface DocumentService {
 	 * @return The requested resource's binary
 	 * 
 	 * @throws IOException I/O error
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
-	 * @throws PermissionException The current user does not have enough permissions
-	 * @throws AuthenticationException Invalid credentials 
+	 * @throws PermissionException The current user does not have enough
+	 *         permissions
+	 * @throws AuthenticationException Invalid credentials
 	 */
 	@GET
 	@Path("/getResource")
 	@Produces(MediaType.APPLICATION_OCTET_STREAM)
-	public DataHandler getResource(long docId, String fileVersion, String suffix) throws AuthenticationException, PermissionException, WebserviceException, PersistenceException, IOException;
-
-	/**
-	 * Tests if a document is readable
-	 * 
-	 * @param docId The document id
-	 * 
-	 * @return True if the identifier denotes a document, otherwise false
-	 * 
-	 * @throws PersistenceException Error in the database 
-	 * @throws WebserviceException A generic error in the WebService
-	 * @throws AuthenticationException Invalid credentials 
-	 */
-	public boolean isReadable(long docId) throws AuthenticationException, WebserviceException, PersistenceException;
+	public DataHandler getResource(long docId, String fileVersion, String suffix)
+			throws AuthenticationException, PermissionException, WebserviceException, PersistenceException, IOException;
 
 	/**
 	 * Creates a new link between two documents.
@@ -774,24 +853,30 @@ public interface DocumentService {
 	 * 
 	 * @return the new link
 	 * 
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
-	 * @throws PermissionException The current user does not have enough permissions
-	 * @throws AuthenticationException Invalid credentials 
+	 * @throws PermissionException The current user does not have enough
+	 *         permissions
+	 * @throws AuthenticationException Invalid credentials
+	 * @throws UnexistingResourceException The specified document does not exist
 	 */
-	public WSLink link(long doc1, long doc2, String type) throws AuthenticationException, PermissionException, WebserviceException, PersistenceException;
+	public WSLink link(long doc1, long doc2, String type) throws AuthenticationException, PermissionException,
+			WebserviceException, PersistenceException, UnexistingResourceException;
 
 	/**
 	 * Locks an existing document with the given identifier.
 	 * 
 	 * @param docId The document id
 	 * 
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
-	 * @throws PermissionException The current user does not have enough permissions
-	 * @throws AuthenticationException Invalid credentials 
+	 * @throws PermissionException The current user does not have enough
+	 *         permissions
+	 * @throws AuthenticationException Invalid credentials
+	 * @throws UnexistingResourceException The specified document does not exist
 	 */
-	public void lock(long docId) throws AuthenticationException, PermissionException, WebserviceException, PersistenceException;
+	public void lock(long docId) throws AuthenticationException, PermissionException, WebserviceException,
+			PersistenceException, UnexistingResourceException;
 
 	/**
 	 * Re-indexes(or indexes from scratch) a document
@@ -799,12 +884,13 @@ public interface DocumentService {
 	 * @param docId The document id
 	 * @param content The content to be used (if null the file is parsed)
 	 * 
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
-	 * @throws ParseException Error parsing the content
-	 * @throws AuthenticationException Invalid credentials 
+	 * @throws ParsingException Error parsing the content
+	 * @throws AuthenticationException Invalid credentials
 	 */
-	public void reindex(long docId, String content) throws AuthenticationException, ParseException, WebserviceException, PersistenceException;
+	public void reindex(long docId, String content)
+			throws AuthenticationException, ParsingException, WebserviceException, PersistenceException;
 
 	/**
 	 * Uploads a new resource of the document
@@ -818,10 +904,11 @@ public interface DocumentService {
 	 * @param contentDetail file content
 	 * 
 	 * @throws IOException I/O error
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
-	 * @throws PermissionException The current user does not have enough permissions
-	 * @throws AuthenticationException Invalid credentials 
+	 * @throws PermissionException The current user does not have enough
+	 *         permissions
+	 * @throws AuthenticationException Invalid credentials
 	 */
 	@POST
 	@Path("/uploadResource")
@@ -832,7 +919,8 @@ public interface DocumentService {
 	Integer docId, @Multipart(value = "fileVersion", required = false)
 	String fileVersion, @Multipart(value = "suffix", required = false)
 	String suffix, @Multipart(value = "content", required = false)
-	Attachment contentDetail) throws AuthenticationException, PermissionException, WebserviceException, PersistenceException, IOException;
+	Attachment contentDetail)
+			throws AuthenticationException, PermissionException, WebserviceException, PersistenceException, IOException;
 
 	/**
 	 * Restores a deleted document
@@ -840,11 +928,12 @@ public interface DocumentService {
 	 * @param docId The document id
 	 * @param folderId Id of the folder in which the document must be restored
 	 * 
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
-	 * @throws AuthenticationException Invalid credentials 
+	 * @throws AuthenticationException Invalid credentials
 	 */
-	public void restore(long docId, long folderId) throws AuthenticationException, WebserviceException, PersistenceException;
+	public void restore(long docId, long folderId)
+			throws AuthenticationException, WebserviceException, PersistenceException;
 
 	/**
 	 * Adds a new note for the given document
@@ -854,12 +943,15 @@ public interface DocumentService {
 	 * 
 	 * @return the added note
 	 * 
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
-	 * @throws PermissionException The current user does not have enough permissions
-	 * @throws AuthenticationException Invalid credentials 
+	 * @throws PermissionException The current user does not have enough
+	 *         permissions
+	 * @throws AuthenticationException Invalid credentials
+	 * @throws UnexistingResourceException The specified document does not exist
 	 */
-	public WSNote saveNote(long docId, WSNote note) throws AuthenticationException, PermissionException, WebserviceException, PersistenceException;
+	public WSNote saveNote(long docId, WSNote note) throws AuthenticationException, PermissionException,
+			WebserviceException, PersistenceException, UnexistingResourceException;
 
 	/**
 	 * Sends a set of documents as mail attachments
@@ -870,12 +962,14 @@ public interface DocumentService {
 	 * @param message The email message body
 	 * 
 	 * @throws IOException I/O error
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
 	 * @throws AuthenticationException Invalid credentials
-	 * @throws MessagingException Error in the communication with the mail server
+	 * @throws MessagingException Error in the communication with the mail
+	 *         server
 	 */
-	public void sendEmail(Long[] docIds, String recipients, String subject, String message) throws AuthenticationException, WebserviceException, PersistenceException, IOException, MessagingException;
+	public void sendEmail(List<Long> docIds, String recipients, String subject, String message)
+			throws AuthenticationException, WebserviceException, PersistenceException, IOException, MessagingException;
 
 	/**
 	 * Puts a password protection to the document
@@ -883,24 +977,30 @@ public interface DocumentService {
 	 * @param docId identifier of the document
 	 * @param password the new password
 	 * 
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
-	 * @throws PermissionException The current user does not have enough permissions
-	 * @throws AuthenticationException Invalid credentials 
+	 * @throws PermissionException The current user does not have enough
+	 *         permissions
+	 * @throws AuthenticationException Invalid credentials
+	 * @throws UnexistingResourceException The specified document does not exist
 	 */
-	public void setPassword(long docId, String password) throws AuthenticationException, PermissionException, WebserviceException, PersistenceException;
+	public void setPassword(long docId, String password) throws AuthenticationException, PermissionException,
+			WebserviceException, PersistenceException, UnexistingResourceException;
 
 	/**
 	 * Unlocks an existing document with the given identifier.
 	 * 
 	 * @param docId identifier of the document
 	 * 
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
-	 * @throws PermissionException The current user does not have enough permissions
-	 * @throws AuthenticationException Invalid credentials 
+	 * @throws PermissionException The current user does not have enough
+	 *         permissions
+	 * @throws AuthenticationException Invalid credentials
+	 * @throws UnexistingResourceException The specified document does not exist
 	 */
-	public void unlock(long docId) throws AuthenticationException, PermissionException, WebserviceException, PersistenceException;
+	public void unlock(long docId) throws AuthenticationException, PermissionException, WebserviceException,
+			PersistenceException, UnexistingResourceException;
 
 	/**
 	 * Unprotects a document that is password protected. If the given password
@@ -912,11 +1012,12 @@ public interface DocumentService {
 	 * 
 	 * @return was it uprotected?
 	 * 
-	 * @throws PersistenceException Error in the database  
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
 	 * @throws AuthenticationException Invalid session
 	 */
-	public boolean unprotect(long docId, String password) throws PersistenceException, AuthenticationException, WebserviceException;
+	public boolean unprotect(long docId, String password)
+			throws PersistenceException, AuthenticationException, WebserviceException;
 
 	/**
 	 * Removes the password protection from the document
@@ -924,10 +1025,118 @@ public interface DocumentService {
 	 * @param docId identifier of the document
 	 * @param currentPassword the password
 	 * 
-	 * @throws PersistenceException Error in the database 
+	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException A generic error in the WebService
-	 * @throws PermissionException The current user does not have enough permissions
-	 * @throws AuthenticationException Invalid credentials  
+	 * @throws PermissionException The current user does not have enough
+	 *         permissions
+	 * @throws AuthenticationException Invalid credentials
+	 * @throws UnexistingResourceException The specified document does not exist
 	 */
-	public void unsetPassword(long docId, String currentPassword) throws AuthenticationException, PermissionException, WebserviceException, PersistenceException;
+	public void unsetPassword(long docId, String currentPassword) throws AuthenticationException, PermissionException,
+			WebserviceException, PersistenceException, UnexistingResourceException;
+
+	/**
+	 * Sets the Access Control List
+	 * 
+	 * @param docId Document id
+	 * @param acl the complete Access Control List
+	 * 
+	 * @throws PersistenceException Error in the database
+	 * @throws WebserviceException Error in the webservice
+	 * @throws AuthenticationException Invalid session
+	 * @throws PermissionException The user does not have the required
+	 *         permission
+	 */
+	@PUT
+	@Path("/setAccessControlList")
+	public void setAccessControlList(@QueryParam("docId")
+	long docId, List<WSAccessControlEntry> acl)
+			throws PersistenceException, PermissionException, AuthenticationException, WebserviceException;
+
+	/**
+	 * Retrieves the access control list
+	 * 
+	 * @param docId Document id
+	 * 
+	 * @return 'error' if error occurred, the right objects collection
+	 * 
+	 * @throws PermissionException The permission has not been granted
+	 * @throws PersistenceException Error in the database
+	 * @throws WebserviceException Error in the webservice
+	 * @throws AuthenticationException Invalid session
+	 */
+	@GET
+	@Path("/getAccessControlList")
+	public List<WSAccessControlEntry> getAccessControlList(@QueryParam("docId")
+	long docId) throws AuthenticationException, WebserviceException, PersistenceException, PermissionException;
+
+	/**
+	 * Tests if a document is readable.
+	 * 
+	 * @param docId The document id
+	 * 
+	 * @return True if the identifier denotes a readable document, otherwise
+	 *         false.
+	 * 
+	 * @throws PersistenceException Error in the database
+	 * @throws WebserviceException A generic error in the WebService
+	 * @throws AuthenticationException Invalid credentials
+	 */
+	@GET
+	@Path("/isRead")
+	public boolean isRead(@QueryParam("docId")
+	long docId) throws AuthenticationException, WebserviceException, PersistenceException;
+
+	/**
+	 * Tests if a document is downloadable.
+	 * 
+	 * @param docId The document id
+	 * 
+	 * @return True if the identifier denotes a downloadable document, otherwise
+	 *         false.
+	 * 
+	 * @throws PersistenceException Error in the database
+	 * @throws WebserviceException A generic error in the WebService
+	 * @throws AuthenticationException Invalid credentials
+	 */
+	@GET
+	@Path("/isDownload")
+	public boolean isDownload(@QueryParam("docId")
+	long docId) throws AuthenticationException, WebserviceException, PersistenceException;
+
+	/**
+	 * Tests if a document is writable
+	 * 
+	 * @param docId The document id
+	 * 
+	 * @return True if the identifier denotes a writable document, otherwise
+	 *         false
+	 * 
+	 * @throws PersistenceException Error in the database
+	 * @throws WebserviceException A generic error in the WebService
+	 * @throws AuthenticationException Invalid credentials
+	 */
+	@GET
+	@Path("/isWrite")
+	public boolean isWrite(@QueryParam("docId")
+	long docId) throws AuthenticationException, WebserviceException, PersistenceException;
+
+	/**
+	 * Tests if the current user has a specific permission on a document
+	 * 
+	 * @param docId The document id
+	 * @param permission The permission to check (eg: 'read', 'write', ...)
+	 * 
+	 * @return True if the identifier denotes a granted permission, otherwise
+	 *         false
+	 * 
+	 * @throws PersistenceException Error in the database
+	 * @throws WebserviceException A generic error in the WebService
+	 * @throws AuthenticationException Invalid credentials
+	 */
+	@GET
+	@Path("/isGranted")
+	public boolean isGranted(@QueryParam("docId")
+	long docId, @QueryParam("permission")
+	String permission) throws AuthenticationException, WebserviceException, PersistenceException;
 }

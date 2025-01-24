@@ -11,16 +11,18 @@
 			</generator>
 		</id>
 		<version name="recordVersion" column="ld_recordversion" type="long" />
-		<property name="lastModified" type="timestamp" column="ld_lastmodified" />
+		<property name="lastModified" type="timestamp" column="ld_lastmodified" not-null="true"/>
+		<property name="creation" type="timestamp" column="ld_creation" not-null="true" />
 		<property name="deleted" type="int" column="ld_deleted" not-null="true" />
 		<property name="tenantId" type="long" column="ld_tenantid" not-null="true" />
 		<property name="sid" type="string" column="ld_sid" not-null="true" length="255" />
 		<property name="username" type="string" column="ld_username" length="255" />
 		<property name="key" type="string" column="ld_key" length="255" />
+		<property name="keyLabel" type="string" column="ld_keylabel" length="255" />
 		<property name="node" type="string" column="ld_node" length="255" />
 		<property name="tenantName" type="string" column="ld_tenantname" length="255" />
-		<property name="creation" type="timestamp" column="ld_creation" />
 		<property name="lastRenew" type="timestamp" column="ld_lastrenew" />
+		<property name="finished" type="timestamp" column="ld_finished" />
 		<property name="status" type="int" column="ld_status" not-null="true" />
 
 		<component name="client" class="com.logicaldoc.core.security.Client">

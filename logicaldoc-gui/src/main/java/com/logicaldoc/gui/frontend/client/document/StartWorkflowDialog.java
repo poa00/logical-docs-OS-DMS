@@ -1,6 +1,8 @@
 package com.logicaldoc.gui.frontend.client.document;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import java.util.List;
+
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.i18n.I18N;
 import com.logicaldoc.gui.common.client.log.GuiLog;
@@ -32,7 +34,7 @@ public class StartWorkflowDialog extends Window {
 
 	private ColorPickerItem color;
 
-	public StartWorkflowDialog(Long[] ids) {
+	public StartWorkflowDialog(List<Long> ids) {
 		setHeaderControls(HeaderControls.HEADER_LABEL, HeaderControls.CLOSE_BUTTON);
 		setTitle(I18N.message("startworkflow"));
 		setCanDragResize(true);
@@ -66,7 +68,7 @@ public class StartWorkflowDialog extends Window {
 		addItem(form);
 	}
 
-	public void onStart(Long[] ids) {
+	public void onStart(List<Long> ids) {
 		if (!form.validate())
 			return;
 
@@ -74,18 +76,22 @@ public class StartWorkflowDialog extends Window {
 
 		WorkflowService.Instance.get().startWorkflow(selection.getAttributeAsString("name"),
 				selection.getAttributeAsString("description"), tag.getValueAsString(), color.getValueAsString(), ids,
-				new AsyncCallback<Void>() {
-
+				new DefaultAsyncCallback<>() {
 					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
-					@Override
-					public void onSuccess(Void result) {
+					public void onSuccess(String result) {
 						GuiLog.info(I18N.message("event.workflow.start"), null);
 						destroy();
 					}
 				});
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+	
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

@@ -10,13 +10,18 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
-import java.util.stream.Collectors;
+import java.util.Set;
+
+import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
+import javax.annotation.Resource;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.lucene.index.CheckIndex;
 import org.apache.lucene.index.CheckIndex.Status;
 import org.apache.lucene.index.IndexWriter;
+import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.LockObtainFailedException;
 import org.apache.lucene.store.NIOFSDirectory;
@@ -34,16 +39,15 @@ import org.apache.solr.core.CoreContainer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.base.Joiner;
 import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.document.AbstractDocument;
 import com.logicaldoc.core.document.Document;
+import com.logicaldoc.core.document.DocumentDAO;
 import com.logicaldoc.core.document.DocumentNote;
-import com.logicaldoc.core.document.dao.DocumentDAO;
-import com.logicaldoc.core.document.dao.DocumentNoteDAO;
+import com.logicaldoc.core.document.DocumentNoteDAO;
 import com.logicaldoc.core.metadata.Attribute;
-import com.logicaldoc.core.parser.ParseException;
 import com.logicaldoc.core.parser.ParserFactory;
+import com.logicaldoc.core.parser.ParsingException;
 import com.logicaldoc.core.searchengine.analyzer.FilteredAnalyzer;
 import com.logicaldoc.util.StringUtil;
 import com.logicaldoc.util.config.ContextProperties;
@@ -65,10 +69,13 @@ public class StandardSearchEngine implements SearchEngine {
 
 	protected static Logger log = LoggerFactory.getLogger(StandardSearchEngine.class);
 
+	@Resource(name = "ContextProperties")
 	private ContextProperties config;
 
+	@Resource(name = "DocumentDAO")
 	protected DocumentDAO documentDao;
 
+	@Resource(name = "DocumentNoteDAO")
 	protected DocumentNoteDAO noteDao;
 
 	protected EmbeddedSolrServer server;
@@ -186,7 +193,6 @@ public class StandardSearchEngine implements SearchEngine {
 	}
 
 	private Document getDocument(Document document) throws PersistenceException {
-		documentDao.initialize(document);
 		Document doc = document;
 		if (document.getDocRef() != null) {
 			// This is an alias
@@ -206,8 +212,10 @@ public class StandardSearchEngine implements SearchEngine {
 	public synchronized void addHit(Document document, InputStream content) throws IndexException {
 		try {
 			Document doc = document;
-			if (doc.getDocRef() != null)
+			if (doc.getDocRef() != null) {
 				doc = documentDao.findById(doc.getDocRef());
+				documentDao.initialize(doc);
+			}
 
 			Locale locale = doc.getLocale();
 			if (locale == null)
@@ -219,7 +227,7 @@ public class StandardSearchEngine implements SearchEngine {
 				ParserFactory.parse(content, doc.getFileName(), null, locale, doc.getTenantId(), doc, null);
 
 			addHit(doc, contentString);
-		} catch (PersistenceException | ParseException | IndexException e) {
+		} catch (PersistenceException | ParsingException | IndexException e) {
 			throw new IndexException(e.getMessage(), e);
 		}
 	}
@@ -230,7 +238,8 @@ public class StandardSearchEngine implements SearchEngine {
 		try {
 			server.optimize(true, true);
 		} catch (Exception e) {
-			log.error("Error during optimization: " + e.getMessage(), e);
+			log.error("Error during optimization");
+			log.error(e.getMessage(), e);
 		}
 		log.warn("Finished optimization of the index");
 	}
@@ -319,7 +328,7 @@ public class StandardSearchEngine implements SearchEngine {
 	@Override
 	public synchronized void deleteHits(Collection<Long> ids) {
 		try {
-			server.deleteById(ids.stream().map(i -> Long.toString(i)).collect(Collectors.toList()));
+			server.deleteById(ids.stream().map(i -> Long.toString(i)).toList());
 			server.commit();
 		} catch (Exception e) {
 			log.debug("Unable to delete {} hits", ids.size(), e);
@@ -367,17 +376,19 @@ public class StandardSearchEngine implements SearchEngine {
 	}
 
 	@Override
-	public Hits search(String expression, String[] filters, String expressionLanguage, Integer rows) {
+	public Hits search(String expression, Set<String> filters, String expressionLanguage, Integer rows) {
 		try {
 			// This configures the analyzer to use to to parse the expression of
 			// the content field
 			FilteredAnalyzer.lang.set(expressionLanguage);
 			Hits hits = null;
+
 			SolrQuery query = prepareSearchQuery(expression, filters, expressionLanguage, rows);
 
 			try {
-				log.info("Execute search: {}", expression);
+				log.info("Execute search: {}   with filters: {}", expression, filters);
 				QueryResponse rsp = server.query(query);
+				log.debug("fulltext query results: {}", rsp.getResults().getNumFound());
 				hits = new Hits(rsp);
 			} catch (Exception e) {
 				log.error(e.getMessage(), e);
@@ -391,42 +402,24 @@ public class StandardSearchEngine implements SearchEngine {
 	/**
 	 * Prepares the query for a search.
 	 */
-	protected SolrQuery prepareSearchQuery(String expression, String[] filters, String expressionLanguage,
+	protected SolrQuery prepareSearchQuery(String expression, Set<String> filters, String expressionLanguage,
 			Integer rows) {
+		// Don't want any limit in the number of conditions processed by Lucene
+		BooleanQuery.setMaxClauseCount( Integer.MAX_VALUE );
+		
 		SolrQuery query = new SolrQuery().setQuery(expression);
 		if (rows != null)
 			query = query.setRows(rows);
-		if (filters != null)
-			query = query.addFilterQuery(Joiner.on(" +").join(filters));
+
+		if (CollectionUtils.isNotEmpty(filters))
+			for (String filter : filters)
+				query = query.addFilterQuery(filter);
+
 		query = query.setSort(SortClause.desc("score"));
 		query.set("exprLang", expressionLanguage);
 		return query;
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.logicaldoc.core.searchengine.SearchEngine#close()
-	 */
-	@Override
-	public synchronized void close() {
-		log.warn("Closing the indexer");
-		try {
-			server.commit();
-			unlock();
-			server.getCoreContainer().shutdown();
-			server.close();
-			FileUtil.strongDelete(new File(getIndexDataFolder(), IndexWriter.WRITE_LOCK_NAME));
-		} catch (Exception e) {
-			log.warn(e.getMessage(), e);
-		}
-	}
-
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.logicaldoc.core.searchengine.SearchEngine#unlock()
-	 */
 	@Override
 	public synchronized void unlock() {
 		try {
@@ -435,7 +428,7 @@ public class StandardSearchEngine implements SearchEngine {
 				directory.obtainLock(IndexWriter.WRITE_LOCK_NAME).close();
 		} catch (Exception e) {
 			log.warn("unlock {}", e.getMessage());
-			FileUtil.strongDelete(new File(getIndexDataFolder(), "write.lock"));
+			FileUtil.delete(new File(getIndexDataFolder(), "write.lock"));
 		}
 	}
 
@@ -563,10 +556,23 @@ public class StandardSearchEngine implements SearchEngine {
 		return new File(indexdir, "index");
 	}
 
-	/**
-	 * @see com.logicaldoc.core.searchengine.SearchEngine#init()
-	 */
 	@Override
+	@PreDestroy
+	public synchronized void close() {
+		log.warn("Closing the indexer");
+		try {
+			server.commit();
+			unlock();
+			server.getCoreContainer().shutdown();
+			server.close();
+			FileUtil.delete(new File(getIndexDataFolder(), IndexWriter.WRITE_LOCK_NAME));
+		} catch (Exception e) {
+			log.warn(e.getMessage(), e);
+		}
+	}
+
+	@Override
+	@PostConstruct
 	public void init() {
 		log.info("Initializing the full-text search engine");
 		try {
@@ -622,7 +628,7 @@ public class StandardSearchEngine implements SearchEngine {
 			}
 
 			// Delete the lock file if it exists
-			FileUtil.strongDelete(new File(indexHome, "logicaldoc/data/index/" + IndexWriter.WRITE_LOCK_NAME));
+			FileUtil.delete(new File(indexHome, "logicaldoc/data/index/" + IndexWriter.WRITE_LOCK_NAME));
 
 			CoreContainer container = new CoreContainer(indexHome.toPath(), null);
 			server = new EmbeddedSolrServer(container, LOGICALDOC);

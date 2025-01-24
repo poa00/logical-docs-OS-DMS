@@ -15,7 +15,6 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.text.StrSubstitutor;
@@ -70,7 +69,8 @@ public class ContextProperties extends OrderedProperties {
 				if ("file".equals(url.getProtocol()))
 					this.file = new File(url.getPath());
 			} catch (Exception e) {
-				log.error("Unable to find classpath resource {}", filePath, e);
+				log.error("Unable to find classpath resource {}", filePath);
+				log.error(e.getMessage(), e);
 			}
 		}
 
@@ -192,7 +192,7 @@ public class ContextProperties extends OrderedProperties {
 
 			FileUtil.moveQuitely(tmpFile, file);
 		} finally {
-			FileUtil.strongDelete(tmpFile);
+			FileUtil.delete(tmpFile);
 		}
 	}
 
@@ -208,6 +208,9 @@ public class ContextProperties extends OrderedProperties {
 	 * are maintained.
 	 */
 	protected void backup() throws IOException {
+		if (maxBackups < 1)
+			return;
+
 		checkFile();
 
 		// Backup the file first
@@ -233,10 +236,10 @@ public class ContextProperties extends OrderedProperties {
 	private void deleteOldestBackups() throws IOException {
 		List<File> oldBackups = getBackups();
 		if (oldBackups.size() > maxBackups) {
-			List<File> backupsToRetain = oldBackups.stream().limit(maxBackups).collect(Collectors.toList());
+			List<File> backupsToRetain = oldBackups.stream().limit(maxBackups).toList();
 			for (File backupFile : oldBackups)
 				if (!backupsToRetain.contains(backupFile))
-					FileUtil.strongDelete(backupFile);
+					FileUtil.delete(backupFile);
 		}
 	}
 
@@ -405,5 +408,15 @@ public class ContextProperties extends OrderedProperties {
 			if (!containsKey(tenantProp))
 				setProperty(tenantProp, getProperty("default." + prop));
 		}
+	}
+
+	@Override
+	public synchronized boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public synchronized int hashCode() {
+		return super.hashCode();
 	}
 }

@@ -1,8 +1,8 @@
 package com.logicaldoc.gui.frontend.client.document.update;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 
 import com.logicaldoc.gui.common.client.Feature;
 import com.logicaldoc.gui.common.client.Session;
@@ -24,7 +24,6 @@ import com.smartgwt.client.widgets.form.fields.MultiComboBoxItem;
 import com.smartgwt.client.widgets.form.fields.SelectItem;
 import com.smartgwt.client.widgets.form.fields.StaticTextItem;
 import com.smartgwt.client.widgets.form.fields.TextItem;
-import com.smartgwt.client.widgets.form.fields.events.FormItemIconClickEvent;
 import com.smartgwt.client.widgets.form.fields.events.KeyPressEvent;
 import com.smartgwt.client.widgets.layout.VLayout;
 
@@ -100,7 +99,7 @@ public class UpdateStandardPropertiesPanel extends DocumentDetailTab {
 			String mode = Session.get().getConfig("tag.mode");
 			final DataSource ds = new TagsDS(null, true, document.getId(), null);
 
-			tagItem = ItemFactory.newMultiComboBoxItem("tag", "tag", ds, document.getTags());
+			tagItem = ItemFactory.newMultiComboBoxItem("tag", "tag", ds, document.getTags().toArray(new String[0]));
 			tagItem.setPrompt(I18N.message("typeatag"));
 			tagItem.setValueField("word");
 			tagItem.setDisplayField("word");
@@ -117,7 +116,7 @@ public class UpdateStandardPropertiesPanel extends DocumentDetailTab {
 			editTags.setSrc("[SKIN]/actions/edit.png");
 			editTags.setWidth(16);
 			editTags.setHeight(16);
-			editTags.addFormItemClickHandler((final FormItemIconClickEvent editTagsClick) -> {
+			editTags.addFormItemClickHandler(editTagsClick -> {
 				tagsString.setVisible(false);
 				tagItem.setVisible(true);
 				tagItem.setEndRow(true);
@@ -147,8 +146,7 @@ public class UpdateStandardPropertiesPanel extends DocumentDetailTab {
 		newTagItem.setRequired(false);
 		newTagItem.addKeyPressHandler((KeyPressEvent newTagKeyPress) -> {
 			if (Boolean.FALSE.equals(newTagItem.validate()) || newTagItem.getValue() == null
-					|| newTagKeyPress.getKeyName() == null
-					|| !"enter".equalsIgnoreCase(newTagKeyPress.getKeyName()))
+					|| newTagKeyPress.getKeyName() == null || !"enter".equalsIgnoreCase(newTagKeyPress.getKeyName()))
 				return;
 
 			String input = newTagItem.getValueAsString().trim();
@@ -199,16 +197,24 @@ public class UpdateStandardPropertiesPanel extends DocumentDetailTab {
 			SC.warn(I18N.message("sometagaddedbecauseinvalid"));
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public boolean validate() {
-		Map<String, Object> values = vm.getValues();
 		vm.validate();
 		if (Boolean.FALSE.equals(vm.hasErrors())) {
-			document.setLanguage((String) values.get(LANGUAGE));
-			document.setColor((String) values.get("color"));
-			document.setTags(tagItem.getValues());
+			document.setLanguage(vm.getValueAsString(LANGUAGE));
+			document.setColor(vm.getValueAsString("color"));
+			document.setTags(Arrays.asList(tagItem.getValues()));
 		}
 		return !vm.hasErrors();
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

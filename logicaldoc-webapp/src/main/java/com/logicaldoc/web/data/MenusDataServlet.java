@@ -11,9 +11,9 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.lang.StringUtils;
 
 import com.logicaldoc.core.PersistenceException;
-import com.logicaldoc.core.security.Menu;
 import com.logicaldoc.core.security.Session;
-import com.logicaldoc.core.security.dao.MenuDAO;
+import com.logicaldoc.core.security.menu.Menu;
+import com.logicaldoc.core.security.menu.MenuDAO;
 import com.logicaldoc.util.Context;
 
 /**
@@ -32,8 +32,7 @@ public class MenusDataServlet extends AbstractDataServlet {
 	protected void service(HttpServletRequest request, HttpServletResponse response, Session session, Integer max,
 			Locale locale) throws PersistenceException, IOException {
 
-		Context context = Context.get();
-		MenuDAO dao = (MenuDAO) context.getBean(MenuDAO.class);
+		MenuDAO dao = Context.get(MenuDAO.class);
 		long parent = Menu.ROOT;
 
 		if (!"/".equals(request.getParameter(PARENT)) && StringUtils.isNotEmpty(request.getParameter(PARENT)))

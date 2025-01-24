@@ -11,7 +11,8 @@
 			</generator>
 		</id>
 		<version name="recordVersion" column="ld_recordversion" type="long" />
-		<property name="lastModified" type="timestamp" column="ld_lastmodified" />
+		<property name="lastModified" type="timestamp" column="ld_lastmodified" not-null="true"/>
+		<property name="creation" type="timestamp" column="ld_creation" not-null="true" />
 		<property name="deleted" type="int" column="ld_deleted" not-null="true" />
 		<property name="name" type="string" column="ld_name" length="255" />
 		<property name="position" type="int" column="ld_position" not-null="true" />
@@ -21,7 +22,6 @@
 		<property name="securityRef" type="long" column="ld_securityref" />
 		<property name="description" type="string" column="ld_description" length="4000" />
 		<property name="type" type="int" column="ld_type" not-null="true" />
-		<property name="creation" type="timestamp" column="ld_creation" />
 		<property name="creator" type="string" column="ld_creator" length="255" />
 		<property name="creatorId" type="long" column="ld_creatorid" />
 		<property name="templateLocked" type="int" column="ld_templocked" not-null="true" />
@@ -41,10 +41,13 @@
 
 		<property name="tile" type="text" column="ld_tile" />
 		
-		<set name="folderGroups" table="ld_foldergroup" cascade="all" lazy="true">
+		<set name="accessControlList" table="ld_folder_acl" cascade="all" lazy="true">
 			<key column="ld_folderid" />
-			<composite-element class="com.logicaldoc.core.folder.FolderGroup">
+			<composite-element class="com.logicaldoc.core.security.AccessControlEntry">
 				<property name="groupId" type="long" column="ld_groupid" not-null="true" />
+				<property name="read" type="int" column="ld_read" not-null="true" />
+				<property name="preview" type="int" column="ld_preview" not-null="true" />
+				<property name="customid" type="int" column="ld_customid" not-null="true" />
 				<property name="write" type="int" column="ld_write" not-null="true" />
 				<property name="add" type="int" column="ld_add" not-null="true" />
 				<property name="security" type="int" column="ld_security" not-null="true" />
@@ -64,7 +67,7 @@
 				<property name="move" type="int" column="ld_move" not-null="true" />
 				<property name="email" type="int" column="ld_email" not-null="true" />
 				<property name="automation" type="int" column="ld_automation" not-null="true" />
-				<property name="storage" type="int" column="ld_storage" not-null="true" />
+				<property name="store" type="int" column="ld_store" not-null="true" />
 				<property name="readingreq" type="int" column="ld_readingreq" not-null="true" />
 			</composite-element>
 		</set>
@@ -101,10 +104,10 @@
 				<property name="dateValue" type="timestamp" column="ld_datevalue" />
 			</composite-element>
 		</map>
-		<map name="storages" table="ld_folder_storage" lazy="true" cascade="all">
+		<map name="stores" table="ld_folder_store" lazy="true" cascade="all">
       		<key column="ld_folderid"/>
       		<map-key type="string" column="ld_nodeid" length="255" />
-      		<element type="int" column="ld_storageid" />
+      		<element type="int" column="ld_storeid" />
         </map>
 	</class>
 </hibernate-mapping>

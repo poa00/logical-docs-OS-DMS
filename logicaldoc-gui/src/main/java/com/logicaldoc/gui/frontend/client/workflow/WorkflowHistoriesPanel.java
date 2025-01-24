@@ -1,20 +1,20 @@
 package com.logicaldoc.gui.frontend.client.workflow;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Menu;
 import com.logicaldoc.gui.common.client.beans.GUIDocument;
 import com.logicaldoc.gui.common.client.data.WorkflowHistoriesDS;
+import com.logicaldoc.gui.common.client.grid.DateListGridField;
+import com.logicaldoc.gui.common.client.grid.DateListGridField.DateCellFormatter;
+import com.logicaldoc.gui.common.client.grid.FileNameListGridField;
+import com.logicaldoc.gui.common.client.grid.IdListGridField;
+import com.logicaldoc.gui.common.client.grid.RefreshableListGrid;
+import com.logicaldoc.gui.common.client.grid.UserListGridField;
+import com.logicaldoc.gui.common.client.grid.VersionListGridField;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
+import com.logicaldoc.gui.common.client.preview.PreviewPopup;
 import com.logicaldoc.gui.common.client.util.DocUtil;
 import com.logicaldoc.gui.common.client.util.GridUtil;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField.DateCellFormatter;
-import com.logicaldoc.gui.common.client.widgets.grid.FileNameListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.RefreshableListGrid;
-import com.logicaldoc.gui.common.client.widgets.grid.UserListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.VersionListGridField;
-import com.logicaldoc.gui.common.client.widgets.preview.PreviewPopup;
 import com.logicaldoc.gui.frontend.client.document.DocumentsPanel;
 import com.logicaldoc.gui.frontend.client.services.DocumentService;
 import com.smartgwt.client.types.SelectionStyle;
@@ -73,8 +73,7 @@ public class WorkflowHistoriesPanel extends VLayout {
 
 	@Override
 	public void onDraw() {
-		ListGridField historyId = new ListGridField("id", I18N.message("id"), 60);
-		historyId.setHidden(true);
+		ListGridField historyId = new IdListGridField();
 
 		ListGridField historyEvent = new ListGridField("event", I18N.message("event"), 200);
 		ListGridField historyName = new WorkflowTaskNameListGridField("name", "display", I18N.message("task"));
@@ -83,6 +82,7 @@ public class WorkflowHistoriesPanel extends VLayout {
 
 		ListGridField historyUser = new UserListGridField("user", "userId", "user");
 		ListGridField historyComment = new ListGridField("comment", I18N.message("comment"));
+		historyComment.setMinWidth(200);
 		historyComment.setWidth("*");
 		historyComment.setHidden(!showComment);
 		FileNameListGridField historyFilename = new FileNameListGridField();
@@ -90,6 +90,8 @@ public class WorkflowHistoriesPanel extends VLayout {
 		documentId.setHidden(true);
 		ListGridField historySid = new ListGridField("sessionid", I18N.message("sid"), 240);
 		historySid.setHidden(true);
+		ListGridField key = new ListGridField("key", I18N.message("key"), 90);
+		key.setHidden(true);
 		ListGridField transition = new ListGridField("transition", I18N.message("transition"), 120);
 		transition.setHidden(true);
 
@@ -112,10 +114,10 @@ public class WorkflowHistoriesPanel extends VLayout {
 			historiesGrid.setDataSource(new WorkflowHistoriesDS(wfInstanceId, wfTemplateId, null, null, null));
 		if (Menu.enabled(Menu.SESSIONS))
 			historiesGrid.setFields(historyId, templateVersion, templateId, historyEvent, historyName, historyDate,
-					historyUser, historyComment, historyFilename, transition, documentId, historySid);
+					historyUser, historyComment, historyFilename, transition, documentId, historySid, key);
 		else
 			historiesGrid.setFields(historyId, templateVersion, templateId, historyEvent, historyName, historyDate,
-					historyUser, historyComment, historyFilename, transition, documentId);
+					historyUser, historyComment, historyFilename, transition, documentId, key);
 		historiesGrid.addCellContextClickHandler(event -> {
 			event.cancel();
 			showHistoryContextMenu();
@@ -158,13 +160,7 @@ public class WorkflowHistoriesPanel extends VLayout {
 			return;
 
 		DocumentService.Instance.get().getById(Long.parseLong(selection.getAttributeAsString(DOCUMENT_ID)),
-				new AsyncCallback<GUIDocument>() {
-
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(final GUIDocument doc) {
 						if (doc == null)
@@ -197,5 +193,15 @@ public class WorkflowHistoriesPanel extends VLayout {
 						contextMenu.showContextMenu();
 					}
 				});
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

@@ -8,7 +8,6 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.when;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.SQLException;
 
@@ -26,13 +25,12 @@ import org.mockito.junit.MockitoJUnitRunner;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import com.logicaldoc.core.AbstractCoreTestCase;
-import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.security.authentication.AuthenticationException;
-import com.logicaldoc.core.security.dao.UserDAO;
 import com.logicaldoc.core.security.spring.LDAuthenticationToken;
 import com.logicaldoc.core.security.spring.LDSecurityContextRepository;
 import com.logicaldoc.util.Context;
 import com.logicaldoc.util.config.ContextProperties;
+import com.logicaldoc.util.plugin.PluginException;
 
 /**
  * Test case for the <code>SessionManager</code>
@@ -60,13 +58,16 @@ public class SessionManagerTest extends AbstractCoreTestCase implements SessionL
 
 	@Before
 	@Override
-	public void setUp() throws FileNotFoundException, IOException, SQLException {
+	public void setUp() throws IOException, SQLException, PluginException {
 		super.setUp();
 		testSubject = SessionManager.get();
 		testSubject.addListener(this);
 
 		when(client.getId()).thenReturn("testid");
 		when(request.getHeader("Authorization")).thenReturn("Basic YWRtaW46YWRtaW4=");
+		when(request.getSession(true)).thenReturn(httpSession);
+		
+		SecurityContextHolder.getContext().setAuthentication(null);
 	}
 
 	@After
@@ -78,27 +79,25 @@ public class SessionManagerTest extends AbstractCoreTestCase implements SessionL
 	}
 
 	@Test
-	public void testNewSession() throws AuthenticationException, PersistenceException {
+	public void testNewSession() throws AuthenticationException {
 		testSubject.clear();
-		Session session1 = testSubject.newSession("admin", "admin", null);
+		Session session1 = testSubject.newSession("admin", "admin", (Client) null);
 		assertNotNull(session1);
-		Session session2 = testSubject.newSession("admin", "admin", null);
+		Session session2 = testSubject.newSession("admin", "admin", (Client) null);
 		assertNotNull(session2);
 		assertNotSame(session1, session2);
 		assertEquals(2, testSubject.getSessions().size());
 
-		UserDAO uDao = (UserDAO) Context.get().getBean(UserDAO.class);
-		Session session3 = testSubject.createSession(uDao.findById(1L), client);
-		assertNotNull(session3);
-		assertEquals(3, testSubject.getSessions().size());
+		Session session4 = testSubject.newSession(apiKey.getDecodedKey(), (Client) null);
+		assertNotNull(session4);
 	}
 
 	@Test
 	public void testKill() {
 		testSubject.clear();
-		Session session1 = testSubject.newSession("admin", "admin", null);
+		Session session1 = testSubject.newSession("admin", "admin", (Client) null);
 		assertNotNull(session1);
-		Session session2 = testSubject.newSession("admin", "admin", null);
+		Session session2 = testSubject.newSession("admin", "admin", (Client) null);
 		assertNotNull(session2);
 		assertNotSame(session1, session2);
 		assertEquals(2, testSubject.getSessions().size());
@@ -112,9 +111,9 @@ public class SessionManagerTest extends AbstractCoreTestCase implements SessionL
 	@Test
 	public void testRemove() {
 		testSubject.clear();
-		Session session1 = testSubject.newSession("admin", "admin", null);
+		Session session1 = testSubject.newSession("admin", "admin", (Client) null);
 		assertNotNull(session1);
-		Session session2 = testSubject.newSession("admin", "admin", null);
+		Session session2 = testSubject.newSession("admin", "admin", (Client) null);
 		assertNotNull(session2);
 		assertNotSame(session1, session2);
 		assertEquals(2, testSubject.getSessions().size());
@@ -127,7 +126,7 @@ public class SessionManagerTest extends AbstractCoreTestCase implements SessionL
 	@Test
 	public void testRemoveSid() {
 		testSubject.clear();
-		Session session = testSubject.newSession("admin", "admin", null);
+		Session session = testSubject.newSession("admin", "admin", (Client) null);
 		assertNotNull(session);
 
 		when(request.getSession(false)).thenReturn(httpSession);
@@ -144,16 +143,16 @@ public class SessionManagerTest extends AbstractCoreTestCase implements SessionL
 
 	@Test
 	public void testBuildClient() {
-		Client client = testSubject.buildClient(request);
-		assertEquals("admin", client.getUsername());
+		Client clnt = testSubject.buildClient(request);
+		assertEquals("admin", clnt.getUsername());
 	}
 
 	@Test
 	public void testRenew() {
 		testSubject.clear();
-		Session session1 = testSubject.newSession("admin", "admin", null);
+		Session session1 = testSubject.newSession("admin", "admin", (Client) null);
 		assertNotNull(session1);
-		Session session2 = testSubject.newSession("admin", "admin", null);
+		Session session2 = testSubject.newSession("admin", "admin", (Client) null);
 		assertNotNull(session2);
 		assertNotSame(session1, session2);
 		assertEquals(2, testSubject.getSessions().size());
@@ -168,7 +167,7 @@ public class SessionManagerTest extends AbstractCoreTestCase implements SessionL
 		testSubject.clear();
 		assertEquals(1, testSubject.countOpened(Tenant.DEFAULT_ID));
 
-		Session session1 = testSubject.newSession("admin", "admin", null);
+		Session session1 = testSubject.newSession("admin", "admin", (Client) null);
 		assertNotNull(session1);
 		assertTrue(testSubject.isOpen(session1.getSid()));
 
@@ -181,7 +180,7 @@ public class SessionManagerTest extends AbstractCoreTestCase implements SessionL
 		testSubject.clear();
 		Session session1 = testSubject.newSession("admin", "admin", client);
 		assertNotNull(session1);
-		Session session2 = testSubject.newSession("admin", "admin", null);
+		Session session2 = testSubject.newSession("admin", "admin", (Client) null);
 		assertNotNull(session2);
 		assertNotSame(session1, session2);
 		assertEquals(2, testSubject.getSessions().size());
@@ -196,7 +195,7 @@ public class SessionManagerTest extends AbstractCoreTestCase implements SessionL
 		conf.setProperty("default.session.timeout", "" + timeout);
 
 		testSubject.clear();
-		Session session1 = testSubject.newSession("admin", "admin", null);
+		Session session1 = testSubject.newSession("admin", "admin", (Client) null);
 		assertNotNull(session1);
 
 		waiting(timeout);
@@ -207,8 +206,9 @@ public class SessionManagerTest extends AbstractCoreTestCase implements SessionL
 	@Test
 	public void getSesssion() {
 		testSubject.clear();
-		Session session = testSubject.newSession("admin", "admin", null);
+		Session session = testSubject.newSession("admin", "admin", (Client) null);
 		when(request.getParameter(SessionManager.PARAM_SID)).thenReturn(session.getSid());
+		when(httpSession.getAttribute(SessionManager.PARAM_SID)).thenReturn(session.getSid());
 		assertEquals(session, testSubject.getSession(request));
 
 		when(request.getSession(false)).thenReturn(httpSession);
@@ -229,8 +229,7 @@ public class SessionManagerTest extends AbstractCoreTestCase implements SessionL
 
 	@Test
 	public void saveSid() {
-		Session session = testSubject.newSession("admin", "admin", null);
-		when(request.getSession(false)).thenReturn(httpSession);
+		Session session = testSubject.newSession("admin", "admin", (Client) null);
 		when(request.getAttribute(SessionManager.PARAM_SID)).thenReturn(session.getSid());
 
 		when(request.getAttribute(SessionManager.PARAM_SID)).thenReturn(session.getSid());
@@ -240,8 +239,7 @@ public class SessionManagerTest extends AbstractCoreTestCase implements SessionL
 
 	@Test
 	public void removeSid() {
-		Session session = testSubject.newSession("admin", "admin", null);
-		when(request.getSession(false)).thenReturn(httpSession);
+		Session session = testSubject.newSession("admin", "admin", (Client) null);
 		when(request.getAttribute(SessionManager.PARAM_SID)).thenReturn(session.getSid());
 
 		testSubject.saveSid(request, response, session.getSid());
@@ -256,7 +254,7 @@ public class SessionManagerTest extends AbstractCoreTestCase implements SessionL
 	public void testCurrentSid() {
 		assertNull(SessionManager.getCurrentSid());
 
-		Session session = testSubject.newSession("admin", "admin", null);
+		Session session = testSubject.newSession("admin", "admin", (Client) null);
 
 		LDAuthenticationToken authentication = new LDAuthenticationToken("admin");
 		authentication.setSid(session.getSid());

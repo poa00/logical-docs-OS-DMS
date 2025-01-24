@@ -4,59 +4,38 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.Arrays;
+import java.util.List;
 
 import javax.activation.DataHandler;
 import javax.ws.rs.core.MediaType;
 
-import org.apache.cxf.jaxrs.client.JAXRSClientFactory;
 import org.apache.cxf.jaxrs.client.WebClient;
 import org.apache.cxf.jaxrs.ext.multipart.Attachment;
 import org.apache.cxf.jaxrs.ext.multipart.AttachmentBuilder;
 import org.apache.cxf.jaxrs.ext.multipart.ContentDisposition;
-import org.apache.cxf.transport.http.HTTPConduit;
-import org.apache.cxf.transports.http.configuration.HTTPClientPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.jaxrs.json.JacksonJsonProvider;
 import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.security.authentication.AuthenticationException;
 import com.logicaldoc.core.security.authorization.PermissionException;
+import com.logicaldoc.core.security.authorization.UnexistingResourceException;
 import com.logicaldoc.webservice.WebserviceException;
 import com.logicaldoc.webservice.model.WSDocument;
 import com.logicaldoc.webservice.model.WSNote;
 import com.logicaldoc.webservice.model.WSRating;
 import com.logicaldoc.webservice.rest.DocumentService;
 
-public class RestDocumentClient extends AbstractRestClient {
+public class RestDocumentClient extends AbstractRestClient<DocumentService> {
 
 	protected static Logger log = LoggerFactory.getLogger(RestDocumentClient.class);
 
-	private DocumentService proxy = null;
-
-	public RestDocumentClient(String endpoint, String username, String password) {
-		this(endpoint, username, password, -1);
+	public RestDocumentClient(String endpoint, String apiKey) {
+		this(endpoint, apiKey, -1);
 	}
 
-	public RestDocumentClient(String endpoint, String username, String password, int timeout) {
-		super(endpoint, username, password, timeout);
-
-		JacksonJsonProvider provider = new JacksonJsonProvider();
-
-		if ((username == null) || (password == null)) {
-			proxy = JAXRSClientFactory.create(endpoint, DocumentService.class, Arrays.asList(provider));
-		} else {
-			proxy = JAXRSClientFactory.create(endpoint, DocumentService.class, Arrays.asList(provider), username,
-					password, null);
-		}
-
-		if (timeout > 0) {
-			HTTPConduit conduit = WebClient.getConfig(proxy).getHttpConduit();
-			HTTPClientPolicy policy = new HTTPClientPolicy();
-			policy.setReceiveTimeout(timeout);
-			conduit.setClient(policy);
-		}
+	public RestDocumentClient(String endpoint, String apiKey, int timeout) {
+		super(DocumentService.class, endpoint, apiKey, timeout);
 	}
 
 	public WSDocument create(WSDocument document, File packageFile) throws FileNotFoundException {
@@ -81,13 +60,21 @@ public class RestDocumentClient extends AbstractRestClient {
 		return proxy.create(document, fileAttachment);
 	}
 
-	public WSDocument[] list(long folderId)
+	public List<WSDocument> list(long folderId)
 			throws AuthenticationException, PermissionException, WebserviceException, PersistenceException {
 		WebClient.client(proxy).type("*/*");
 		return proxy.list(folderId);
 	}
 
-	public WSDocument[] listDocuments(long folderId, String fileName)
+	public List<WSDocument> listPaginated(long folderId, String fileName, String sort, Integer page, Integer max)
+			throws AuthenticationException, PermissionException, WebserviceException, PersistenceException {
+		WebClient.client(proxy).type("*/*");
+		WebClient.client(proxy).accept(MediaType.APPLICATION_JSON);
+
+		return proxy.listPaginated(folderId, fileName, sort, page, max);
+	}
+
+	public List<WSDocument> listDocuments(long folderId, String fileName)
 			throws AuthenticationException, PermissionException, WebserviceException, PersistenceException {
 		WebClient.client(proxy).type("*/*");
 		WebClient.client(proxy).accept(MediaType.APPLICATION_JSON);
@@ -125,8 +112,8 @@ public class RestDocumentClient extends AbstractRestClient {
 		proxy.checkout(docId);
 	}
 
-	public void update(WSDocument document)
-			throws AuthenticationException, PermissionException, WebserviceException, PersistenceException {
+	public void update(WSDocument document) throws AuthenticationException, PermissionException, WebserviceException,
+			PersistenceException, UnexistingResourceException {
 		WebClient.client(proxy).type(MediaType.APPLICATION_JSON);
 		WebClient.client(proxy).accept(MediaType.APPLICATION_JSON);
 		proxy.update(document);
@@ -142,8 +129,8 @@ public class RestDocumentClient extends AbstractRestClient {
 		proxy.checkin(Long.toString(docId), comment, release.toString(), packageFile.getName(), fileAttachment);
 	}
 
-	public WSNote addNote(long docId, String note)
-			throws AuthenticationException, PermissionException, WebserviceException, PersistenceException {
+	public WSNote addNote(long docId, String note) throws AuthenticationException, PermissionException,
+			WebserviceException, PersistenceException, UnexistingResourceException {
 		WebClient.client(proxy).type(MediaType.APPLICATION_FORM_URLENCODED);
 		WebClient.client(proxy).accept(MediaType.APPLICATION_JSON);
 		return proxy.addNote(docId, note);
@@ -185,15 +172,16 @@ public class RestDocumentClient extends AbstractRestClient {
 	 * 
 	 * @param docId identifier of the document
 	 * 
-	 * @return array of ratings
+	 * @return list of ratings
 	 * 
 	 * @throws PersistenceException Error in the data layer
 	 * @throws WebserviceException Error in the Webservice layer
 	 * @throws AuthenticationException Authentication issue
 	 * @throws PermissionException Not enough permissions
+	 * @throws UnexistingResourceException The specified document does not exist
 	 */
-	public WSNote[] getNotes(long docId)
-			throws AuthenticationException, PermissionException, WebserviceException, PersistenceException {
+	public List<WSNote> getNotes(long docId) throws AuthenticationException, PermissionException, WebserviceException,
+			PersistenceException, UnexistingResourceException {
 		WebClient.client(proxy).type(MediaType.APPLICATION_JSON);
 		WebClient.client(proxy).accept(MediaType.APPLICATION_JSON);
 		return proxy.getNotes(docId);
@@ -211,9 +199,10 @@ public class RestDocumentClient extends AbstractRestClient {
 	 * @throws WebserviceException Error in the Webservice layer
 	 * @throws AuthenticationException Authentication issue
 	 * @throws PermissionException Not enough permissions
+	 * @throws UnexistingResourceException The specified document does not exist
 	 */
-	public WSRating rateDocument(long docId, int vote)
-			throws AuthenticationException, PermissionException, WebserviceException, PersistenceException {
+	public WSRating rateDocument(long docId, int vote) throws AuthenticationException, PermissionException,
+			WebserviceException, PersistenceException, UnexistingResourceException {
 		WebClient.client(proxy).type(MediaType.APPLICATION_JSON);
 		WebClient.client(proxy).accept(MediaType.APPLICATION_JSON);
 		return proxy.rateDocument(docId, vote);
@@ -230,9 +219,10 @@ public class RestDocumentClient extends AbstractRestClient {
 	 * @throws WebserviceException Error in the Webservice layer
 	 * @throws AuthenticationException Authentication issue
 	 * @throws PermissionException Not enough permissions
+	 * @throws UnexistingResourceException The specified document does not exist
 	 */
-	public WSRating[] getRatings(long docId)
-			throws AuthenticationException, PermissionException, WebserviceException, PersistenceException {
+	public List<WSRating> getRatings(long docId) throws AuthenticationException, PermissionException,
+			WebserviceException, PersistenceException, UnexistingResourceException {
 		WebClient.client(proxy).type(MediaType.APPLICATION_JSON);
 		WebClient.client(proxy).accept(MediaType.APPLICATION_JSON);
 		return proxy.getRatings(docId);

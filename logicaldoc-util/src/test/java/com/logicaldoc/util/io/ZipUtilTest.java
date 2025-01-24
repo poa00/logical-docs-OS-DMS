@@ -1,9 +1,13 @@
 package com.logicaldoc.util.io;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.sql.SQLException;
 import java.util.List;
 import java.util.zip.ZipEntry;
 
@@ -14,96 +18,130 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import junit.framework.Assert;
-
 public class ZipUtilTest {
 	private static Logger log = LoggerFactory.getLogger(ZipUtilTest.class);
 
+	private File folder = new File("target/test");
+
+	private File file = new File("target/test.zip");
+
+	private ZipUtil testSubject = new ZipUtil();
+
 	@Before
-	public void setUp() throws FileNotFoundException, IOException, SQLException {
-		File dir = new File("target/test");
-		dir.mkdirs();
-		dir.mkdir();
+	public void setUp() throws IOException {
+		folder.mkdir();
+		FileUtil.copyResource("/test.zip", file);
 	}
 
 	@After
-	public void tearDown() throws Exception {
-		File dir = new File("target/test");
-		if (dir.exists())
-			try {
-				FileUtils.forceDelete(dir);
-			} catch (IOException e) {
-				// Nothing to do
-			}
+	public void tearDown() {
+		try {
+			FileUtils.forceDelete(file);
+			FileUtils.forceDelete(folder);
+		} catch (IOException e) {
+			// Ignore
+		}
 	}
 
 	@Test
-	public void testListZipEntries() throws IOException {
-		File file = new File("target/test.zip");
-		FileUtil.copyResource("/test.zip", file);
-
-		ZipUtil zipUtil = new ZipUtil();
-		List<ZipEntry> entries = zipUtil.listZipEntries(file);
-
-		for (ZipEntry zipEntry : entries) {
-			System.out.println(zipEntry.getName() + " " + zipEntry.getSize() + " " + zipEntry.getLastModifiedTime());
-		}
-
-		Assert.assertEquals(5, entries.size());
+	public void testListZipEntries() {
+		List<ZipEntry> entries = testSubject.listZipEntries(file);
+		assertEquals(5, entries.size());
 	}
 
 	@Test
 	public void testUnzip() throws IOException {
-		File file = new File("target/test.zip");
-		FileUtil.copyResource("/test.zip", file);
+		File indexXml = new File("target/test/index.xml");
+		File test = new File("target/text.txt");
 
-		Assert.assertFalse(new File("target/test/index.xml").exists());
+		try {
+			assertFalse(indexXml.exists());
 
-		ZipUtil zipUtil = new ZipUtil();
-		zipUtil.unzip(file.getPath(), "target/test");
+			testSubject.unzip(file, folder);
 
-		Assert.assertTrue(new File("target/test/index.xml").exists());
-		Assert.assertTrue(new File("target/test/abc/test.txt").exists());
+			assertTrue(new File(folder, "index.xml").exists());
+			assertTrue(new File(folder.getPath() + "/abc/test.txt").exists());
+
+			testSubject.unzip(this.getClass().getResourceAsStream("/test.zip"), "abc/test.txt", test);
+			assertTrue(test.exists());
+			FileUtil.delete(test);
+
+			testSubject.unzip(new File("src/test/resources/test.zip"), "/abc/test.txt", test);
+			assertTrue(test.exists());
+		} finally {
+			FileUtil.delete(test);
+			FileUtil.delete(indexXml);
+		}
 	}
 
 	@Test
-	public void testListEntries() throws IOException {
-		File file = new File("target/test.zip");
-		FileUtil.copyResource("/test.zip", file);
-
-		ZipUtil zipUtil = new ZipUtil();
-		List<String> entries = zipUtil.listEntries(file);
-
-		Assert.assertEquals(5, entries.size());
-		Assert.assertTrue(entries.contains("impex.xsd"));
+	public void testListEntries(){
+		List<String> entries = testSubject.listEntries(file);
+		assertEquals(5, entries.size());
+		assertTrue(entries.contains("impex.xsd"));
 	}
 
 	@Test
-	public void testGetEntryBytes() throws IOException {
-		File file = new File("target/test.zip");
-		FileUtil.copyResource("/test.zip", file);
-		ZipUtil zipUtil = new ZipUtil();
-		zipUtil.setFileNameCharset("UTF-8");
-		byte[] in = zipUtil.getEntryBytes(file, "index.xml");
-		Assert.assertEquals(132997526, in.length);
+	public void testGetEntryBytes() {
+		testSubject.setFileNameCharset("UTF-8");
+		byte[] in = testSubject.getEntryBytes(file, "/index.xml");
+		assertEquals(132997526, in.length);
 	}
 
 	@Test
 	public void testUmlauts() {
 		String notThrownTest = null;
 		try {
-			File file = new File("target/NeuesZip.zip");
-			FileUtil.copyResource("/NeuesZip.zip", file);
-			ZipUtil zipUtil = new ZipUtil();
-			zipUtil.setFileNameCharset("utf-8");
-			List<String> entries = zipUtil.listEntries(file);
+			File zipFile = new File("target/NeuesZip.zip");
+			FileUtil.copyResource("/NeuesZip.zip", zipFile);
+			testSubject.setFileNameCharset("utf-8");
+			List<String> entries = testSubject.listEntries(zipFile);
 			log.debug("Found {} entries", entries.size());
 			notThrownTest = "ok";
 		} catch (Exception t) {
 			// Nothing to do
-
 		}
-		Assert.assertNotNull(notThrownTest);
+		assertNotNull(notThrownTest);
+	}
 
+	@Test
+	public void testGetEntryContent() throws IOException {
+		String content = testSubject.getEntryContent(file, "abc/test.txt");
+		assertEquals("abc", content);
+	}
+
+	@Test
+	public void testAddEntry() throws IOException {
+		try {
+			testSubject.getEntryContent(file, "abc/pippo.txt");
+			fail("No error getting content of unexisting entry?");
+		} catch (NullPointerException npe) {
+			// All ok
+		}
+		ZipUtil.addEntry(file, "abc/pippo.txt", this.getClass().getResourceAsStream("/context.properties"));
+		assertNotNull(testSubject.getEntryContent(file, "abc/pippo.txt"));
+	}
+
+	@Test
+	public void testZipFolder() throws IOException {
+		testSubject.zipFolder(new File("src/test/resources"), file);
+		assertNotNull(testSubject.getEntryContent(file, "/log.xml"));
+	}
+
+	@Test
+	public void testZipFile() throws IOException {
+		File context = new File("target/context.zip");
+		try {
+			testSubject.zipFile(new File("src/test/resources/context.properties"), context);
+			assertNotNull(testSubject.getEntryContent(context, "/context.properties"));
+		} finally {
+			FileUtil.delete(context);
+		}
+	}
+
+	@Test
+	public void testUnGZipUnTar() throws IOException {
+		testSubject.unGZipUnTar(new File("src/test/resources/kofax2.tgz"), folder);
+		assertTrue(new File("target/test/kofax/scans/invoice-001.PDF").exists());
 	}
 }

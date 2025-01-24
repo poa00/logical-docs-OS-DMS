@@ -74,11 +74,13 @@ public class TaskScheduling {
 	}
 
 	public Date getNextFireTime() {
-		Object trigger = Context.get().getBean(taskName + "Trigger");
+		Date nextFire = null;
 
-		if (!(trigger instanceof Trigger))
-			return null;
-		else return ((Trigger)trigger).getNextFireTime();
+		Object trigger = Context.get(taskName + "Trigger");
+		if (trigger instanceof Trigger trgr)
+			nextFire = previousFireTime != null ? trgr.getFireTimeAfter(previousFireTime) : trgr.getNextFireTime();
+
+		return nextFire;
 	}
 
 	public boolean isEnabled() {
@@ -90,7 +92,7 @@ public class TaskScheduling {
 	}
 
 	/**
-	 * Loads scheduling configurations from persistent storage
+	 * Loads scheduling configurations from persistent store
 	 * 
 	 * @throws IOException error reading the configuration file
 	 * 
@@ -98,8 +100,7 @@ public class TaskScheduling {
 	 */
 	public void load() throws IOException, ParseException {
 		ContextProperties config = Context.get().getProperties();
-		String enbl = config.getProperty("schedule.enabled." + taskName);
-		this.enabled = "true".equals(enbl);
+		this.enabled = config.getBoolean("schedule.enabled." + taskName, false);
 		setCronExpression(config.getProperty("schedule.cron." + taskName));
 		setMode(config.getProperty("schedule.mode." + taskName));
 		try {
@@ -112,15 +113,15 @@ public class TaskScheduling {
 	}
 
 	/**
-	 * Saves scheduling configurations in the persistent storage
+	 * Saves scheduling configurations in the persistent store
 	 * 
 	 * @throws IOException raised is an I/O problem occurs
 	 * @throws ParseException raised if the scheduling expression is invalid
 	 */
 	public void save() throws IOException, ParseException {
-		Scheduler scheduler = (Scheduler) Context.get().getBean("Scheduler");
+		Scheduler scheduler = (Scheduler) Context.get("Scheduler");
 		// Use the & prefix to get the factory and not the bean it produces
-		TaskTrigger trigger = (TaskTrigger) Context.get().getBean("&" + taskName + "Trigger");
+		TaskTrigger trigger = (TaskTrigger) Context.get("&" + taskName + "Trigger");
 		String expression = getCronExpression();
 
 		ContextProperties config = Context.get().getProperties();

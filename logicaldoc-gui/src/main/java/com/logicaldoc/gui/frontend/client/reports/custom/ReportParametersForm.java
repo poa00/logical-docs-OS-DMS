@@ -5,8 +5,8 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.logicaldoc.gui.common.client.Constants;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIAttribute;
 import com.logicaldoc.gui.common.client.beans.GUIReport;
 import com.logicaldoc.gui.common.client.i18n.I18N;
@@ -41,7 +41,7 @@ public class ReportParametersForm extends Window {
 
 	private GUIReport report;
 
-	private GUIAttribute[] parameters;
+	private List<GUIAttribute> parameters;
 
 	private CustomReportsPanel panel;
 
@@ -57,15 +57,9 @@ public class ReportParametersForm extends Window {
 		setShowModalMask(true);
 		centerInPage();
 
-		ReportService.Instance.get().getReportParameters(form.getId(), new AsyncCallback<GUIAttribute[]>() {
-
+		ReportService.Instance.get().getReportParameters(form.getId(), new DefaultAsyncCallback<>() {
 			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
-			@Override
-			public void onSuccess(GUIAttribute[] parameters) {
+			public void onSuccess(List<GUIAttribute> parameters) {
 				ReportParametersForm.this.parameters = parameters;
 				initGUI();
 			}
@@ -203,20 +197,23 @@ public class ReportParametersForm extends Window {
 	}
 
 	private void doExecute(ArrayList<GUIAttribute> parameters) {
-		ReportService.Instance.get().execute(report.getId(), parameters.toArray(new GUIAttribute[0]),
-				new AsyncCallback<Void>() {
+		ReportService.Instance.get().execute(report.getId(), parameters, new DefaultAsyncCallback<>() {
+			@Override
+			public void onSuccess(Void arg) {
+				destroy();
+				GuiLog.info(I18N.message("reportinexecution"), null);
+				panel.update();
+			}
+		});
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
 
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
-					@Override
-					public void onSuccess(Void arg) {
-						destroy();
-						GuiLog.info(I18N.message("reportinexecution"), null);
-						panel.update();
-					}
-				});
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

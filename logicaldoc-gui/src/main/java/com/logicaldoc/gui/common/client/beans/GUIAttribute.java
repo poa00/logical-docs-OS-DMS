@@ -1,7 +1,12 @@
 package com.logicaldoc.gui.common.client.beans;
 
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
+import java.util.List;
+
+import javax.annotation.Nullable;
 
 /**
  * This class defines the value of an attribute associated to an extensible
@@ -13,8 +18,8 @@ import java.util.Date;
  */
 public class GUIAttribute implements Comparable<GUIAttribute>, Serializable {
 
-	private static final String[] FORBIDDEN_NAMES = new String[] { "date", "fileName", "fileSize", "creation", "creator",
-			"version", "fileVersion", "published", "publisher", "name", "description" };
+	private static final List<String> FORBIDDEN_NAMES = Arrays.asList("date", "fileName", "fileSize", "creation",
+			"creator", "version", "fileVersion", "published", "publisher", "name", "description");
 
 	private static final long serialVersionUID = 1L;
 
@@ -35,6 +40,10 @@ public class GUIAttribute implements Comparable<GUIAttribute>, Serializable {
 	public static final int TYPE_BOOLEAN = 5;
 
 	public static final int TYPE_FOLDER = 6;
+
+	public static final int TYPE_DOCUMENT = 7;
+
+	public static final int TYPE_SECTION = 8;
 
 	public static final int EDITOR_DEFAULT = 0;
 
@@ -84,7 +93,7 @@ public class GUIAttribute implements Comparable<GUIAttribute>, Serializable {
 	private Long setId;
 
 	// Optional array of possible values
-	private String[] options;
+	private List<String> options = new ArrayList<>();
 
 	private String stringValues;
 
@@ -169,6 +178,10 @@ public class GUIAttribute implements Comparable<GUIAttribute>, Serializable {
 		this.type = type;
 	}
 
+	public boolean isSection() {
+		return type == TYPE_SECTION;
+	}
+
 	public boolean isReadonly() {
 		return readonly;
 	}
@@ -196,6 +209,8 @@ public class GUIAttribute implements Comparable<GUIAttribute>, Serializable {
 			return getIntValue();
 		case TYPE_FOLDER:
 			return getIntValue();
+		case TYPE_DOCUMENT:
+			return getIntValue();
 		default:
 			return getStringValue();
 		}
@@ -207,33 +222,37 @@ public class GUIAttribute implements Comparable<GUIAttribute>, Serializable {
 	 * @param value The attribute value.
 	 */
 	public void setValue(Object value) {
-		if (value instanceof java.lang.String) {
+		if (value instanceof java.lang.String str) {
 			this.type = TYPE_STRING;
-			setStringValue((String) value);
-		} else if (value instanceof Long) {
+			setStringValue(str);
+		} else if (value instanceof Long longVal) {
 			this.type = TYPE_INT;
-			setIntValue((Long) value);
-		} else if (value instanceof Integer) {
+			setIntValue(longVal);
+		} else if (value instanceof Integer intVal) {
 			this.type = TYPE_INT;
-			setIntValue(Long.parseLong(value.toString()));
-		} else if (value instanceof Boolean) {
+			setIntValue(Long.parseLong(intVal.toString()));
+		} else if (value instanceof Boolean bool) {
 			this.type = TYPE_BOOLEAN;
-			setBooleanValue((Boolean) value);
-		} else if (value instanceof Double) {
+			setBooleanValue(bool);
+		} else if (value instanceof Double doubleVal) {
 			this.type = TYPE_DOUBLE;
-			setDoubleValue((Double) value);
-		} else if (value instanceof Date) {
+			setDoubleValue(doubleVal);
+		} else if (value instanceof Date date) {
 			this.type = TYPE_DATE;
-			setDateValue((Date) value);
-		} else if (value instanceof GUIUser) {
-			setIntValue(((GUIUser) value).getId());
-			setStringValue(((GUIUser) value).getUsername());
-			setUsername(((GUIUser) value).getUsername());
+			setDateValue(date);
+		} else if (value instanceof GUIUser user) {
+			setIntValue(user.getId());
+			setStringValue(user.getUsername());
+			setUsername(user.getUsername());
 			this.type = TYPE_USER;
-		} else if (value instanceof GUIFolder) {
-			setIntValue(((GUIFolder) value).getId());
-			setStringValue(((GUIFolder) value).getName());
+		} else if (value instanceof GUIFolder folder) {
+			setIntValue(folder.getId());
+			setStringValue(folder.getName());
 			this.type = TYPE_FOLDER;
+		} else if (value instanceof GUIDocument document) {
+			setIntValue(document.getId());
+			setStringValue(document.getFileName());
+			this.type = TYPE_DOCUMENT;
 		} else if (value == null) {
 			setStringValue(null);
 			setDoubleValue(null);
@@ -312,14 +331,15 @@ public class GUIAttribute implements Comparable<GUIAttribute>, Serializable {
 		this.editor = editor;
 	}
 
-	public String[] getOptions() {
+	public List<String> getOptions() {
 		return options;
 	}
 
-	public void setOptions(String[] options) {
+	public void setOptions(List<String> options) {
 		this.options = options;
 	}
 
+    @Nullable	
 	public Boolean getBooleanValue() {
 		return booleanValue;
 	}
@@ -420,7 +440,7 @@ public class GUIAttribute implements Comparable<GUIAttribute>, Serializable {
 		return getName() + "=" + getValue();
 	}
 
-	public static String[] getForbiddenNames() {
+	public static List<String> getForbiddenNames() {
 		return FORBIDDEN_NAMES;
 	}
 }

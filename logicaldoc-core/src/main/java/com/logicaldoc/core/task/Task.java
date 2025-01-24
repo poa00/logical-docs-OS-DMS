@@ -16,6 +16,9 @@ import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.UUID;
 
+import javax.annotation.PostConstruct;
+import javax.annotation.Resource;
+
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,8 +31,8 @@ import com.logicaldoc.core.communication.EMailSender;
 import com.logicaldoc.core.communication.Recipient;
 import com.logicaldoc.core.lock.LockManager;
 import com.logicaldoc.core.searchengine.IndexException;
-import com.logicaldoc.core.security.User;
-import com.logicaldoc.core.security.dao.UserDAO;
+import com.logicaldoc.core.security.user.User;
+import com.logicaldoc.core.security.user.UserDAO;
 import com.logicaldoc.core.system.SystemLoadMonitor;
 import com.logicaldoc.i18n.I18N;
 import com.logicaldoc.util.Context;
@@ -70,21 +73,26 @@ public abstract class Task implements Runnable {
 
 	protected Throwable lastRunError = null;
 
+	@Resource(name = "ContextProperties")
 	protected ContextProperties config;
 
+	@Resource(name = "EMailSender")
 	protected EMailSender sender = null;
 
+	@Resource(name = "UserDAO")
 	protected UserDAO userDao = null;
+
+	@Resource(name = "lockManager")
+	protected LockManager lockManager;
+
+	@Resource(name = "systemLoadMonitor")
+	protected SystemLoadMonitor systemLoadMonitor;
 
 	protected boolean sendActivityReport = false;
 
 	private String reportRecipients = null;
 
 	protected String transactionId = null;
-
-	protected LockManager lockManager;
-
-	protected SystemLoadMonitor systemLoadMonitor;
 
 	private Random random = new Random();
 
@@ -213,10 +221,10 @@ public abstract class Task implements Runnable {
 			transactionId = UUID.randomUUID().toString();
 			if (isConcurrent() || (lockManager != null && lockManager.get(getName(), transactionId)))
 				runTask();
-		} catch (Exception t) {
-			log.error("Error caught " + t.getMessage(), t);
+		} catch (Exception e) {
+			log.error(e.getMessage(), e);
 			log.error("The task is stopped");
-			lastRunError = t;
+			lastRunError = e;
 		} finally {
 			// In any case release the lock
 			try {
@@ -311,7 +319,7 @@ public abstract class Task implements Runnable {
 
 	/**
 	 * Concrete implementations must insert here the code needed to save the
-	 * elaboration state in a persistent storage
+	 * elaboration state in a persistent store
 	 */
 	public void saveWork() {
 		// By default do nothing
@@ -383,7 +391,7 @@ public abstract class Task implements Runnable {
 			dictionary.put("error", (lastRunError != null ? lastRunError.getMessage() : null));
 			dictionary.put("report", prepareReport(recipient.getLocale()).replace("\\n", "<br />"));
 
-			// Send the email
+			// Send the email..eeee
 			try {
 				sender.send(email, "task.report", dictionary);
 				log.info("Report sent to: {}", recipient.getEmail());
@@ -401,7 +409,7 @@ public abstract class Task implements Runnable {
 	 * @return the report's body
 	 */
 	protected String prepareReport(Locale locale) {
-		return null;
+		return "";
 	}
 
 	/**
@@ -423,7 +431,7 @@ public abstract class Task implements Runnable {
 
 	/**
 	 * Concrete implementations must override this method declaring if the task
-	 * supports multiple instances running concurrently.
+	 * supports multiple instances running concurrently. tHIbernat
 	 * 
 	 * @return true if the task is concurrent
 	 */
@@ -435,20 +443,6 @@ public abstract class Task implements Runnable {
 
 	public ContextProperties getConfig() {
 		return config;
-	}
-
-	public void setConfig(ContextProperties config) {
-		this.config = config;
-		sendActivityReport = "true".equals(config.getProperty("task.sendreport." + name));
-		reportRecipients = config.getProperty("task.recipients." + name);
-	}
-
-	public void setSender(EMailSender sender) {
-		this.sender = sender;
-	}
-
-	public void setUserDao(UserDAO userDao) {
-		this.userDao = userDao;
 	}
 
 	/**
@@ -477,15 +471,13 @@ public abstract class Task implements Runnable {
 		this.reportRecipients = reportRecipients;
 	}
 
-	public void setLockManager(LockManager lockManager) {
-		this.lockManager = lockManager;
-	}
-
-	public void setSystemLoadMonitor(SystemLoadMonitor systemLoadMonitor) {
-		this.systemLoadMonitor = systemLoadMonitor;
-	}
-
 	public boolean isInterruptRequested() {
 		return interruptRequested;
+	}
+
+	@PostConstruct
+	protected void init() {
+		sendActivityReport = config.getBoolean("task.sendreport." + name);
+		reportRecipients = config.getProperty("task.recipients." + name);
 	}
 }

@@ -5,7 +5,7 @@
 	<parent>
 		<groupId>com.logicaldoc</groupId>
 		<artifactId>logicaldoc</artifactId>
-		<version>8.8.6</version>
+		<version>9.1.1</version>
 	</parent>
 	<artifactId>logicaldoc-dropbox</artifactId>
 	<name>logicaldoc-dropbox</name>
@@ -113,7 +113,7 @@
 		</dependency>
 		<dependency>
 			<groupId>javax.servlet</groupId>
-			<artifactId>servlet-api</artifactId>
+			<artifactId>javax.servlet-api</artifactId>
 			<scope>provided</scope>
 		</dependency>
 		<!-- https://mvnrepository.com/artifact/com.dropbox.core/dropbox-core-sdk -->

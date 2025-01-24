@@ -3,9 +3,10 @@ package com.logicaldoc.gui.frontend.client.security.user;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.logicaldoc.gui.common.client.Constants;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIGroup;
 import com.logicaldoc.gui.common.client.beans.GUIUser;
@@ -18,14 +19,13 @@ import com.smartgwt.client.data.Record;
 import com.smartgwt.client.types.Alignment;
 import com.smartgwt.client.types.TitleOrientation;
 import com.smartgwt.client.util.SC;
-import com.smartgwt.client.widgets.Canvas;
-import com.smartgwt.client.widgets.Label;
 import com.smartgwt.client.widgets.form.DynamicForm;
 import com.smartgwt.client.widgets.form.ValuesManager;
 import com.smartgwt.client.widgets.form.fields.CheckboxItem;
 import com.smartgwt.client.widgets.form.fields.ComboBoxItem;
 import com.smartgwt.client.widgets.form.fields.MultiComboBoxItem;
 import com.smartgwt.client.widgets.form.fields.SelectItem;
+import com.smartgwt.client.widgets.form.fields.StaticTextItem;
 import com.smartgwt.client.widgets.form.fields.TextItem;
 import com.smartgwt.client.widgets.form.fields.events.ChangedEvent;
 import com.smartgwt.client.widgets.form.fields.events.ChangedHandler;
@@ -57,8 +57,6 @@ public class UserPropertiesPanel extends HLayout {
 
 	private ChangedHandler changedHandler;
 
-	private Canvas idLabel;
-
 	private VLayout layout = new VLayout();
 
 	private MultiComboBoxItem groupsItem;
@@ -75,10 +73,6 @@ public class UserPropertiesPanel extends HLayout {
 			setMembersMargin(20);
 
 			layout.setWidth(300);
-
-			idLabel = new Label(I18N.message("id") + ": " + Long.toString(user.getId()));
-			idLabel.setHeight(15);
-			layout.addMember(idLabel, 0);
 
 			prepareGUI();
 		}
@@ -111,6 +105,12 @@ public class UserPropertiesPanel extends HLayout {
 		notifyCredentials.setValue(true);
 		notifyCredentials.setVisible(user.getId() == 0);
 
+		StaticTextItem id = ItemFactory.newStaticTextItem("ID", Long.toString(user.getId()));
+		StaticTextItem lastLogin = ItemFactory.newStaticTextItem("lastlogin", "lastlogin",
+				I18N.formatDate(user.getLastLogin()));
+		StaticTextItem creation = ItemFactory.newStaticTextItem("createdon", "createdon",
+				I18N.formatDate(user.getCreation()));
+
 		TextItem username = prepareUsername(readonly);
 
 		TextItem firstname = prepareFirstname(readonly);
@@ -137,14 +137,24 @@ public class UserPropertiesPanel extends HLayout {
 
 		TextItem email2 = prepareEmail2Item(readonly);
 
+		TextItem building = prepareBuildingItem(readonly);
+
+		TextItem organizationalUnit = prepareOrganizationalUnitItem(readonly);
+
+		TextItem department = prepareDepartmentItem(readonly);
+
+		TextItem company = prepareCompanyItem(readonly);
+
 		ComboBoxItem timeZone = prepareTimeZoneSelector(readonly);
 
 		if (user.getId() == 0L)
-			form1.setItems(notifyCredentials, guest, username, email, firstname, name, email2, language, address,
-					postalcode, city, country, state, phone, cell, timeZone);
+			form1.setItems(notifyCredentials, guest, username, email, firstname, name, email2, language, timeZone,
+					address, postalcode, city, country, state, phone, cell, company, department, building,
+					organizationalUnit);
 		else
-			form1.setItems(username, notifyCredentials, guest, email, firstname, name, email2, language, address,
-					postalcode, city, country, state, phone, cell, timeZone);
+			form1.setItems(id, lastLogin, creation, username, notifyCredentials, guest, email, firstname, name, email2,
+					language, timeZone, address, postalcode, city, country, state, phone, cell, company, department,
+					building, organizationalUnit);
 		addMember(layout);
 
 		prepareGroupsForm(readonly);
@@ -154,13 +164,7 @@ public class UserPropertiesPanel extends HLayout {
 
 	private void addAvatar() {
 		if (user.getId() != 0L) {
-			Avatar avatar = new Avatar(user.getId(), new AsyncCallback<Void>() {
-
-				@Override
-				public void onFailure(Throwable caught) {
-					GuiLog.serverError(caught);
-				}
-
+			Avatar avatar = new Avatar(user.getId(), new DefaultAsyncCallback<>() {
 				@Override
 				public void onSuccess(Void result) {
 					if (usersPanel != null)
@@ -169,6 +173,42 @@ public class UserPropertiesPanel extends HLayout {
 			});
 			addMember(avatar);
 		}
+	}
+
+	private TextItem prepareDepartmentItem(boolean readonly) {
+		TextItem item = ItemFactory.newTextItem("department", user.getDepartment());
+		item.setRequired(false);
+		item.setDisabled(readonly);
+		if (!readonly)
+			item.addChangedHandler(changedHandler);
+		return item;
+	}
+
+	private TextItem prepareOrganizationalUnitItem(boolean readonly) {
+		TextItem item = ItemFactory.newTextItem("organizationalunit", user.getOrganizationalUnit());
+		item.setRequired(false);
+		item.setDisabled(readonly);
+		if (!readonly)
+			item.addChangedHandler(changedHandler);
+		return item;
+	}
+
+	private TextItem prepareCompanyItem(boolean readonly) {
+		TextItem item = ItemFactory.newTextItem("company", user.getCompany());
+		item.setRequired(false);
+		item.setDisabled(readonly);
+		if (!readonly)
+			item.addChangedHandler(changedHandler);
+		return item;
+	}
+
+	private TextItem prepareBuildingItem(boolean readonly) {
+		TextItem item = ItemFactory.newTextItem("building", user.getBuilding());
+		item.setRequired(false);
+		item.setDisabled(readonly);
+		if (!readonly)
+			item.addChangedHandler(changedHandler);
+		return item;
 	}
 
 	private ComboBoxItem prepareTimeZoneSelector(boolean readonly) {
@@ -321,14 +361,8 @@ public class UserPropertiesPanel extends HLayout {
 	}
 
 	private void prepareGroupsForm(boolean readOnly) {
-		List<String> groupIds = new ArrayList<>();
-		GUIGroup[] groups = user.getGroups();
-		if (groups != null && groups.length > 0) {
-			for (int i = 0; i < groups.length; i++)
-				if (groups[i].getType() == 0)
-					groupIds.add(Long.toString(groups[i].getId()));
-		}
-
+		List<String> groupIds = user.getGroups().stream().filter(g -> g.getType() == 0)
+				.map(g -> Long.toString(g.getId())).collect(Collectors.toList());
 		groupsItem = ItemFactory.newMultiComboBoxItem("groups", "groups", new GroupsDS(),
 				groupIds.toArray(new String[0]));
 		groupsItem.setDisabled(readOnly || ADMIN.equals(user.getUsername())
@@ -346,7 +380,7 @@ public class UserPropertiesPanel extends HLayout {
 
 	@SuppressWarnings("unchecked")
 	boolean validate() {
-		Map<String, Object> values =  vm.getValues();
+		Map<String, Object> values = vm.getValues();
 		vm.validate();
 		if (Boolean.FALSE.equals(vm.hasErrors())) {
 			user.setUsername((String) values.get("username"));
@@ -363,32 +397,46 @@ public class UserPropertiesPanel extends HLayout {
 			user.setEmail((String) values.get(EMAIL));
 			user.setEmail2((String) values.get("email2"));
 			user.setTimeZone((String) values.get("timezone"));
+			user.setBuilding((String) values.get("building"));
+			user.setOrganizationalUnit((String) values.get("organizationalunit"));
+			user.setDepartment((String) values.get("department"));
+			user.setCompany((String) values.get("company"));
 
 			if (user.getId() == 0L)
 				user.setNotifyCredentials(Boolean.parseBoolean(values.get("notifyCredentials").toString()));
 		}
 
-		String[] ids = groupsItem.getValues();
-		if (ids == null || ids.length == 0) {
+		String[] groupIds = groupsItem.getValues();
+		if (groupIds == null || groupIds.length == 0) {
 			SC.warn(I18N.message(USERMUSTBELONGTOGROUP));
 			GuiLog.warn(I18N.message(USERMUSTBELONGTOGROUP), I18N.message(USERMUSTBELONGTOGROUP));
 			return false;
 		}
 
-		GUIGroup[] groups = new GUIGroup[ids.length];
-		for (int i = 0; i < ids.length; i++) {
+		List<GUIGroup> groups = new ArrayList<>();
+		for (int i = 0; i < groupIds.length; i++) {
 			GUIGroup group = new GUIGroup();
-			group.setId(Long.parseLong(ids[i]));
-			groups[i] = group;
+			group.setId(Long.parseLong(groupIds[i]));
+			groups.add(group);
 		}
 		user.setGroups(groups);
 
 		if (Boolean.parseBoolean(values.get(READONLY).toString())) {
 			user.setType(GUIUser.TYPE_READONLY);
-			user.setGroups(new GUIGroup[0]);
+			user.setGroups(new ArrayList<>());
 		} else
 			user.setType(GUIUser.TYPE_DEFAULT);
 
 		return !vm.hasErrors();
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

@@ -18,11 +18,11 @@ import javax.servlet.http.HttpServletResponse;
 
 import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.document.Document;
-import com.logicaldoc.core.document.dao.DocumentDAO;
-import com.logicaldoc.core.document.dao.DocumentHistoryDAO;
-import com.logicaldoc.core.security.Menu;
+import com.logicaldoc.core.document.DocumentDAO;
+import com.logicaldoc.core.document.DocumentHistoryDAO;
 import com.logicaldoc.core.security.Session;
-import com.logicaldoc.core.security.dao.MenuDAO;
+import com.logicaldoc.core.security.menu.Menu;
+import com.logicaldoc.core.security.menu.MenuDAO;
 import com.logicaldoc.core.util.IconSelector;
 import com.logicaldoc.i18n.I18N;
 import com.logicaldoc.util.Context;
@@ -48,18 +48,17 @@ public class DocumentHistoryDataServlet extends AbstractDataServlet {
 	protected void service(HttpServletRequest request, HttpServletResponse response, Session session, Integer max,
 			Locale locale) throws IOException, PersistenceException {
 
-		MenuDAO mDao = (MenuDAO) Context.get().getBean(MenuDAO.class);
+		MenuDAO mDao = Context.get(MenuDAO.class);
 		boolean showSid = mDao.isReadEnable(Menu.SESSIONS, session.getUserId());
 
 		PrintWriter writer = response.getWriter();
 		writer.write("<list>");
 
 		StringBuilder query = new StringBuilder(
-				"select A.username, A.event, A.version, A.date, A.comment, A.filename, A.isNew, A.folderId, A.docId, A.path, A.sessionId, A.userId, A.reason, A.ip, A.device, A.geolocation, A.color, A.fileVersion, A.fileSize from DocumentHistory A where A.deleted = 0 ");
+				"select A.username, A.event, A.version, A.date, A.comment, A.filename, A.isNew, A.folderId, A.docId, A.path, A.sessionId, A.userId, A.reason, A.ip, A.device, A.geolocation, A.color, A.fileVersion, A.fileSize, A.keyLabel from DocumentHistory A where A.deleted = 0 ");
 		Map<String, Object> params = prepareQueryParams(request, query);
-
-		DocumentHistoryDAO dao = (DocumentHistoryDAO) Context.get().getBean(DocumentHistoryDAO.class);
-		List<Object> records = dao.findByQuery(query.toString(), params, max != null ? max : 100);
+		List<?> records = Context.get(DocumentHistoryDAO.class).findByQuery(query.toString(), params,
+				max != null ? max : 100);
 
 		// Used only to cache the already encountered documents when the
 		// history
@@ -122,6 +121,8 @@ public class DocumentHistoryDataServlet extends AbstractDataServlet {
 
 		writer.print("<fileVersion>" + (historyRecord[17] == null ? "" : historyRecord[17]) + "</fileVersion>");
 		writer.print("<fileSize>" + (historyRecord[18] == null ? "" : historyRecord[18]) + "</fileSize>");
+		if (historyRecord[19] != null)
+			writer.write("<key><![CDATA[" + historyRecord[19] + "]]></key>");
 		writer.print("</history>");
 	}
 
@@ -131,7 +132,7 @@ public class DocumentHistoryDataServlet extends AbstractDataServlet {
 
 		if (request.getParameter(DOC_ID) != null) {
 			Long docId = Long.parseLong(request.getParameter(DOC_ID));
-			DocumentDAO ddao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+			DocumentDAO ddao = Context.get(DocumentDAO.class);
 			Document doc = ddao.findDocument(docId);
 			if (doc != null)
 				docId = doc.getId();

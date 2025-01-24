@@ -21,17 +21,17 @@ import org.slf4j.LoggerFactory;
 
 import com.google.gwt.user.client.rpc.SerializationException;
 import com.google.gwt.user.server.rpc.impl.ServerSerializationStreamWriter;
-import com.logicaldoc.core.History;
 import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.communication.EventCollector;
 import com.logicaldoc.core.communication.EventListener;
 import com.logicaldoc.core.document.Document;
+import com.logicaldoc.core.document.DocumentDAO;
 import com.logicaldoc.core.document.DocumentEvent;
-import com.logicaldoc.core.document.dao.DocumentDAO;
 import com.logicaldoc.core.folder.FolderEvent;
-import com.logicaldoc.core.security.UserEvent;
-import com.logicaldoc.core.security.UserHistory;
-import com.logicaldoc.core.security.dao.TenantDAO;
+import com.logicaldoc.core.history.History;
+import com.logicaldoc.core.security.TenantDAO;
+import com.logicaldoc.core.security.user.UserEvent;
+import com.logicaldoc.core.security.user.UserHistory;
 import com.logicaldoc.gui.common.client.ServerException;
 import com.logicaldoc.gui.common.client.beans.GUIDocument;
 import com.logicaldoc.gui.common.client.beans.GUIFolder;
@@ -111,7 +111,7 @@ public class EventEndpoint implements EventListener {
 	@OnOpen
 	public void onOpen(final Session session) {
 		if (!registered) {
-			EventCollector eventCollector = (EventCollector) Context.get().getBean(EventCollector.class);
+			EventCollector eventCollector = Context.get(EventCollector.class);
 			eventCollector.addListener(this);
 			registered = true;
 		}
@@ -140,9 +140,13 @@ public class EventEndpoint implements EventListener {
 	public void newEvent(History event) {
 		ContextProperties config = Context.get().getProperties();
 
-		if (event.getTenant() == null) {
-			TenantDAO tenantDAO = (TenantDAO) Context.get().getBean(TenantDAO.class);
-			event.setTenant(tenantDAO.getTenantName(event.getTenantId()));
+		try {
+			if (event.getTenant() == null) {
+				TenantDAO tenantDAO = Context.get(TenantDAO.class);
+				event.setTenant(tenantDAO.getTenantName(event.getTenantId()));
+			}
+		} catch (PersistenceException e) {
+			log.warn("Cannot retrieve the name of tenant {}", event.getTenantId());
 		}
 
 		if (EventCollector.isEnabled() && config.getBoolean(event.getTenant() + ".gui.serverpush", false)
@@ -170,9 +174,10 @@ public class EventEndpoint implements EventListener {
 		message.setComment(event.getComment());
 		message.setDate(event.getDate());
 		message.setId(event.getId());
+		message.setTenantId(event.getTenantId());
 
-		if (event instanceof UserHistory)
-			message.setAuthor(((UserHistory) event).getAuthor());
+		if (event instanceof UserHistory userHistory)
+			message.setAuthor(userHistory.getAuthor());
 
 		GUIFolder folder = null;
 		if (event.getFolder() != null) {
@@ -185,8 +190,8 @@ public class EventEndpoint implements EventListener {
 			message.setFolder(folder);
 
 		GUIDocument document = null;
-		if (event.getDocument() != null) {
-			Document clone = new Document(event.getDocument());
+		if (event.getDocument() != null && event.getDocument() instanceof Document doc) {
+			Document clone = new Document(doc);
 			// Report some attributes skipped by the clone method
 			clone.setCustomId(event.getDocument().getCustomId());
 			clone.setStatus(event.getDocument().getStatus());
@@ -197,7 +202,7 @@ public class EventEndpoint implements EventListener {
 			document = new DocumentServiceImpl().fromDocument(clone, null, null);
 			document.setId(event.getDocId());
 		} else if (event.getDocId() != null) {
-			DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+			DocumentDAO docDao = Context.get(DocumentDAO.class);
 			Document d = docDao.findById(event.getDocId());
 			if (d != null) {
 				document = new DocumentServiceImpl().fromDocument(d, null, null);
@@ -231,14 +236,29 @@ public class EventEndpoint implements EventListener {
 	 * @param message The message to be sent
 	 */
 	public static void distributeMessage(WebsocketMessage message) {
-		for (Session peer : peers)
-			try {
-				String serializedMessage = serializeMessage(message);
+		try {
+			String serializedMessage = serializeMessage(message);
+			for (Session peer : peers)
 				if (peer.getAsyncRemote() != null)
-					peer.getAsyncRemote().sendText(serializedMessage);
-			} catch (SerializationException e) {
-				log.error("Error preparing websocket message {}", message.getEvent(), e);
+					sendMessageToPear(message.getEvent(), serializedMessage, peer);
+		} catch (SerializationException e) {
+			log.error("Error preparing websocket message {}", message.getEvent());
+			log.error(e.getMessage(), e);
+		}
+	}
+
+	private static synchronized void sendMessageToPear(String event, String serializedMessage, Session peer) {
+		try {
+			peer.getBasicRemote().sendText(serializedMessage);
+		} catch (Exception e) {
+			if (e.getMessage().contains("WebSocket session has been closed")) {
+				log.debug("Cannot send websocket message {} to peer {} because WebSocket session has been closed",
+						event, peer.getRequestURI());
+			} else {
+				log.error("Error sending websocket message {} to peer {}", event, peer.getRequestURI());
+				log.error(e.getMessage(), e);
 			}
+		}
 	}
 
 	private static String serializeMessage(final WebsocketMessage messageDto) throws SerializationException {

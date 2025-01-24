@@ -10,7 +10,7 @@ import javax.servlet.http.HttpServletResponse;
 
 import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.document.Document;
-import com.logicaldoc.core.document.dao.DocumentDAO;
+import com.logicaldoc.core.document.DocumentDAO;
 import com.logicaldoc.core.folder.Folder;
 import com.logicaldoc.core.folder.FolderDAO;
 import com.logicaldoc.core.security.Session;
@@ -32,8 +32,8 @@ public class GarbageDataServlet extends AbstractDataServlet {
 	protected void service(HttpServletRequest request, HttpServletResponse response, Session session, Integer max, Locale locale)
 			throws PersistenceException, IOException {
 
-		DocumentDAO documentDAO = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
-		FolderDAO folderDAO = (FolderDAO) Context.get().getBean(FolderDAO.class);
+		DocumentDAO documentDAO = Context.get(DocumentDAO.class);
+		FolderDAO folderDAO = Context.get(FolderDAO.class);
 
 		DateFormat df = getDateFormat();
 

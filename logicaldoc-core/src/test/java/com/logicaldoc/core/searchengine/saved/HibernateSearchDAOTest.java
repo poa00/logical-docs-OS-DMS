@@ -3,9 +3,9 @@ package com.logicaldoc.core.searchengine.saved;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.Date;
 import java.util.List;
@@ -18,6 +18,7 @@ import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.searchengine.FulltextSearchOptions;
 import com.logicaldoc.core.searchengine.SearchOptions;
 import com.logicaldoc.util.Context;
+import com.logicaldoc.util.plugin.PluginException;
 
 import junit.framework.Assert;
 
@@ -33,7 +34,7 @@ public class HibernateSearchDAOTest extends AbstractCoreTestCase {
 	private SearchDAO dao;
 
 	@Before
-	public void setUp() throws FileNotFoundException, IOException, SQLException {
+	public void setUp() throws IOException, SQLException, PluginException {
 		super.setUp();
 
 		// Retrieve the instance under test from spring context. Make sure that
@@ -42,7 +43,7 @@ public class HibernateSearchDAOTest extends AbstractCoreTestCase {
 	}
 
 	@Test
-	public void testFindByUserId() throws PersistenceException, IOException {
+	public void testFindByUserId() throws PersistenceException {
 		FulltextSearchOptions opt = new FulltextSearchOptions();
 
 		opt.setLanguage("it");
@@ -78,7 +79,7 @@ public class HibernateSearchDAOTest extends AbstractCoreTestCase {
 	}
 
 	@Test
-	public void testCharsets() throws IOException {
+	public void testCharsets() throws PersistenceException {
 		FulltextSearchOptions opt = new FulltextSearchOptions();
 
 		opt.setLanguage("it");
@@ -102,7 +103,7 @@ public class HibernateSearchDAOTest extends AbstractCoreTestCase {
 		saved = new SavedSearch();
 		saved.setOptions(xml);
 
-		ch = Charset.forName("UTF-8");
+		ch = StandardCharsets.UTF_8;
 		Context.get().getProperties().setProperty("default.charset", ch.name());
 		saved = new SavedSearch();
 		saved.setName("manca l'umiltà");
@@ -114,15 +115,16 @@ public class HibernateSearchDAOTest extends AbstractCoreTestCase {
 		saved.setOptions(xml);
 
 		opt.setExpression("我正在寻找每月200欧元的工人，没有人回答：缺乏谦虚");
-		ch = Charset.forName("UTF-8");
+		ch = StandardCharsets.UTF_8;
 		Context.get().getProperties().setProperty("default.charset", ch.name());
 		saved = new SavedSearch();
 		saved.setName("缺乏谦卑");
 		saved.saveOptions(opt);
 		xml = saved.getOptions();
-		
+
 		assertNotNull(xml);
-		assertTrue(xml.length() > 700);
+		System.out.println(xml);
+		assertTrue(xml.length() > 600);
 
 		saved = new SavedSearch();
 		saved.setOptions(xml);

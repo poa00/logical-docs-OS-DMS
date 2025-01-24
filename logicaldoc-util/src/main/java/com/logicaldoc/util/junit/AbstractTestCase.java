@@ -1,6 +1,6 @@
 package com.logicaldoc.util.junit;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 
 import java.io.File;
 import java.io.FileReader;
@@ -9,11 +9,14 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
 import javax.sql.DataSource;
 
+import org.apache.commons.io.FilenameUtils;
 import org.hsqldb.cmdline.SqlFile;
 import org.hsqldb.cmdline.SqlToolError;
 import org.junit.After;
@@ -23,8 +26,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.support.AbstractApplicationContext;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
+import org.springframework.util.CollectionUtils;
 
+import com.logicaldoc.util.Context;
+import com.logicaldoc.util.config.ContextProperties;
 import com.logicaldoc.util.io.FileUtil;
+import com.logicaldoc.util.plugin.PluginException;
+import com.logicaldoc.util.plugin.PluginRegistry;
+import com.logicaldoc.util.time.Pause;
 
 /**
  * Abstract test case that of database and context initialization.
@@ -42,25 +51,31 @@ public abstract class AbstractTestCase {
 
 	protected File tempDir = new File("target/tmp");
 
-	private String userHome;
+	protected final String originalUserHome = System.getProperty(USER_HOME);
 
 	@Before
-	public void setUp() throws IOException, SQLException {
+	public void setUp() throws IOException, SQLException, PluginException {
 		loadDevelSettings();
 
 		updateUserHome();
 
 		createTestDirs();
 
-		context = new ClassPathXmlApplicationContext(getContexts());
+		initializePlugins();
 
-		createTestDatabase();
+		context = buildApplicationContext();
+
+		createDatabase();
 	}
 
 	@After
 	public void tearDown() throws SQLException {
 		try {
 			destroyDatabase();
+
+			File pluginsDir = new File(
+					Context.get().getProperties().getProperty("conf.plugindir", "target/tests-plugins"));
+			FileUtil.delete(pluginsDir);
 
 			if (context != null)
 				((AbstractApplicationContext) context).close();
@@ -70,18 +85,52 @@ public abstract class AbstractTestCase {
 	}
 
 	private void updateUserHome() {
-		userHome = System.getProperty(USER_HOME);
 		System.setProperty(USER_HOME, tempDir.getPath());
 	}
 
 	/**
-	 * Concrete implementations should return the array of context XML resources
-	 * to use to setup the database
+	 * Concrete implementations should prepare and return the Spring
+	 * ApplicationContext to use. By default it is used the
+	 * ClassPathXmlApplicationContext loading the /context.xml resource.
 	 * 
-	 * @return array of resources(default is a single /context.xml)
+	 * @return the ApplicationContext
 	 */
-	protected String[] getContexts() {
-		return new String[] { "/context.xml" };
+	protected ApplicationContext buildApplicationContext() {
+		return new ClassPathXmlApplicationContext("/context.xml");
+	}
+
+	/**
+	 * Concrete implementations should return the list of plugin archives to
+	 * initialize
+	 * 
+	 * @return collection of plugin archives
+	 */
+	protected List<String> getPluginArchives() {
+		return new ArrayList<>();
+	}
+
+	/**
+	 * Initializes the declared plugins
+	 * 
+	 * @throws IOException I/O error retrieving the plugin archives
+	 * @throws PluginException Error during plugin initialization
+	 */
+	protected void initializePlugins() throws IOException, PluginException {
+		List<String> pluginArchives = getPluginArchives();
+		if (CollectionUtils.isEmpty(pluginArchives))
+			return;
+
+		File pluginsDir = new File(new ContextProperties().getProperty("conf.plugindir", "target/tests-plugins"));
+		FileUtil.delete(pluginsDir);
+		pluginsDir.mkdir();
+
+		for (String pluginArchive : pluginArchives) {
+			File pluginFile = new File(pluginsDir, FilenameUtils.getName(pluginArchive));
+			FileUtil.copyResource(pluginArchive, pluginFile);
+		}
+
+		PluginRegistry registry = PluginRegistry.getInstance();
+		registry.init(pluginsDir.getAbsolutePath());
 	}
 
 	/**
@@ -90,55 +139,8 @@ public abstract class AbstractTestCase {
 	 * 
 	 * @return array of resources(database script files)
 	 */
-	protected String[] getSqlScripts() {
-		return new String[0];
-	}
-
-	/**
-	 * Loads the settigs in the file user.home/logicaldoc-dev.properties putting
-	 * them as Java variables
-	 * 
-	 * @throws IOException Error reading the development file
-	 */
-	private void loadDevelSettings() throws IOException {
-		Properties devSettings = new Properties();
-		try (FileReader reader = new FileReader(
-				new File(System.getProperty(USER_HOME) + "/logicaldoc-dev.properties"))) {
-			devSettings.load(reader);
-			for (Map.Entry<Object, Object> entry : devSettings.entrySet())
-				System.setProperty(entry.getKey().toString(), entry.getValue().toString());
-		}
-	}
-
-	protected void createTestDirs() {
-		FileUtil.strongDelete(tempDir);
-		FileUtil.strongDelete(tempDir);
-		FileUtil.strongDelete(tempDir);
-		tempDir.mkdirs();
-	}
-
-	private void restoreUserHome() {
-		// Restore user home system property
-		System.setProperty(USER_HOME, userHome);
-	}
-
-	/**
-	 * Destroys the in-memory database
-	 * 
-	 * @throws SQLException error at database level
-	 */
-	private void destroyDatabase() throws SQLException {
-		if (getSqlScripts().length < 1)
-			return;
-
-		try (Connection con = getConnection(); Statement statement = con.createStatement()) {
-			statement.execute("shutdown");
-		}
-	}
-
-	protected Connection getConnection() throws SQLException {
-		DataSource ds = (DataSource) context.getBean("DataSource");
-		return ds.getConnection();
+	protected List<String> getDatabaseScripts() {
+		return new ArrayList<>();
 	}
 
 	/**
@@ -147,11 +149,12 @@ public abstract class AbstractTestCase {
 	 * @throws SQLException Error in one of the SQL scripts
 	 * @throws IOException Error reading one of the SQL scripts
 	 */
-	private void createTestDatabase() throws SQLException, IOException {
-		if (getSqlScripts().length < 1)
+	private void createDatabase() throws SQLException, IOException {
+		final List<String> databaseScripts = getDatabaseScripts();
+		if (CollectionUtils.isEmpty(databaseScripts))
 			return;
 
-		for (String sqlScript : getSqlScripts()) {
+		for (String sqlScript : databaseScripts) {
 			File sqlFile = File.createTempFile("sql", ".sql");
 			FileUtil.copyResource(sqlScript, sqlFile);
 			try (Connection con = getConnection()) {
@@ -164,15 +167,61 @@ public abstract class AbstractTestCase {
 					throw new SQLException(e.getMessage(), e);
 				}
 			} finally {
-				FileUtil.strongDelete(sqlFile);
+				FileUtil.delete(sqlFile);
 			}
 		}
 
 		// Test the connection
-		try (Connection con = getConnection();
-				ResultSet rs = con.createStatement().executeQuery("select * from ld_menu where ld_id=2")) {
+		try (Connection con = getConnection(); ResultSet rs = con.createStatement().executeQuery("CALL NOW()")) {
 			rs.next();
-			assertEquals(2, rs.getInt(1));
+			assertNotNull(rs.getObject(1));
 		}
+	}
+
+	/**
+	 * Loads the settigs in the file user.home/logicaldoc-dev.properties putting
+	 * them as Java variables
+	 * 
+	 * @throws IOException Error reading the development file
+	 */
+	private void loadDevelSettings() throws IOException {
+		Properties devSettings = new Properties();
+		try (FileReader reader = new FileReader(new File(originalUserHome + "/logicaldoc-dev.properties"))) {
+			devSettings.load(reader);
+			for (Map.Entry<Object, Object> entry : devSettings.entrySet())
+				System.setProperty(entry.getKey().toString(), entry.getValue().toString());
+		}
+	}
+
+	protected void createTestDirs() {
+		FileUtil.delete(tempDir);
+		tempDir.mkdirs();
+	}
+
+	private void restoreUserHome() {
+		// Restore user home system property
+		System.setProperty(USER_HOME, originalUserHome);
+	}
+
+	/**
+	 * Destroys the in-memory database
+	 * 
+	 * @throws SQLException error at database level
+	 */
+	private void destroyDatabase() throws SQLException {
+		if (CollectionUtils.isEmpty(getDatabaseScripts()))
+			return;
+
+		try (Connection con = getConnection(); Statement statement = con.createStatement()) {
+			statement.execute("shutdown");
+		}
+	}
+
+	protected Connection getConnection() throws SQLException {
+		return context.getBean(DataSource.class).getConnection();
+	}
+
+	protected void waiting() throws InterruptedException {
+		Pause.doPause(5000L);
 	}
 }

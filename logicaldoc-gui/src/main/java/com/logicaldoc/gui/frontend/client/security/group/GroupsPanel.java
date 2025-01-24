@@ -1,18 +1,18 @@
 package com.logicaldoc.gui.frontend.client.security.group;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.logicaldoc.gui.common.client.Constants;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Feature;
 import com.logicaldoc.gui.common.client.beans.GUIGroup;
 import com.logicaldoc.gui.common.client.data.GroupsDS;
+import com.logicaldoc.gui.common.client.grid.IdListGridField;
+import com.logicaldoc.gui.common.client.grid.RefreshableListGrid;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.services.SecurityService;
 import com.logicaldoc.gui.common.client.util.GridUtil;
 import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.common.client.widgets.HTMLPanel;
 import com.logicaldoc.gui.common.client.widgets.InfoPanel;
-import com.logicaldoc.gui.common.client.widgets.grid.RefreshableListGrid;
 import com.logicaldoc.gui.frontend.client.administration.AdminPanel;
 import com.smartgwt.client.data.AdvancedCriteria;
 import com.smartgwt.client.data.Record;
@@ -105,9 +105,8 @@ public class GroupsPanel extends AdminPanel {
 		listing.setHeight("55%");
 		listing.setShowResizeBar(true);
 
-		ListGridField id = new ListGridField("id", 50);
-		id.setHidden(true);
-
+		ListGridField id = new IdListGridField();
+		
 		ListGridField name = new ListGridField("name", I18N.message("name"), 150);
 		name.setCanFilter(true);
 
@@ -140,13 +139,7 @@ public class GroupsPanel extends AdminPanel {
 			Record rec = list.getSelectedRecord();
 			if (rec != null)
 				SecurityService.Instance.get().getGroup(Long.parseLong(rec.getAttributeAsString("id")),
-						new AsyncCallback<GUIGroup>() {
-
-							@Override
-							public void onFailure(Throwable caught) {
-								GuiLog.serverError(caught);
-							}
-
+						new DefaultAsyncCallback<>() {
 							@Override
 							public void onSuccess(GUIGroup group) {
 								showGroupDetails(group);
@@ -203,12 +196,7 @@ public class GroupsPanel extends AdminPanel {
 		delete.addClickHandler(
 				event -> LD.ask(I18N.message("question"), I18N.message("confirmdelete"), (Boolean value) -> {
 					if (Boolean.TRUE.equals(value)) {
-						SecurityService.Instance.get().deleteGroup(id, new AsyncCallback<Void>() {
-							@Override
-							public void onFailure(Throwable caught) {
-								GuiLog.serverError(caught);
-							}
-
+						SecurityService.Instance.get().deleteGroup(id, new DefaultAsyncCallback<>() {
 							@Override
 							public void onSuccess(Void result) {
 								list.removeSelectedData();
@@ -228,5 +216,15 @@ public class GroupsPanel extends AdminPanel {
 
 		contextMenu.setItems(delete);
 		contextMenu.showContextMenu();
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

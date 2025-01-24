@@ -11,6 +11,7 @@ import org.apache.commons.lang.StringUtils;
 public class TimeDiff {
 
 	private TimeDiff() {
+		throw new IllegalStateException("Utility class");
 	}
 
 	/**
@@ -19,7 +20,7 @@ public class TimeDiff {
 	 * 
 	 * @param d1 Date one
 	 * @param d2 Date two
-	 * @param field The field we're interested in out of day, hour, minute,
+	 * @param field The field we're interested in: day, hour, minute,
 	 *        second, millisecond
 	 * 
 	 * @return The value of the required field

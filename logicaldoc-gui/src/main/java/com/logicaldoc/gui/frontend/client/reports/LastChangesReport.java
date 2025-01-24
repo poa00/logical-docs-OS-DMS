@@ -1,26 +1,28 @@
 package com.logicaldoc.gui.frontend.client.reports;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
-import java.util.Map;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.logicaldoc.gui.common.client.Feature;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIDocument;
 import com.logicaldoc.gui.common.client.beans.GUIHistory;
+import com.logicaldoc.gui.common.client.grid.CopyCellClickHandler;
+import com.logicaldoc.gui.common.client.grid.DateListGridField;
+import com.logicaldoc.gui.common.client.grid.FileNameListGridField;
+import com.logicaldoc.gui.common.client.grid.UserListGridField;
+import com.logicaldoc.gui.common.client.grid.DateListGridField.DateCellFormatter;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
+import com.logicaldoc.gui.common.client.preview.PreviewPopup;
 import com.logicaldoc.gui.common.client.util.DocUtil;
+import com.logicaldoc.gui.common.client.util.EventSelectorOptions;
 import com.logicaldoc.gui.common.client.util.GridUtil;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.common.client.widgets.FolderSelector;
 import com.logicaldoc.gui.common.client.widgets.InfoPanel;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.FileNameListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.UserListGridField;
-import com.logicaldoc.gui.common.client.widgets.preview.PreviewPopup;
 import com.logicaldoc.gui.frontend.client.administration.AdminPanel;
 import com.logicaldoc.gui.frontend.client.document.DocumentsPanel;
 import com.logicaldoc.gui.frontend.client.services.DocumentService;
@@ -186,7 +188,8 @@ public class LastChangesReport extends AdminPanel {
 		eventForm.setColWidths(1, "*");
 
 		// Event
-		SelectItem event = ItemFactory.newEventsSelector(EVENT, I18N.message(EVENT), null, true, true, true, true, true);
+		SelectItem event = ItemFactory.newEventsSelector(EVENT, I18N.message(EVENT), null,
+				new EventSelectorOptions(true, true, true, true, true, false, false));
 		event.setColSpan(2);
 		event.setEndRow(true);
 
@@ -206,7 +209,7 @@ public class LastChangesReport extends AdminPanel {
 		ListGridField eventField = new ListGridField(EVENT, I18N.message(EVENT), 200);
 		eventField.setCanFilter(true);
 
-		ListGridField date = new DateListGridField("date", "date");
+		ListGridField date = new DateListGridField("date", "date", DateCellFormatter.FORMAT_LONG);
 
 		ListGridField userField = new UserListGridField("user", USER_ID, "user");
 		userField.setCanFilter(true);
@@ -221,6 +224,11 @@ public class LastChangesReport extends AdminPanel {
 		ListGridField sid = new ListGridField("sid", I18N.message("sid"), 250);
 		sid.setCanFilter(true);
 		sid.setAlign(Alignment.CENTER);
+
+		ListGridField key = new ListGridField("key", I18N.message("key"), 90);
+		key.setCanFilter(true);
+		key.setHidden(true);
+		key.setAlign(Alignment.CENTER);
 
 		ListGridField docId = new ListGridField(DOC_ID, I18N.message("documentid"), 100);
 		docId.setCanFilter(true);
@@ -259,8 +267,8 @@ public class LastChangesReport extends AdminPanel {
 		histories.setEmptyMessage(I18N.message("notitemstoshow"));
 		histories.setWidth100();
 		histories.setHeight100();
-		histories.setFields(eventField, date, userField, name, folderField, sid, docId, folderId, userId, username, ip,
-				device, geolocation, comment, reason);
+		histories.setFields(eventField, date, userField, name, folderField, sid, key, docId, folderId, userId, username,
+				ip, device, geolocation, comment, reason);
 		histories.setSelectionType(SelectionStyle.SINGLE);
 		histories.setShowRecordComponents(true);
 		histories.setShowRecordComponentsByCell(true);
@@ -268,6 +276,7 @@ public class LastChangesReport extends AdminPanel {
 		histories.setFilterOnKeypress(true);
 		histories.setAutoFetchData(true);
 		histories.sort("date", SortDirection.DESCENDING);
+		histories.addCellDoubleClickHandler(new CopyCellClickHandler());
 		histories.addCellContextClickHandler(evn -> {
 			showContextMenu();
 			evn.cancel();
@@ -295,113 +304,101 @@ public class LastChangesReport extends AdminPanel {
 	 * @return an array of select items
 	 */
 	public SelectItem[] getEventTypes() {
-		List<SelectItem> items = new ArrayList<>();
-		return items.toArray(new SelectItem[0]);
+		return new ArrayList<>().toArray(new SelectItem[0]);
 	}
 
-	@SuppressWarnings("unchecked")
 	private void onSearch() {
 		histories.setData();
-
-		final Map<String, Object> values =  vm.getValues();
-
 		if (Boolean.FALSE.equals(vm.validate()))
 			return;
 
-		String[] eventValues = getEvents(values);
+		List<String> eventValues = getEvents();
 
-		Long userId = getUserId(values);
+		Long userId = getUserId();
 
 		Date fromValue = null;
-		if (values.get(FROM_DATE) != null)
-			fromValue = (Date) values.get(FROM_DATE);
+		if (vm.getValue(FROM_DATE) != null)
+			fromValue = (Date) vm.getValue(FROM_DATE);
 		Date tillValue = null;
-		if (values.get(TILL_DATE) != null)
-			tillValue = (Date) values.get(TILL_DATE);
+		if (vm.getValue(TILL_DATE) != null)
+			tillValue = (Date) vm.getValue(TILL_DATE);
 
 		String sid = null;
-		if (values.get("sid") != null)
-			sid = (String) values.get("sid");
+		if (vm.getValue("sid") != null)
+			sid = vm.getValueAsString("sid");
 
-		int displayMaxValue = getDisplayMax(values);
+		int displayMaxValue = getDisplayMax();
 
 		doSearch(eventValues, userId, fromValue, tillValue, sid, displayMaxValue);
 	}
 
-	private String[] getEvents(final Map<String, Object> values) {
+	private List<String> getEvents() {
 		String[] eventValues = new String[0];
-		if (values.get(EVENT) != null) {
-			String buf = values.get(EVENT).toString().trim().toLowerCase();
+		if (vm.getValue(EVENT) != null) {
+			String buf = vm.getValueAsString(EVENT).trim().toLowerCase();
 			buf = buf.replace('[', ' ');
 			buf = buf.replace(']', ' ');
 			buf = buf.replace(" ", "");
 			eventValues = buf.split(",");
 		}
-		return eventValues;
+		return Arrays.asList(eventValues);
 	}
 
-	private Long getUserId(final Map<String, Object> values) {
+	private Long getUserId() {
 		Long userId = null;
-		if (values.get("user") != null) {
-			if (values.get("user") instanceof Long)
-				userId = (Long) values.get("user");
+		if (vm.getValue("user") != null) {
+			if (vm.getValue("user") instanceof Long longVal)
+				userId = longVal;
 			else
-				userId = Long.parseLong(values.get("user").toString());
+				userId = Long.parseLong(vm.getValueAsString("user"));
 		}
 		return userId;
 	}
 
-	private int getDisplayMax(final Map<String, Object> values) {
+	private int getDisplayMax() {
 		int displayMaxValue = 0;
-		if (values.get(DISPLAYMAX) != null) {
-			if (values.get(DISPLAYMAX) instanceof Integer)
-				displayMaxValue = (Integer) values.get(DISPLAYMAX);
+		if (vm.getValue(DISPLAYMAX) != null) {
+			if (vm.getValue(DISPLAYMAX) instanceof Integer intVal)
+				displayMaxValue = intVal;
 			else
-				displayMaxValue = Integer.parseInt((String) values.get(DISPLAYMAX));
+				displayMaxValue = Integer.parseInt(vm.getValueAsString(DISPLAYMAX));
 		}
 		return displayMaxValue;
 	}
 
-	private void doSearch(String[] eventValues, Long userId, Date fromValue, Date tillValue, String sid,
+	private void doSearch(List<String> eventValues, Long userId, Date fromValue, Date tillValue, String sid,
 			int displayMaxValue) {
 		LD.contactingServer();
 		SystemService.Instance.get().search(userId, fromValue, tillValue, displayMaxValue, sid, eventValues,
-				folder.getFolderId(), new AsyncCallback<GUIHistory[]>() {
-
+				folder.getFolderId(), new DefaultAsyncCallback<>() {
 					@Override
-					public void onFailure(Throwable caught) {
-						LD.clearPrompt();
-						GuiLog.serverError(caught);
-					}
-
-					@Override
-					public void onSuccess(GUIHistory[] result) {
+					public void onSuccess(List<GUIHistory> result) {
 						LD.clearPrompt();
 
-						if (result != null && result.length > 0) {
-							ListGridRecord[] records = new ListGridRecord[result.length];
-							for (int i = 0; i < result.length; i++) {
-								ListGridRecord rec = new ListGridRecord();
-								rec.setAttribute(EVENT, I18N.message(result[i].getEvent()));
-								rec.setAttribute("date", result[i].getDate());
-								rec.setAttribute("user", result[i].getUsername());
-								rec.setAttribute(NAME, result[i].getFileName());
-								rec.setAttribute(FOLDER_STR, result[i].getPath());
-								rec.setAttribute("sid", result[i].getSessionId());
-								rec.setAttribute(DOC_ID, result[i].getDocId());
-								rec.setAttribute(FOLDER_ID, result[i].getFolderId());
-								rec.setAttribute(USER_ID, result[i].getUserId());
-								rec.setAttribute("ip", result[i].getIp());
-								rec.setAttribute(DEVICE, result[i].getDevice());
-								rec.setAttribute(GEOLOCATION, result[i].getGeolocation());
-								rec.setAttribute(USERNAME, result[i].getUserLogin());
-								rec.setAttribute(COMMENT, result[i].getComment());
-								rec.setAttribute(REASON, result[i].getReason());
-								rec.setAttribute("icon", result[i].getIcon());
-								records[i] = rec;
-							}
-							histories.setData(records);
+						List<ListGridRecord> records = new ArrayList<>();
+						for (GUIHistory hist : result) {
+							ListGridRecord rec = new ListGridRecord();
+							rec.setAttribute(EVENT, I18N.message(hist.getEvent()));
+							rec.setAttribute("date", hist.getDate());
+							rec.setAttribute("user", hist.getUsername());
+							rec.setAttribute(NAME, hist.getFileName());
+							rec.setAttribute(FOLDER_STR, hist.getPath());
+							rec.setAttribute("sid", hist.getSessionId());
+							rec.setAttribute("key", hist.getKeyLabel());
+							rec.setAttribute(DOC_ID, hist.getDocId());
+							rec.setAttribute(FOLDER_ID, hist.getFolderId());
+							rec.setAttribute(USER_ID, hist.getUserId());
+							rec.setAttribute("ip", hist.getIp());
+							rec.setAttribute(DEVICE, hist.getDevice());
+							rec.setAttribute(GEOLOCATION, hist.getGeolocation());
+							rec.setAttribute(USERNAME, hist.getUserLogin());
+							rec.setAttribute(COMMENT, hist.getComment());
+							rec.setAttribute(REASON, hist.getReason());
+							rec.setAttribute("icon", hist.getIcon());
+							records.add(rec);
 						}
+						histories.setData(records.toArray(new ListGridRecord[0]));
+
 						lastchanges.removeMember(infoPanel);
 						infoPanel = new InfoPanel("");
 						infoPanel.setMessage(I18N.message("showelements", Integer.toString(histories.getTotalRows())));
@@ -450,20 +447,22 @@ public class LastChangesReport extends AdminPanel {
 		MenuItem preview = new MenuItem();
 		preview.setTitle(I18N.message("preview"));
 		if (docId != null)
-			preview.addClickHandler(
-					event -> DocumentService.Instance.get().getById(docId, new AsyncCallback<GUIDocument>() {
-
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
-						}
-
-						@Override
-						public void onSuccess(GUIDocument doc) {
-							PreviewPopup iv = new PreviewPopup(doc);
-							iv.show();
-						}
-					}));
+			preview.addClickHandler(event -> DocumentService.Instance.get().getById(docId, new DefaultAsyncCallback<>() {
+				@Override
+				public void onSuccess(GUIDocument doc) {
+					new PreviewPopup(doc).show();
+				}
+			}));
 		return preview;
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

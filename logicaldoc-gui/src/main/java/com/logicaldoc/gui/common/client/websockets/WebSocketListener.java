@@ -3,6 +3,7 @@ package com.logicaldoc.gui.common.client.websockets;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
@@ -11,14 +12,13 @@ import org.realityforge.gwt.websockets.client.WebSocket;
 import org.realityforge.gwt.websockets.client.WebSocketListenerAdapter;
 
 import com.google.gwt.core.client.GWT;
-import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.google.gwt.user.client.rpc.SerializationException;
 import com.google.gwt.user.client.rpc.SerializationStreamFactory;
 import com.google.gwt.user.client.rpc.SerializationStreamReader;
 import com.google.gwt.user.client.rpc.SerializationStreamWriter;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Menu;
 import com.logicaldoc.gui.common.client.Session;
-import com.logicaldoc.gui.common.client.beans.GUIDocument;
 import com.logicaldoc.gui.common.client.beans.GUIReadingRequest;
 import com.logicaldoc.gui.common.client.controllers.DocumentController;
 import com.logicaldoc.gui.common.client.controllers.FolderController;
@@ -116,6 +116,10 @@ public class WebSocketListener extends WebSocketListenerAdapter {
 	}
 
 	private void onEvent(WebsocketMessage event) {
+		// Skip events related to other tenants
+		if (event.getTenantId() != Session.get().getInfo().getTenant().getId())
+			return;
+
 		if (!moniteredEvents.contains(event.getEvent()))
 			return;
 
@@ -133,7 +137,7 @@ public class WebSocketListener extends WebSocketListenerAdapter {
 		} else if ("event.moved".equals(event.getEvent())) {
 			handleMovedEvent(event);
 		} else if ("event.deleted".equals(event.getEvent())) {
-			DocumentController.get().deleted(new GUIDocument[] { event.getDocument() });
+			DocumentController.get().deleted(Arrays.asList(event.getDocument()));
 		} else if (isFolderEvent(event)) {
 			handleFolderEvent(event);
 		} else if ("event.user.messagereceived".equals(event.getEvent()) && Menu.enabled(Menu.MESSAGES)) {
@@ -149,15 +153,10 @@ public class WebSocketListener extends WebSocketListenerAdapter {
 		} else if ("event.reading.requested".equals(event.getEvent())) {
 			String recipient = event.getComment().substring(event.getComment().indexOf(':') + 1).trim();
 			if (Session.get().getUser().getUsername().equals(recipient)) {
-				ReadingRequestService.Instance.get().getUnconfimedReadings(new AsyncCallback<GUIReadingRequest[]>() {
+				ReadingRequestService.Instance.get().getUnconfimedReadings(new DefaultAsyncCallback<>() {
 
 					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
-					@Override
-					public void onSuccess(GUIReadingRequest[] readings) {
+					public void onSuccess(List<GUIReadingRequest> readings) {
 						ReadingRequestController.get().addUnconfirmedReadings(readings);
 					}
 				});
@@ -192,8 +191,9 @@ public class WebSocketListener extends WebSocketListenerAdapter {
 	}
 
 	private void handleDocumentModifiedEvent(WebsocketMessage event) {
-		if (FolderController.get().getCurrentFolder().getId() == event.getDocument().getFolder().getId())
+		if (FolderController.get().getCurrentFolder().getId() == event.getDocument().getFolder().getId()) {
 			event.getDocument().setFolder(FolderController.get().getCurrentFolder());
+		}
 		DocumentController.get().modified(event.getDocument());
 	}
 
@@ -258,7 +258,6 @@ public class WebSocketListener extends WebSocketListenerAdapter {
 	@Override
 	public void onMessage(WebSocket webSocket, String data) {
 		onEvent(deserializeMessage(data));
-
 	}
 
 	@Override

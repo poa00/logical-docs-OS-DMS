@@ -1,12 +1,15 @@
 package com.logicaldoc.webservice.soap.client;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.security.authentication.AuthenticationException;
 import com.logicaldoc.core.security.authorization.PermissionException;
 import com.logicaldoc.webservice.WebserviceException;
+import com.logicaldoc.webservice.model.WSAccessControlEntry;
 import com.logicaldoc.webservice.model.WSAttributeOption;
 import com.logicaldoc.webservice.model.WSAttributeSet;
-import com.logicaldoc.webservice.model.WSRight;
 import com.logicaldoc.webservice.model.WSTemplate;
 import com.logicaldoc.webservice.soap.DocumentMetadataService;
 
@@ -27,9 +30,13 @@ public class SoapDocumentMetadataClient extends SoapClient<DocumentMetadataServi
 	}
 
 	@Override
-	public WSTemplate[] listTemplates(String sid)
+	public List<WSTemplate> listTemplates(String sid)
 			throws AuthenticationException, WebserviceException, PersistenceException {
-		return client.listTemplates(sid);
+		final List<WSTemplate> templates = client.listTemplates(sid);
+		if (templates != null)
+			return templates;
+		else
+			return new ArrayList<>();
 	}
 
 	@Override
@@ -57,27 +64,39 @@ public class SoapDocumentMetadataClient extends SoapClient<DocumentMetadataServi
 	}
 
 	@Override
-	public void setAttributeOptions(String sid, long setId, String attribute, WSAttributeOption[] options)
+	public void setAttributeOptions(String sid, long setId, String attribute, List<WSAttributeOption> options)
 			throws WebserviceException, PersistenceException {
 		client.setAttributeOptions(sid, setId, attribute, options);
 	}
 
 	@Override
-	public String[] getAttributeOptions(String sid, long setId, String attribute)
+	public List<String> getAttributeOptions(String sid, long setId, String attribute)
 			throws AuthenticationException, WebserviceException, PersistenceException {
-		return client.getAttributeOptions(sid, setId, attribute);
+		final List<String> options = client.getAttributeOptions(sid, setId, attribute);
+		if (options != null)
+			return options;
+		else
+			return new ArrayList<>();
 	}
 
 	@Override
-	public WSAttributeOption[] getAttributeOptionsByCategory(String sid, long setId, String attribute, String category)
-			throws AuthenticationException, WebserviceException, PersistenceException {
-		return client.getAttributeOptionsByCategory(sid, setId, attribute, category);
+	public List<WSAttributeOption> getAttributeOptionsByCategory(String sid, long setId, String attribute,
+			String category) throws AuthenticationException, WebserviceException, PersistenceException {
+		final List<WSAttributeOption> options = client.getAttributeOptionsByCategory(sid, setId, attribute, category);
+		if (options != null)
+			return options;
+		else
+			return new ArrayList<>();
 	}
 
 	@Override
-	public WSAttributeSet[] listAttributeSets(String sid)
+	public List<WSAttributeSet> listAttributeSets(String sid)
 			throws AuthenticationException, WebserviceException, PersistenceException {
-		return client.listAttributeSets(sid);
+		final List<WSAttributeSet> sets = client.listAttributeSets(sid);
+		if (sets != null)
+			return sets;
+		else
+			return new ArrayList<>();
 	}
 
 	@Override
@@ -104,44 +123,36 @@ public class SoapDocumentMetadataClient extends SoapClient<DocumentMetadataServi
 	}
 
 	@Override
-	public boolean isTemplateReadable(String sid, long templateId)
+	public boolean isReadable(String sid, long templateId)
 			throws AuthenticationException, WebserviceException, PersistenceException {
-		return client.isTemplateReadable(sid, templateId);
+		return client.isReadable(sid, templateId);
 	}
 
 	@Override
-	public boolean isTemplateWritable(String sid, long templateId)
+	public boolean isWritable(String sid, long templateId)
 			throws AuthenticationException, WebserviceException, PersistenceException {
-		return client.isTemplateWritable(sid, templateId);
-	}
-
-	@Override
-	public void grantUserToTemplate(String sid, long templateId, long userId, int permissions)
-			throws AuthenticationException, PermissionException, PersistenceException, WebserviceException {
-		client.grantUserToTemplate(sid, templateId, userId, permissions);
-	}
-
-	@Override
-	public void grantGroupToTemplate(String sid, long templateId, long groupId, int permissions)
-			throws AuthenticationException, PermissionException, WebserviceException, PersistenceException {
-		client.grantGroupToTemplate(sid, templateId, groupId, permissions);
-	}
-
-	@Override
-	public WSRight[] getGrantedUsers(String sid, long groupId)
-			throws AuthenticationException, PermissionException, WebserviceException, PersistenceException {
-		return client.getGrantedUsers(sid, groupId);
-	}
-
-	@Override
-	public WSRight[] getGrantedGroups(String sid, long groupId)
-			throws AuthenticationException, PermissionException, WebserviceException, PersistenceException {
-		return client.getGrantedGroups(sid, groupId);
+		return client.isWritable(sid, templateId);
 	}
 
 	@Override
 	public void addAttributeOption(String sid, long setId, String attribute, WSAttributeOption wsoption)
 			throws AuthenticationException, WebserviceException, PersistenceException {
 		client.addAttributeOption(sid, setId, attribute, wsoption);
+	}
+
+	@Override
+	public List<WSAccessControlEntry> getAccessControlList(String sid, long templateId)
+			throws AuthenticationException, WebserviceException, PersistenceException, PermissionException {
+		final List<WSAccessControlEntry> acl = client.getAccessControlList(sid, templateId);
+		if (acl != null)
+			return acl;
+		else
+			return new ArrayList<>();
+	}
+
+	@Override
+	public void setAccessControlList(String sid, long templateId, List<WSAccessControlEntry> acl)
+			throws PersistenceException, PermissionException, AuthenticationException, WebserviceException {
+		client.setAccessControlList(sid, templateId, acl);
 	}
 }

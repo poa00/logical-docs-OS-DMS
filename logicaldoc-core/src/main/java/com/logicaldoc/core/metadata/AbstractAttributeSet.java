@@ -1,5 +1,7 @@
 package com.logicaldoc.core.metadata;
 
+import com.logicaldoc.core.security.SecurableExtensibleObject;
+
 /**
  * A base class for attribute sets and templates
  * 
@@ -7,7 +9,8 @@ package com.logicaldoc.core.metadata;
  * 
  * @since 8.8.3
  */
-public class AbstractAttributeSet extends ExtensibleObject {
+public class AbstractAttributeSet extends SecurableExtensibleObject {
+
 	private static final long serialVersionUID = 1L;
 
 	/**
@@ -16,6 +19,8 @@ public class AbstractAttributeSet extends ExtensibleObject {
 	public static final int TYPE_DEFAULT = 0;
 
 	private String name;
+
+	private String label;
 
 	private String description;
 
@@ -53,5 +58,38 @@ public class AbstractAttributeSet extends ExtensibleObject {
 
 	public void setType(int type) {
 		this.type = type;
+	}
+
+	public String getLabel() {
+		return label;
+	}
+
+	public void setLabel(String label) {
+		this.label = label;
+	}
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = super.hashCode();
+		result = prime * result + ((name == null) ? 0 : name.hashCode());
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (!super.equals(obj))
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		AbstractAttributeSet other = (AbstractAttributeSet) obj;
+		if (name == null) {
+			if (other.name != null)
+				return false;
+		} else if (!name.equals(other.name))
+			return false;
+		return true;
 	}
 }

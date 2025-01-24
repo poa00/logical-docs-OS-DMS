@@ -1,7 +1,6 @@
 package com.logicaldoc.core.folder;
 
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -14,14 +13,15 @@ import org.apache.commons.lang.StringUtils;
 import org.hibernate.LazyInitializationException;
 
 import com.logicaldoc.core.document.Tag;
-import com.logicaldoc.core.metadata.ExtensibleObject;
+import com.logicaldoc.core.security.AccessControlEntry;
+import com.logicaldoc.core.security.SecurableExtensibleObject;
 import com.logicaldoc.util.Context;
 
 /**
  * This class represents the key concept of security of documents. The Folder is
- * used as an element to build hierarchies. With foldergroups you can associate
- * groups to a given folder and grant some permissions. Also setting the
- * recurityRef you can specify another reference folder that contains the
+ * used as an element to build hierarchies. With the AccessControlList you can
+ * associate groups to a given folder and grant some permissions. Also setting
+ * the recurityRef you can specify another reference folder that contains the
  * security policies.
  * <p>
  * Folders have a type: 0 for standard folders, 1 for workspaces.
@@ -29,7 +29,7 @@ import com.logicaldoc.util.Context;
  * @author Marco Meschieri - LogicalDOC
  * @version 6.0
  */
-public class Folder extends ExtensibleObject implements Comparable<Folder> {
+public class Folder extends SecurableExtensibleObject implements Comparable<Folder> {
 
 	private static final long serialVersionUID = 1L;
 
@@ -45,8 +45,6 @@ public class Folder extends ExtensibleObject implements Comparable<Folder> {
 
 	public static final int TYPE_ALIAS = 2;
 
-	private long id = 0;
-
 	private String name = "";
 
 	private long parentId = DEFAULTWORKSPACEID;
@@ -57,8 +55,6 @@ public class Folder extends ExtensibleObject implements Comparable<Folder> {
 
 	private int type = TYPE_DEFAULT;
 
-	private Date creation = new Date();
-
 	private String creator;
 
 	private Long creatorId;
@@ -66,8 +62,6 @@ public class Folder extends ExtensibleObject implements Comparable<Folder> {
 	private int position = 1;
 
 	private int hidden = 0;
-
-	private Set<FolderGroup> folderGroups = new HashSet<>();
 
 	/**
 	 * If 1, the users cannot change the template of the contained documents
@@ -89,10 +83,10 @@ public class Folder extends ExtensibleObject implements Comparable<Folder> {
 	private Long foldRef;
 
 	/**
-	 * The default storages to use for this folder in the nodes(key: nodeId -
-	 * value: storageId)
+	 * The default stores to use for this folder in the nodes(key: nodeId -
+	 * value: storeId)
 	 */
-	private Map<String, Integer> storages = new HashMap<>();
+	private Map<String, Integer> stores = new HashMap<>();
 
 	private Integer maxVersions;
 
@@ -100,6 +94,9 @@ public class Folder extends ExtensibleObject implements Comparable<Folder> {
 
 	private Set<Tag> tags = new HashSet<>();
 
+	/**
+	 * Comma-separated tags, used for searching only
+	 */
 	private String tgs;
 
 	/**
@@ -136,18 +133,17 @@ public class Folder extends ExtensibleObject implements Comparable<Folder> {
 	}
 
 	public Folder(Folder source) {
-		this.id = source.id;
+		this.setId(source.getId());
 		this.name = source.name;
 		this.parentId = source.parentId;
 		this.securityRef = source.securityRef;
 		this.description = source.description;
 		this.type = source.type;
-		this.creation = source.creation;
+		this.setCreation(source.getCreation());
 		this.creator = source.creator;
 		this.creatorId = source.creatorId;
 		this.position = source.position;
 		this.hidden = source.hidden;
-		this.folderGroups = source.folderGroups;
 		this.templateLocked = source.templateLocked;
 		this.deleteUserId = source.deleteUserId;
 		this.deleteUser = source.deleteUser;
@@ -156,7 +152,7 @@ public class Folder extends ExtensibleObject implements Comparable<Folder> {
 		this.quotaThreshold = source.quotaThreshold;
 		this.quotaAlertRecipients = source.quotaAlertRecipients;
 		this.foldRef = source.foldRef;
-		this.storages = source.storages;
+		this.stores = source.stores;
 		this.maxVersions = source.maxVersions;
 		this.color = source.color;
 		this.tags = source.tags;
@@ -173,6 +169,13 @@ public class Folder extends ExtensibleObject implements Comparable<Folder> {
 		setTemplateName(source.getTemplateName());
 
 		setTenantId(source.getTenantId());
+
+		try {
+			for (AccessControlEntry ace : source.getAccessControlList())
+				getAccessControlList().add(new AccessControlEntry(ace));
+		} catch (LazyInitializationException x) {
+			// may happen do nothing
+		}
 
 		setAttributes(new HashMap<>());
 		try {
@@ -191,19 +194,11 @@ public class Folder extends ExtensibleObject implements Comparable<Folder> {
 		} catch (LazyInitializationException x) {
 			// may happen do nothing
 		}
-		try {
-			setFolderGroups(new HashSet<>());
-			for (FolderGroup fg : source.getFolderGroups()) {
-				getFolderGroups().add(new FolderGroup(fg));
-			}
-		} catch (LazyInitializationException x) {
-			// may happen do nothing
-		}
 
-		setStorages(new HashMap<>());
+		setStores(new HashMap<>());
 		try {
-			for (String nodeId : source.getStorages().keySet()) {
-				getStorages().put(nodeId, source.getStorages().get(nodeId));
+			for (String nodeId : source.getStores().keySet()) {
+				getStores().put(nodeId, source.getStores().get(nodeId));
 			}
 		} catch (LazyInitializationException x) {
 			// may happen do nothing
@@ -218,101 +213,12 @@ public class Folder extends ExtensibleObject implements Comparable<Folder> {
 		return type == TYPE_ALIAS;
 	}
 
-	@Override
-	public long getId() {
-		return id;
-	}
-
 	public long getParentId() {
 		return parentId;
 	}
 
-	public Set<FolderGroup> getFolderGroups() {
-		return folderGroups;
-	}
-
-	public void clearFolderGroups() {
-		folderGroups.clear();
-		folderGroups = new HashSet<>();
-	}
-
-	@Override
-	public void setId(long id) {
-		this.id = id;
-	}
-
 	public void setParentId(long parentId) {
 		this.parentId = parentId;
-	}
-
-	public void setFolderGroups(Set<FolderGroup> fgroup) {
-		folderGroups = fgroup;
-	}
-
-	public long[] getFolderGroupIds() {
-		long[] idsArray = new long[folderGroups.size()];
-		int i = 0;
-		for (FolderGroup mg : folderGroups) {
-			idsArray[i++] = mg.getGroupId();
-		}
-		return idsArray;
-	}
-
-	/**
-	 * Adds FolderGroup object given in a String array to the ArrayList of
-	 * FolderGroup.
-	 * 
-	 * @param groups array of group ids
-	 */
-	public void setFolderGroup(long[] groups) {
-		folderGroups.clear();
-		for (int i = 0; i < groups.length; i++) {
-			FolderGroup mg = new FolderGroup();
-			mg.setGroupId(groups[i]);
-			mg.setWrite(1);
-			mg.setAdd(1);
-			mg.setSecurity(1);
-			mg.setDelete(1);
-			mg.setRename(1);
-			folderGroups.add(mg);
-		}
-	}
-
-	/**
-	 * Adds a new element, substituting an existing one with the same groupId.
-	 * 
-	 * @param fg the folder group
-	 */
-	public void addFolderGroup(FolderGroup fg) {
-		FolderGroup m = getFolderGroup(fg.getGroupId());
-		if (m != null)
-			getFolderGroups().remove(m);
-		if (fg.getRead() != 0)
-			getFolderGroups().add(fg);
-	}
-
-	public FolderGroup getFolderGroup(long groupId) {
-		for (FolderGroup fg : folderGroups) {
-			if (fg.getGroupId() == groupId)
-				return fg;
-		}
-		return null;
-	}
-
-	@Override
-	public int compareTo(Folder o) {
-		int comparison = Integer.compare(this.position, o.position);
-		if (comparison != 0)
-			return comparison;
-		return this.name.compareTo(o.name);
-	}
-
-	@Override
-	public boolean equals(Object obj) {
-		if (!(obj instanceof Folder))
-			return false;
-		Folder other = (Folder) obj;
-		return other.getId() == this.getId();
 	}
 
 	public String getName() {
@@ -345,14 +251,6 @@ public class Folder extends ExtensibleObject implements Comparable<Folder> {
 
 	public void setType(int type) {
 		this.type = type;
-	}
-
-	public Date getCreation() {
-		return creation;
-	}
-
-	public void setCreation(Date creation) {
-		this.creation = creation;
 	}
 
 	public String getCreator() {
@@ -428,30 +326,30 @@ public class Folder extends ExtensibleObject implements Comparable<Folder> {
 	}
 
 	/**
-	 * Gets the default storage to use from this folder in the current node
+	 * Gets the default store to use from this folder in the current node
 	 * 
-	 * @return identifier of the default storage
+	 * @return identifier of the default store
 	 */
-	public Integer getStorage() {
+	public Integer getStore() {
 		try {
-			return storages.get(Context.get().getProperties().get("id"));
+			return stores.get(Context.get().getProperties().get("id"));
 		} catch (Exception t) {
 			return null;
 		}
 	}
 
 	/**
-	 * Gets the default storage to use from this folder in the current node
+	 * Gets the default store to use from this folder in the current node
 	 * 
-	 * @param storage identifier of the default storage
+	 * @param store identifier of the default store
 	 */
-	public void setStorage(Integer storage) {
+	public void setStore(Integer store) {
 		try {
 			String nodeId = Context.get().getProperties().getProperty("id");
-			if (storage == null)
-				storages.remove(nodeId);
+			if (store == null)
+				stores.remove(nodeId);
 			else
-				storages.put(nodeId, storage);
+				stores.put(nodeId, store);
 		} catch (Exception t) {
 			// Nothing to do
 		}
@@ -485,6 +383,12 @@ public class Folder extends ExtensibleObject implements Comparable<Folder> {
 		return tgs;
 	}
 
+	/**
+	 * So not invoke this method directly, it is thought to be used by the ORM
+	 * inside the DAO.
+	 * 
+	 * @param tgs comma-separated string of tags
+	 */
 	public void setTgs(String tgs) {
 		this.tgs = tgs;
 	}
@@ -643,12 +547,12 @@ public class Folder extends ExtensibleObject implements Comparable<Folder> {
 		return getName() + "(" + getId() + ")";
 	}
 
-	public Map<String, Integer> getStorages() {
-		return storages;
+	public Map<String, Integer> getStores() {
+		return stores;
 	}
 
-	public void setStorages(Map<String, Integer> storages) {
-		this.storages = storages;
+	public void setStores(Map<String, Integer> stores) {
+		this.stores = stores;
 	}
 
 	public String getTile() {
@@ -657,5 +561,42 @@ public class Folder extends ExtensibleObject implements Comparable<Folder> {
 
 	public void setTile(String tile) {
 		this.tile = tile;
+	}
+
+	@Override
+	public int compareTo(Folder other) {
+		if (this.equals(other))
+			return 0;
+
+		int comparison = Integer.compare(this.position, other.position);
+		if (comparison != 0)
+			return comparison;
+		return this.name.compareTo(other.name);
+	}
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = super.hashCode();
+		result = prime * result + ((name == null) ? 0 : name.hashCode());
+		result = prime * result + (int) (parentId ^ (parentId >>> 32));
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (!super.equals(obj))
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		Folder other = (Folder) obj;
+		if (name == null) {
+			if (other.name != null)
+				return false;
+		} else if (!name.equals(other.name))
+			return false;
+		return parentId == other.parentId;
 	}
 }

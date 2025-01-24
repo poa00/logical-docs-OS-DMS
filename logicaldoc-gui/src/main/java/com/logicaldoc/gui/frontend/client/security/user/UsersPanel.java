@@ -2,32 +2,33 @@ package com.logicaldoc.gui.frontend.client.security.user;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Feature;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIGroup;
 import com.logicaldoc.gui.common.client.beans.GUIUser;
 import com.logicaldoc.gui.common.client.data.UsersDS;
-import com.logicaldoc.gui.common.client.formatters.UserCellFormatter;
-import com.logicaldoc.gui.common.client.formatters.UserDateCellFormatter;
+import com.logicaldoc.gui.common.client.grid.DateListGridField;
+import com.logicaldoc.gui.common.client.grid.EnabledListGridField;
+import com.logicaldoc.gui.common.client.grid.IdListGridField;
+import com.logicaldoc.gui.common.client.grid.RefreshableListGrid;
+import com.logicaldoc.gui.common.client.grid.UserListGridField;
+import com.logicaldoc.gui.common.client.grid.formatters.UserCellFormatter;
+import com.logicaldoc.gui.common.client.grid.formatters.UserDateCellFormatter;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.services.SecurityService;
 import com.logicaldoc.gui.common.client.util.GridUtil;
 import com.logicaldoc.gui.common.client.util.LD;
-import com.logicaldoc.gui.common.client.util.Util;
 import com.logicaldoc.gui.common.client.widgets.HTMLPanel;
 import com.logicaldoc.gui.common.client.widgets.InfoPanel;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.RefreshableListGrid;
-import com.logicaldoc.gui.common.client.widgets.grid.UserListGridField;
 import com.logicaldoc.gui.frontend.client.administration.AdminPanel;
 import com.logicaldoc.gui.frontend.client.security.twofactorsauth.TwoFactorsAuthenticationDialog;
 import com.smartgwt.client.data.AdvancedCriteria;
 import com.smartgwt.client.data.Record;
 import com.smartgwt.client.types.Alignment;
-import com.smartgwt.client.types.ListGridFieldType;
+import com.smartgwt.client.types.AutoFitWidthApproach;
 import com.smartgwt.client.types.OperatorId;
 import com.smartgwt.client.types.SelectionStyle;
 import com.smartgwt.client.widgets.Canvas;
@@ -48,6 +49,12 @@ import com.smartgwt.client.widgets.toolbar.ToolStripButton;
  */
 public class UsersPanel extends AdminPanel {
 
+	private static final String DEPARTMENT = "department";
+
+	private static final String BUILDING = "building";
+
+	private static final String COMPANY = "company";
+
 	private static final String ADMIN = "admin";
 
 	private static final String SOURCE = "source";
@@ -56,9 +63,7 @@ public class UsersPanel extends AdminPanel {
 
 	private static final String GUEST = "guest";
 
-	private static final String EENABLED = "eenabled";
-
-	private static final String ENABLED_ICON = "enabledIcon";
+	private static final String ENABLED = "eenabled";
 
 	private static final String EMAIL = "email";
 
@@ -132,8 +137,7 @@ public class UsersPanel extends AdminPanel {
 		listing.setHeight("55%");
 		listing.setShowResizeBar(true);
 
-		ListGridField id = new ListGridField("id", 50);
-		id.setHidden(true);
+		ListGridField id = new IdListGridField();
 		id.setCellFormatter(new UserCellFormatter());
 
 		ListGridField username = new ListGridField(USERNAME, I18N.message(USERNAME), 100);
@@ -156,6 +160,32 @@ public class UsersPanel extends AdminPanel {
 		cell.setCanFilter(true);
 		cell.setCellFormatter(new UserCellFormatter());
 
+		ListGridField city = new ListGridField("city", I18N.message("city"), 90);
+		city.setCanFilter(true);
+		city.setHidden(true);
+		city.setCellFormatter(new UserCellFormatter());
+
+		ListGridField company = new ListGridField(COMPANY, I18N.message(COMPANY), 100);
+		company.setCanFilter(true);
+		company.setHidden(true);
+		company.setCellFormatter(new UserCellFormatter());
+
+		ListGridField building = new ListGridField(BUILDING, I18N.message(BUILDING), 100);
+		building.setCanFilter(true);
+		building.setHidden(true);
+		building.setCellFormatter(new UserCellFormatter());
+
+		ListGridField department = new ListGridField(DEPARTMENT, I18N.message(DEPARTMENT), 100);
+		department.setCanFilter(true);
+		department.setHidden(true);
+		department.setCellFormatter(new UserCellFormatter());
+
+		ListGridField organizationalUnit = new ListGridField("organizationalUnit", I18N.message("organizationalunit"),
+				100);
+		organizationalUnit.setCanFilter(true);
+		organizationalUnit.setHidden(true);
+		organizationalUnit.setCellFormatter(new UserCellFormatter());
+
 		ListGridField email = new ListGridField(EMAIL, I18N.message(EMAIL), 200);
 		email.setCanFilter(true);
 		email.setCellFormatter(new UserCellFormatter());
@@ -164,18 +194,20 @@ public class UsersPanel extends AdminPanel {
 				DateListGridField.DateCellFormatter.FORMAT_SHORT);
 		expire.setCellFormatter(new UserDateCellFormatter());
 
-		ListGridField enabledIcon = new ListGridField(ENABLED_ICON, " ", 24);
-		enabledIcon.setType(ListGridFieldType.IMAGE);
-		enabledIcon.setCanSort(false);
-		enabledIcon.setAlign(Alignment.CENTER);
-		enabledIcon.setShowDefaultContextMenu(false);
-		enabledIcon.setImageURLPrefix(Util.imagePrefix());
-		enabledIcon.setImageURLSuffix(".gif");
-		enabledIcon.setCanFilter(false);
+		DateListGridField lastLogin = new DateListGridField("lastLogin", "lastlogin",
+				DateListGridField.DateCellFormatter.FORMAT_DEFAULT);
+		lastLogin.setAutoFitWidth(true);
+		lastLogin.setAutoFitWidthApproach(AutoFitWidthApproach.BOTH);
+		lastLogin.setCellFormatter(new UserDateCellFormatter(false));
 
-		ListGridField enabled = new ListGridField(EENABLED, I18N.message("enabled"), 55);
-		enabled.setCanFilter(true);
-		enabled.setHidden(true);
+		DateListGridField creation = new DateListGridField("creation", "createdon",
+				DateListGridField.DateCellFormatter.FORMAT_DEFAULT);
+		creation.setAutoFitWidth(true);
+		creation.setAutoFitWidthApproach(AutoFitWidthApproach.BOTH);
+		creation.setCellFormatter(new UserDateCellFormatter(false));
+		creation.setHidden(true);
+
+		ListGridField enabled = new EnabledListGridField();
 
 		ListGridField guest = new ListGridField(GUEST, I18N.message(GUEST), 55);
 		guest.setCanFilter(true);
@@ -207,8 +239,8 @@ public class UsersPanel extends AdminPanel {
 		list.setFilterOnKeypress(true);
 		list.setShowFilterEditor(true);
 		list.setDataSource(new UsersDS(null, true, false));
-		list.setFields(id, enabledIcon, avatar, username, firstName, name, email, expire, phone, cell, groups, enabled,
-				guest, timeZone, source);
+		list.setFields(id, enabled, avatar, username, firstName, name, email, creation, lastLogin, expire, company,
+				department, building, organizationalUnit, city, phone, cell, groups, guest, timeZone, source);
 
 		listing.addMember(infoPanel);
 		listing.addMember(list);
@@ -235,13 +267,7 @@ public class UsersPanel extends AdminPanel {
 	}
 
 	private void onSelectUser(long userId) {
-		SecurityService.Instance.get().getUser(userId, new AsyncCallback<GUIUser>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
+		SecurityService.Instance.get().getUser(userId, new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(GUIUser user) {
 				showUserDetails(user);
@@ -272,24 +298,16 @@ public class UsersPanel extends AdminPanel {
 		rec.setAttribute("cell", user.getCell());
 		rec.setAttribute(PHONE, user.getPhone());
 		rec.setAttribute("expire", user.getExpire());
-		rec.setAttribute(EENABLED, user.isEnabled());
-		if (user.isEnabled())
-			rec.setAttribute(ENABLED_ICON, "0");
-		else
-			rec.setAttribute(ENABLED_ICON, "2");
+		rec.setAttribute(ENABLED, user.isEnabled());
 		rec.setAttribute(GUEST, user.isReadOnly());
 		rec.setAttribute(SOURCE, user.getSource());
-
-		GUIGroup[] groups = user.getGroups();
-		StringBuilder gnames = new StringBuilder();
-		for (GUIGroup group : groups) {
-			if (!group.getName().startsWith("_user_")) {
-				if (!gnames.toString().isEmpty())
-					gnames.append(", ");
-				gnames.append(group.getName());
-			}
-		}
-		rec.setAttribute(GROUPS, gnames);
+		rec.setAttribute("city", user.getCity());
+		rec.setAttribute(BUILDING, user.getBuilding());
+		rec.setAttribute("organizationalUnit", user.getOrganizationalUnit());
+		rec.setAttribute(DEPARTMENT, user.getDepartment());
+		rec.setAttribute(COMPANY, user.getCompany());
+		rec.setAttribute(GROUPS, user.getGroups().stream().filter(g -> g.getType() == GUIGroup.TYPE_DEFAULT)
+				.map(g -> g.getName()).collect(Collectors.joining(",")));
 
 		list.refreshRow(list.getRecordIndex(rec));
 		list.redraw();
@@ -324,7 +342,7 @@ public class UsersPanel extends AdminPanel {
 
 		List<MenuItem> items = new ArrayList<>();
 		if (!Session.get().isAdmin()) {
-			if (Boolean.TRUE.equals(list.getSelectedRecord().getAttributeAsBoolean(EENABLED)))
+			if (Boolean.TRUE.equals(list.getSelectedRecord().getAttributeAsBoolean(ENABLED)))
 				items.add(disableUser);
 			else
 				items.add(enableUser);
@@ -332,7 +350,7 @@ public class UsersPanel extends AdminPanel {
 		items.add(password);
 
 		if (!ADMIN.equals(list.getSelectedRecord().getAttributeAsString(USERNAME))) {
-			if (Boolean.TRUE.equals(list.getSelectedRecord().getAttributeAsBoolean(EENABLED)))
+			if (Boolean.TRUE.equals(list.getSelectedRecord().getAttributeAsBoolean(ENABLED)))
 				items.add(disableUser);
 			else
 				items.add(enableUser);
@@ -368,16 +386,10 @@ public class UsersPanel extends AdminPanel {
 		MenuItem disableUser = new MenuItem();
 		disableUser.setTitle(I18N.message("disable"));
 		disableUser.addClickHandler(event -> SecurityService.Instance.get()
-				.changeStatus(list.getSelectedRecord().getAttributeAsLong("id"), false, new AsyncCallback<Void>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				.changeStatus(list.getSelectedRecord().getAttributeAsLong("id"), false, new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Void result) {
-						list.getSelectedRecord().setAttribute(ENABLED_ICON, "2");
-						list.getSelectedRecord().setAttribute(EENABLED, false);
+						list.getSelectedRecord().setAttribute(ENABLED, false);
 						list.refreshRow(list.getRecordIndex(list.getSelectedRecord()));
 						onSelectUser(list.getSelectedRecord().getAttributeAsLong("id"));
 					}
@@ -389,16 +401,10 @@ public class UsersPanel extends AdminPanel {
 		MenuItem enableUser = new MenuItem();
 		enableUser.setTitle(I18N.message("enable"));
 		enableUser.addClickHandler(event -> SecurityService.Instance.get()
-				.changeStatus(list.getSelectedRecord().getAttributeAsLong("id"), true, new AsyncCallback<Void>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				.changeStatus(list.getSelectedRecord().getAttributeAsLong("id"), true, new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Void result) {
-						list.getSelectedRecord().setAttribute(ENABLED_ICON, "0");
-						list.getSelectedRecord().setAttribute(EENABLED, true);
+						list.getSelectedRecord().setAttribute(ENABLED, true);
 						list.refreshRow(list.getRecordIndex(list.getSelectedRecord()));
 						onSelectUser(list.getSelectedRecord().getAttributeAsLong("id"));
 					}
@@ -410,13 +416,7 @@ public class UsersPanel extends AdminPanel {
 		MenuItem twoTactorsAuth = new MenuItem();
 		twoTactorsAuth.setTitle(I18N.message("twofactorsauth"));
 		twoTactorsAuth.addClickHandler(event -> SecurityService.Instance.get()
-				.getUser(selectedUsers[0].getAttributeAsLong("id"), new AsyncCallback<GUIUser>() {
-
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				.getUser(selectedUsers[0].getAttributeAsLong("id"), new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(GUIUser user) {
 						TwoFactorsAuthenticationDialog dialog = new TwoFactorsAuthenticationDialog(user, true);
@@ -452,12 +452,7 @@ public class UsersPanel extends AdminPanel {
 		delete.setTitle(I18N.message("ddelete"));
 		delete.addClickHandler(event -> LD.ask(I18N.message("question"), I18N.message("confirmdelete"), yes -> {
 			if (Boolean.TRUE.equals(yes)) {
-				SecurityService.Instance.get().deleteUser(selectedUserId, new AsyncCallback<Void>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				SecurityService.Instance.get().deleteUser(selectedUserId, new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Void result) {
 						list.removeSelectedData();
@@ -473,5 +468,15 @@ public class UsersPanel extends AdminPanel {
 
 	void refresh() {
 		list.refresh(new UsersDS(null, true, false));
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

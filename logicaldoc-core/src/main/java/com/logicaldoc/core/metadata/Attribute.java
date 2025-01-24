@@ -3,8 +3,11 @@ package com.logicaldoc.core.metadata;
 import java.io.Serializable;
 import java.util.Date;
 
+import javax.annotation.Nullable;
+
+import com.logicaldoc.core.document.Document;
 import com.logicaldoc.core.folder.Folder;
-import com.logicaldoc.core.security.User;
+import com.logicaldoc.core.security.user.User;
 
 /**
  * This class defines the value of an attribute associated to an extensible
@@ -31,6 +34,10 @@ public class Attribute implements Comparable<Attribute>, Serializable {
 	public static final int TYPE_BOOLEAN = 5;
 
 	public static final int TYPE_FOLDER = 6;
+
+	public static final int TYPE_DOCUMENT = 7;
+
+	public static final int TYPE_SECTION = 8;
 
 	public static final int EDITOR_DEFAULT = 0;
 
@@ -152,7 +159,8 @@ public class Attribute implements Comparable<Attribute>, Serializable {
 	public void setDateValue(Date dateValue) {
 		this.dateValue = dateValue;
 	}
-
+	
+	@Nullable
 	public Boolean getBooleanValue() {
 		if (intValue != null)
 			return intValue.intValue() == 1;
@@ -176,6 +184,10 @@ public class Attribute implements Comparable<Attribute>, Serializable {
 		this.type = type;
 	}
 
+	public boolean isSection() {
+		return type == TYPE_SECTION;
+	}
+
 	/**
 	 * Gets the attribute value. It can be as String, Long, Double or Date.
 	 * 
@@ -183,15 +195,11 @@ public class Attribute implements Comparable<Attribute>, Serializable {
 	 */
 	public Object getValue() {
 		switch (type) {
-		case TYPE_INT:
-			return getIntValue();
 		case TYPE_DOUBLE:
 			return getDoubleValue();
 		case TYPE_DATE:
 			return getDateValue();
-		case TYPE_USER:
-			return getIntValue();
-		case TYPE_FOLDER:
+		case TYPE_USER, TYPE_FOLDER, TYPE_DOCUMENT, TYPE_INT:
 			return getIntValue();
 		case TYPE_BOOLEAN:
 			if (getIntValue() == null)
@@ -201,6 +209,18 @@ public class Attribute implements Comparable<Attribute>, Serializable {
 		default:
 			return getStringValue();
 		}
+	}
+
+	/**
+	 * Gets the value as it should be displayed to the user
+	 * 
+	 * @return The attribute value to display
+	 */
+	public Object getDisplayValue() {
+		if (type == TYPE_USER || type == TYPE_DOCUMENT)
+			return getStringValue();
+		else
+			return getValue();
 	}
 
 	/**
@@ -215,36 +235,59 @@ public class Attribute implements Comparable<Attribute>, Serializable {
 			setDoubleValue(null);
 			setDateValue(null);
 			setBooleanValue(null);
-		} else {
-			if (value instanceof String) {
-				this.type = TYPE_STRING;
-				setStringValue((String) value);
-			} else if (value instanceof Integer) {
-				this.type = TYPE_INT;
-				setIntValue(Long.valueOf((Integer) value));
-			} else if (value instanceof Long) {
-				this.type = TYPE_INT;
-				setIntValue((Long) value);
-			} else if (value instanceof Double) {
-				this.type = TYPE_DOUBLE;
-				setDoubleValue((Double) value);
-			} else if (value instanceof Date) {
-				this.type = TYPE_DATE;
-				setDateValue((Date) value);
-			} else if (value instanceof User) {
-				this.type = TYPE_USER;
-				this.intValue = ((User) value).getId();
-				this.stringValue = ((User) value).getUsername();
-			} else if (value instanceof Folder) {
-				this.type = TYPE_FOLDER;
-				this.intValue = ((Folder) value).getId();
-				this.stringValue = ((Folder) value).getName();
-			} else if (value instanceof Boolean) {
-				this.type = TYPE_BOOLEAN;
-				this.intValue = ((Boolean) value).booleanValue() ? 1L : 0L;
-			} else {
-				throw new IllegalArgumentException("Not a String, Long, Double, Date, Boolean, User, Folder value");
-			}
+			return;
+		}
+
+		switch (value) {
+		case String string -> {
+			this.type = TYPE_STRING;
+			setStringValue(string);
+		}
+
+		case Integer integer -> {
+			this.type = TYPE_INT;
+			setIntValue(Long.valueOf(integer));
+		}
+
+		case Long longVal -> {
+			this.type = TYPE_INT;
+			setIntValue(longVal);
+		}
+
+		case Double doubleVal -> {
+			this.type = TYPE_DOUBLE;
+			setDoubleValue(doubleVal);
+		}
+
+		case Date date -> {
+			this.type = TYPE_DATE;
+			setDateValue(date);
+		}
+
+		case User user -> {
+			this.type = TYPE_USER;
+			this.intValue = user.getId();
+			this.stringValue = user.getUsername();
+		}
+
+		case Folder folder -> {
+			this.type = TYPE_FOLDER;
+			this.intValue = folder.getId();
+			this.stringValue = folder.getName();
+		}
+
+		case Document document -> {
+			this.type = TYPE_DOCUMENT;
+			this.intValue = document.getId();
+			this.stringValue = document.getFileName();
+		}
+
+		case Boolean bool -> {
+			this.type = TYPE_BOOLEAN;
+			this.intValue = bool.booleanValue() ? 1L : 0L;
+		}
+
+		default -> throw new IllegalArgumentException("Not a String, Long, Double, Date, Boolean, User, Folder value");
 		}
 	}
 

@@ -1,5 +1,7 @@
 package com.logicaldoc.gui.frontend.client.document.selector;
 
+import java.util.List;
+
 import com.logicaldoc.gui.common.client.beans.GUIDocument;
 import com.logicaldoc.gui.common.client.i18n.I18N;
 import com.logicaldoc.gui.common.client.widgets.StickyWindow;
@@ -23,18 +25,18 @@ public abstract class DocumentSelectorDialog extends StickyWindow {
 		return new WindowStatus(950, 600);
 	}
 
-	protected abstract void onSelection(GUIDocument[] selection);
+	protected abstract void onSelection(List<GUIDocument> selection);
 
 	@Override
 	protected void onDraw() {
 		DocumentSelectorPanel selectionPanel = new DocumentSelectorPanel();
 		addItem(selectionPanel);
 
-		ToolStripButton useSelection = new ToolStripButton(I18N.message("useseleteddocuments"));
-		useSelection.addClickHandler(event -> onSelection(selectionPanel.getSelection()));
+		ToolStripButton confirmSelection = new ToolStripButton(I18N.message("Confirm selection"));
+		confirmSelection.addClickHandler(event -> onSelection(selectionPanel.getSelection()));
 		ToolStrip toolStrip = new ToolStrip();
 		toolStrip.setWidth100();
-		toolStrip.addButton(useSelection);
+		toolStrip.addButton(confirmSelection);
 		addItem(toolStrip);
 	}
 }

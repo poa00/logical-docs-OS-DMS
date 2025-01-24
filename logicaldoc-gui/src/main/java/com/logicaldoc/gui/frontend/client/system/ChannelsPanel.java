@@ -1,8 +1,8 @@
 package com.logicaldoc.gui.frontend.client.system;
 
 import com.logicaldoc.gui.common.client.data.ChannelsDS;
+import com.logicaldoc.gui.common.client.grid.RefreshableListGrid;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.widgets.grid.RefreshableListGrid;
 import com.smartgwt.client.types.SelectionStyle;
 import com.smartgwt.client.widgets.grid.ListGridField;
 import com.smartgwt.client.widgets.layout.Layout;
@@ -56,5 +56,15 @@ public class ChannelsPanel extends VLayout {
 		list.setDataSource(new ChannelsDS());
 
 		listing.addMember(list);
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

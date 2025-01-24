@@ -262,9 +262,12 @@ public class LD {
 	 * @param callback call back used when the user confirms the input
 	 * @param cancelCallback call back used when the user cancels the input
 	 */
+	@SuppressWarnings("unchecked")
 	public static void askForValues(String title, String message, List<FormItem> items, Integer width,
 			final ValueCallback callback, final ClickHandler cancelCallback) {
 		final Window dialog = prepareDialogForAskValues(title, width);
+		if (cancelCallback != null)
+			dialog.addCloseClickHandler(click -> cancelCallback.onClick(null));
 
 		VStack container = new VStack();
 		container.setWidth100();
@@ -288,8 +291,8 @@ public class LD {
 		ok.addClickHandler(event -> {
 			if (form.validate() && callback != null) {
 				dialog.close();
-				if (callback instanceof ValuesCallback) {
-					((ValuesCallback) callback).execute(form.getValues());
+				if (callback instanceof ValuesCallback valuesCallback) {
+					valuesCallback.execute(form.getValues());
 				} else
 					callback.execute(form.getValue(VALUE) != null ? form.getValue(VALUE).toString() : null);
 				dialog.destroy();
@@ -343,15 +346,15 @@ public class LD {
 	private static void prepareItemsForAskValues(String message, List<FormItem> items, final ValueCallback callback,
 			final Window dialog, final DynamicForm form) {
 		for (FormItem item : items) {
-			if (items.size() == 1)
+			if (items.size() == 1) {
 				item.setName(VALUE);
+				if (message == null)
+					item.setShowTitle(false);
+				else
+					item.setTitle(I18N.message(message));
+			}
 
 			item.setWidth("100%");
-			if (message == null)
-				item.setShowTitle(false);
-			else
-				item.setTitle(I18N.message(message));
-
 			item.setWrapTitle(false);
 			if (!(item instanceof TextAreaItem) && !(item instanceof RichTextItem) && items.size() == 1
 					&& callback != null) {
@@ -424,10 +427,10 @@ public class LD {
 
 		if (defaultValue != null) {
 			item.setValue(defaultValue);
-			if (item instanceof TextItem) {
-				((TextItem) item).selectValue();
+			if (item instanceof TextItem textItem) {
+				textItem.selectValue();
 				if (defaultValue.length() > 0)
-					((TextItem) item).setSelectionRange(0, defaultValue.length());
+					textItem.setSelectionRange(0, defaultValue.length());
 			}
 		}
 	}

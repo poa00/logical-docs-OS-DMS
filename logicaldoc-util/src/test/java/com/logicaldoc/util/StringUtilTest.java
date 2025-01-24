@@ -1,6 +1,8 @@
 package com.logicaldoc.util;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+
+import java.security.NoSuchAlgorithmException;
 
 import org.junit.Test;
 
@@ -14,7 +16,7 @@ import com.logicaldoc.util.crypt.CryptUtil;
  */
 public class StringUtilTest {
 	@Test
-	public void testSplit() {
+	public void testSplit() throws NoSuchAlgorithmException {
 		String str="1";
 		assertEquals("1", StringUtil.split(str, '/', 3));
 		str="12";
@@ -28,6 +30,6 @@ public class StringUtilTest {
 		str="12345678";
 		assertEquals("123/456/78", StringUtil.split(str, '/', 3));
 		
-		System.out.println("Crypt J2A86bc26QnIpf1:"+CryptUtil.cryptString("J2A86bc26QnIpf1"));
+		System.out.println("Crypt J2A86bc26QnIpf1:"+CryptUtil.encryptSHA256("J2A86bc26QnIpf1"));
 	}
 }

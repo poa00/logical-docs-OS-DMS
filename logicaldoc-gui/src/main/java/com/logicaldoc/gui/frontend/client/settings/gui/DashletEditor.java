@@ -178,6 +178,7 @@ public class DashletEditor extends Window {
 		max = ItemFactory.newSpinnerItem("max", dashlet.getMax() != null ? dashlet.getMax() : 1);
 		max.setMin(1);
 		max.setRequired(true);
+		max.setDisabled(dashlet.getType().equals(GUIDashlet.TYPE_BOOKMARK));
 
 		unique = ItemFactory.newYesNoRadioItem(UNIQUE_STR, UNIQUE_STR);
 		unique.setValue(dashlet.isUnique());
@@ -194,6 +195,7 @@ public class DashletEditor extends Window {
 
 		query = ItemFactory.newTextAreaItemForAutomation("query", dashlet.getQuery(), null, false);
 		query.setWidth("*");
+		query.setDisabled(dashlet.getType().equals(GUIDashlet.TYPE_BOOKMARK));
 
 		form.setWidth100();
 		form.setHeight100();
@@ -254,5 +256,15 @@ public class DashletEditor extends Window {
 		} else {
 			tabset.selectTab(0);
 		}
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

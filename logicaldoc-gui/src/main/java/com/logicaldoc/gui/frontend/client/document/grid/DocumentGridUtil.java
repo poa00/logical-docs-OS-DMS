@@ -1,6 +1,7 @@
 package com.logicaldoc.gui.frontend.client.document.grid;
 
 import java.util.ArrayList;
+import java.util.List;
 
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIAttribute;
@@ -72,19 +73,19 @@ public class DocumentGridUtil {
 	private DocumentGridUtil() {
 	}
 
-	public static Long[] getIds(Record[] records) {
-		Long[] ids = new Long[records.length];
+	public static List<Long> getIds(Record[] records) {
+		List<Long> ids = new ArrayList<>();
 		for (int i = 0; i < records.length; i++)
-			ids[i] = Long.parseLong(records[i].getAttributeAsString("id"));
+			ids.add(Long.parseLong(records[i].getAttributeAsString("id")));
 		return ids;
 	}
 
-	public static GUIDocument[] toDocuments(Record[] records) {
-		ArrayList<GUIDocument> docs = new ArrayList<>();
+	public static List<GUIDocument> toDocuments(Record[] records) {
+		List<GUIDocument> docs = new ArrayList<>();
 		if (records != null)
 			for (Record rec : records)
 				docs.add(DocumentGridUtil.toDocument(rec));
-		return docs.toArray(new GUIDocument[0]);
+		return docs;
 	}
 
 	public static GUIDocument toDocument(Record rec) {
@@ -159,8 +160,7 @@ public class DocumentGridUtil {
 		if (rec.getAttributeAsInt(IMMUTABLE) != null)
 			document.setImmutable(rec.getAttributeAsInt(IMMUTABLE));
 
-		if (rec.getAttributeAsInt(PASSWORD) != null)
-			document.setPasswordProtected(rec.getAttributeAsBoolean(PASSWORD));
+		document.setPasswordProtected(Boolean.TRUE.equals(rec.getAttributeAsBoolean(PASSWORD)));
 
 		if (rec.getAttributeAsInt(SIGNED) != null)
 			document.setSigned(rec.getAttributeAsInt(SIGNED));
@@ -168,8 +168,7 @@ public class DocumentGridUtil {
 		if (rec.getAttributeAsInt(STAMPED) != null)
 			document.setStamped(rec.getAttributeAsInt(STAMPED));
 
-		if (rec.getAttributeAsInt(BOOKMARKED) != null)
-			document.setBookmarked(rec.getAttributeAsBoolean(BOOKMARKED));
+		document.setBookmarked(Boolean.TRUE.equals(rec.getAttributeAsBoolean(BOOKMARKED)));
 	}
 
 	private static void setDates(Record rec, GUIDocument document) {
@@ -256,13 +255,15 @@ public class DocumentGridUtil {
 			rec.setAttribute("fileVersion", doc.getFileVersion());
 			rec.setAttribute("version", doc.getVersion());
 			rec.setAttribute(COMMENT, doc.getComment());
+			rec.setAttribute("lastNote", doc.getLastNote());
 			rec.setAttribute(WORKFLOW_STATUS, doc.getWorkflowStatus());
 			rec.setAttribute(WORKFLOW_STATUS_DISPLAY, doc.getWorkflowStatusDisplay());
 			rec.setAttribute("color", doc.getColor());
 			rec.setAttribute("startPublishing", doc.getStartPublishing());
 			rec.setAttribute("stopPublishing", doc.getStopPublishing());
 			rec.setAttribute("publishedStatus", doc.getPublished() == 1 ? "yes" : "no");
-			rec.setAttribute("score", doc.getScore());
+			if (rec.getAttribute("score") == null)
+				rec.setAttribute("score", doc.getScore());
 			rec.setAttribute(SUMMARY, doc.getSummary());
 			rec.setAttribute("rating", doc.getRating());
 			rec.setAttribute("template", doc.getTemplate());
@@ -273,7 +274,8 @@ public class DocumentGridUtil {
 			rec.setAttribute(BOOKMARKED, doc.isBookmarked());
 			rec.setAttribute("extResId", doc.getExtResId());
 			rec.setAttribute("language", doc.getLanguage());
-			rec.setAttribute("links", doc.getLinks());
+			rec.setAttribute("links", doc.getLinks()
+					+ (Session.get().getConfigAsBoolean("gui.showdocattrsaslinks") ? doc.getDocAttrs() : 0));
 			rec.setAttribute("tags", doc.getTgs());
 
 			updateFolder(doc, rec);
@@ -297,6 +299,8 @@ public class DocumentGridUtil {
 			if (att.getType() == GUIAttribute.TYPE_USER && att.getStringValues() == null)
 				value = att.getUsername();
 			else if (att.getType() == GUIAttribute.TYPE_FOLDER && att.getStringValues() == null)
+				value = att.getStringValue();
+			else if (att.getType() == GUIAttribute.TYPE_DOCUMENT && att.getStringValues() == null)
 				value = att.getStringValue();
 			rec.setAttribute("ext_" + name, value);
 		}

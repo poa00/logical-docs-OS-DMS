@@ -6,6 +6,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.logicaldoc.webservice.doc.JavaNameDisplayStrategy;
 import com.logicaldoc.webservice.doc.WSDoc;
 import com.logicaldoc.webservice.doc.model.WebServiceStubSet;
@@ -31,7 +34,6 @@ public class FreemarkerWebServiceDisplayer {
 	}
 
 	public String displayWebService() {
-
 		try {
 			Map<String, Object> rootMap = new HashMap<>();
 
@@ -73,6 +75,8 @@ public class FreemarkerWebServiceDisplayer {
 
 		if (className.startsWith("[L"))
 			className = className.substring(2, className.length() - 1);
+		else if (className.startsWith("[[L"))
+			className = className.substring(3, className.length() - 1);
 		else if (className.equals("[J"))
 			className = Long.class.getName();
 		else if (className.equals("[D"))
@@ -81,8 +85,9 @@ public class FreemarkerWebServiceDisplayer {
 		try {
 			return serviceStubSet.getWebServiceClass().getClassLoader().loadClass(className);
 		} catch (Exception e) {
-			System.out.println(e.getMessage());
-			System.out.println("Cannot generate html for type " + className + ". Will use 'UnkownType' instead");
+			Logger console = LoggerFactory.getLogger("console");
+			console.warn(e.getMessage());
+			console.warn("Cannot generate html for type {}. Will use 'UnkownType' instead", className);
 			return UnkownType.class;
 		}
 	}

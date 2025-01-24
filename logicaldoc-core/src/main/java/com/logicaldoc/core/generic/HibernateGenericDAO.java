@@ -1,8 +1,8 @@
 package com.logicaldoc.core.generic;
 
-import java.util.ArrayList;
-import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
@@ -28,7 +28,7 @@ public class HibernateGenericDAO extends HibernatePersistentObjectDAO<Generic> i
 
 	@Override
 	public void delete(long genericId, int code) throws PersistenceException {
-		if(code==0)
+		if (code == 0)
 			throw new IllegalArgumentException("code cannot be 0");
 
 		if (!checkStoringAspect())
@@ -45,43 +45,41 @@ public class HibernateGenericDAO extends HibernatePersistentObjectDAO<Generic> i
 	}
 
 	@Override
-	public Generic findByAlternateKey(String type, String subtype, Long qualifier, long tenantId) {
-		Generic generic = null;
-		StringBuilder sb = new StringBuilder(" " + ENTITY + ".type = '" + SqlUtil.doubleQuotes(type) + "' and "
-				+ ENTITY + ".subtype='" + SqlUtil.doubleQuotes(subtype) + "' ");
+	public Generic findByAlternateKey(String type, String subtype, Long qualifier, long tenantId)
+			throws PersistenceException {
+
+		StringBuilder sb = new StringBuilder(" " + ENTITY + ".type = '" + SqlUtil.doubleQuotes(type) + "' and " + ENTITY
+				+ ".subtype='" + SqlUtil.doubleQuotes(subtype) + "' ");
 		sb.append(AND + ENTITY + ".tenantId=" + tenantId);
 		if (qualifier != null)
 			sb.append(AND + ENTITY + ".qualifier=" + qualifier);
 		else
 			sb.append(AND + ENTITY + ".qualifier is null");
-		try {
-			Collection<Generic> coll = findByWhere(sb.toString(), null, null);
-			if (CollectionUtils.isNotEmpty(coll))
-				generic = coll.iterator().next();
-		} catch (PersistenceException e) {
-			log.error(e.getMessage(), e);
-		}
-		return generic;
+		List<Generic> coll = findByWhere(sb.toString(), null, null);
+		if (CollectionUtils.isNotEmpty(coll))
+			return coll.get(0);
+		else
+			return null;
 	}
 
 	@Override
-	public List<Generic> findByTypeAndSubtype(String type, String subtype, Long qualifier, Long tenantId) {
+	public List<Generic> findByTypeAndSubtype(String type, String subtype, Long qualifier, Long tenantId) throws PersistenceException {
+		Map<String, Object> params = new HashMap<>();
 		String query = " 1=1 ";
-		if (StringUtils.isNotEmpty(type))
-			query += AND + ENTITY + ".type like '" + SqlUtil.doubleQuotes(type) + "' ";
-		if (StringUtils.isNotEmpty(subtype))
-			query += AND + ENTITY + ".subtype like '" + SqlUtil.doubleQuotes(subtype) + "' ";
+		if (StringUtils.isNotEmpty(type)) {
+			query += AND + ENTITY + ".type like :type ";
+			params.put("type", type);
+		}
+		if (StringUtils.isNotEmpty(subtype)) {
+			query += AND + ENTITY + ".subtype like :subtype ";
+			params.put("subtype", subtype);
+		}
 		if (qualifier != null)
 			query += AND + ENTITY + ".qualifier = " + qualifier;
 		if (tenantId != null)
 			query += AND + ENTITY + ".tenantId = " + tenantId;
 
-		try {
-			return findByWhere(query, null, null);
-		} catch (PersistenceException e) {
-			log.error(e.getMessage(), e);
-			return new ArrayList<>();
-		}
+			return findByWhere(query, params, null, null);
 	}
 
 	@Override
