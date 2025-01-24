@@ -1,10 +1,11 @@
 package com.logicaldoc.gui.frontend.client.zoho;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import java.util.Arrays;
+
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIDocument;
 import com.logicaldoc.gui.common.client.controllers.DocumentController;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.DocUtil;
 import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.common.client.util.WindowUtils;
@@ -110,11 +111,11 @@ public class ZohoEditor extends Window {
 	}
 
 	private void onCancel() {
-		DocumentService.Instance.get().unlock(new Long[] { ZohoEditor.this.document.getId() },
-				new AsyncCallback<Void>() {
+		DocumentService.Instance.get().unlock(Arrays.asList(ZohoEditor.this.document.getId()),
+				new DefaultAsyncCallback<>() {
 					@Override
 					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
+						super.onFailure(caught);
 						destroy();
 					}
 
@@ -124,11 +125,10 @@ public class ZohoEditor extends Window {
 						DocumentController.get().setCurrentDocument(document);
 						LD.contactingServer();
 						ZohoService.Instance.get().delete(ZohoEditor.this.document.getExtResId(),
-								new AsyncCallback<Void>() {
+								new DefaultAsyncCallback<>() {
 									@Override
 									public void onFailure(Throwable caught) {
-										LD.clearPrompt();
-										GuiLog.serverError(caught);
+										super.onFailure(caught);
 										destroy();
 									}
 
@@ -140,5 +140,15 @@ public class ZohoEditor extends Window {
 								});
 					}
 				});
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

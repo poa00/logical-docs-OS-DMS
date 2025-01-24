@@ -9,8 +9,12 @@ import java.io.InputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.text.SimpleDateFormat;
-import java.util.Collection;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -22,16 +26,21 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.lang.text.StrSubstitutor;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.logicaldoc.core.document.dao.DocumentDAO;
-import com.logicaldoc.core.security.Menu;
+import com.logicaldoc.core.PersistenceException;
+import com.logicaldoc.core.document.DocumentDAO;
+import com.logicaldoc.core.security.menu.Menu;
 import com.logicaldoc.util.Context;
 import com.logicaldoc.util.SystemUtil;
 import com.logicaldoc.util.config.ContextProperties;
-import com.logicaldoc.util.config.LoggingConfigurator;
+import com.logicaldoc.util.config.LogConfigurator;
 import com.logicaldoc.util.config.OrderedProperties;
+import com.logicaldoc.util.csv.CSVFileWriter;
 import com.logicaldoc.util.io.FileUtil;
 import com.logicaldoc.web.util.ServletUtil;
 
@@ -42,6 +51,8 @@ import com.logicaldoc.web.util.ServletUtil;
  * @since 6.0
  */
 public class LogDownload extends HttpServlet {
+
+	private static final String DOT_PROPERTIES = ".properties";
 
 	private static final long serialVersionUID = 1L;
 
@@ -55,6 +66,11 @@ public class LogDownload extends HttpServlet {
 			ServletUtil.sendError(response, t.getMessage());
 		}
 
+		// Avoid resource caching
+		response.setHeader("Cache-Control", "no-cache,no-store,must-revalidate");
+		response.setHeader("Expires", "0");
+		response.setHeader("Pragma", "no-cache");
+
 		String appender = request.getParameter("appender");
 		File file = null;
 		try {
@@ -65,15 +81,10 @@ public class LogDownload extends HttpServlet {
 				response.setHeader("Content-Disposition",
 						"attachment; filename=\"" + ("ldoc-log-" + df.format(new Date()) + ".zip") + "\"");
 
-				// Avoid resource caching
-				response.setHeader("Pragma", "no-cache");
-				response.setHeader("Cache-Control", "no-store");
-				response.setDateHeader("Expires", 0);
-
 				file = prepareAllSupportResources();
 			} else if (appender != null) {
 				response.setContentType("text/html");
-				LoggingConfigurator conf = new LoggingConfigurator();
+				LogConfigurator conf = new LogConfigurator();
 				if (conf.getFile(appender, true) != null)
 					file = new File(conf.getFile(appender, true));
 			}
@@ -82,7 +93,7 @@ public class LogDownload extends HttpServlet {
 				return;
 
 			downloadLogFile(response, appender, file);
-		} catch (IOException e) {
+		} catch (IOException | PersistenceException e) {
 			log.warn(e.getMessage(), e);
 		}
 	}
@@ -116,61 +127,80 @@ public class LogDownload extends HttpServlet {
 	 * context.properties, the snapshot of the env variables.
 	 * 
 	 * @throws IOException error creting a temporary file
+	 * @throws PersistenceException Error in the data layer
 	 */
-	private File prepareAllSupportResources() throws IOException {
+	private File prepareAllSupportResources() throws IOException, PersistenceException {
 		File tmp = FileUtil.createTempFile("logs", ".zip");
 
 		try (ZipOutputStream out = new ZipOutputStream(new FileOutputStream(tmp));) {
-
-			LoggingConfigurator conf = new LoggingConfigurator();
-			Collection<String> appenders = conf.getLoggingFiles();
-
 			/*
 			 * Store the log files in the zip file
 			 */
-			for (String appender : appenders) {
-				if (appender.endsWith("_WEB"))
-					continue;
+			LogConfigurator conf = new LogConfigurator();
+			File logsDir = new File(conf.getLogsRoot());
+			File[] files = logsDir.listFiles();
 
-				File logFile = new File(conf.getFile(appender, true));
-				writeEntry(out, logFile.getName(), logFile);
+			// Sort by descending modified date
+			Arrays.sort(files, Comparator.comparingLong(File::lastModified).reversed());
+
+			// Take max 10 files of each type
+			Map<String, Integer> counter = new HashMap<>();
+			for (File file : files) {
+				String baseName = StringUtils.substringBefore(FilenameUtils.getBaseName(file.getName()), ".");
+				counter.computeIfAbsent(baseName, k -> Integer.valueOf(0));
+
+				// store just the latest logs
+				if (file.length() > 0 && counter.get(baseName) < 10
+						&& !file.getName().toLowerCase().contains(".html")) {
+					writeEntry(out, "logicaldoc/logs/" + file.getName(), file);
+					counter.computeIfPresent(baseName, (k, v) -> v + 1);
+				}
 			}
 
 			/*
 			 * Now create a copy of the configuration and store it in the zip
 			 * file
 			 */
-			File buf;
-			OrderedProperties prop = writeContextProperties(out);
+			OrderedProperties prop = writeContextPropertiesDump(out);
+
+			/*
+			 * Save the most important configuration files
+			 */
+			writeConfigFiles(out);
 
 			/*
 			 * Now create a file with the environment
 			 */
 			String env = SystemUtil.printEnvironment();
 			env += "\n\n" + printDatabaseEnvironment();
-			buf = FileUtil.createTempFile("environment", ".txt");
+			File buf = FileUtil.createTempFile("environment", ".txt");
 			FileUtil.writeFile(env, buf.getPath());
 
-			writeEntry(out, "environment.txt", buf);
-			FileUtil.strongDelete(buf);
+			writeEntry(out, "logicaldoc/conf/environment.txt", buf);
+			FileUtil.delete(buf);
 
 			/*
 			 * Discover the tomcat's folder
 			 */
 			ServletContext context = getServletContext();
-			File webappDescriptor = new File(context.getRealPath("/WEB-INF/web.xml"));
-			webappDescriptor = webappDescriptor.getParentFile().getParentFile().getParentFile().getParentFile();
+			File webappFolder = new File(context.getRealPath("/WEB-INF/web.xml"));
+			webappFolder = webappFolder.getParentFile().getParentFile().getParentFile().getParentFile();
 
 			/*
-			 * Now put the server.xml file
+			 * Now put the server.xml file and the other config files
 			 */
-			File serverFile = new File(webappDescriptor.getPath() + "/conf/server.xml");
-			writeEntry(out, "tomcat/server.xml", serverFile);
+			writeTomcatConfigFiles(out, webappFolder);
 
 			/*
 			 * Now put the most recent tomcat's logs
 			 */
-			writeTomcatLogs(out, webappDescriptor);
+			writeTomcatLogs(out, webappFolder);
+
+			/*
+			 * Dump all the informations about updates and batches
+			 */
+			writeUpdateLogs(out);
+			writePatchLogs(out);
 
 			prop.store(new FileOutputStream(buf), "Support Request");
 		}
@@ -179,7 +209,7 @@ public class LogDownload extends HttpServlet {
 	}
 
 	private String printDatabaseEnvironment() {
-		DocumentDAO dao = (DocumentDAO) Context.get().getBean("DocumentDAO");
+		DocumentDAO dao = (DocumentDAO) Context.get("DocumentDAO");
 		Properties prop = new Properties();
 		prop.putAll(dao.getDatabaseMetadata());
 
@@ -193,26 +223,160 @@ public class LogDownload extends HttpServlet {
 		return "";
 	}
 
-	private void writeTomcatLogs(ZipOutputStream out, File webappDescriptor) throws IOException {
-		SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd");
-		String today = df.format(new Date());
-		File logsDir = new File(webappDescriptor.getPath() + "/logs");
+	private void writeTomcatLogs(ZipOutputStream out, File webappDir) throws IOException {
+		File logsDir = new File(webappDir.getPath() + "/logs");
 		File[] files = logsDir.listFiles();
-		for (File file : files) {
-			if (file.isDirectory()
-					|| (!file.getName().toLowerCase().endsWith(".log") && !file.getName().toLowerCase().endsWith(".out")
-							&& !file.getName().toLowerCase().endsWith(".txt")))
-				continue;
 
-			// store just the logs of today
-			if (file.getName().toLowerCase().endsWith(".out") || file.getName().toLowerCase().endsWith(today + ".log")
-					|| file.getName().toLowerCase().endsWith(today + ".txt"))
-				writeEntry(out, "tomcat/" + file.getName(), file);
+		// Sort by descending modified date
+		Arrays.sort(files, Comparator.comparingLong(File::lastModified).reversed());
+
+		// Take max 10 files of each type
+		Map<String, Integer> counter = new HashMap<>();
+		for (File file : files) {
+			String baseName = StringUtils.substringBefore(FilenameUtils.getBaseName(file.getName()), ".");
+			counter.computeIfAbsent(baseName, k -> Integer.valueOf(0));
+
+			// store just the latest logs
+			if (file.length() > 0 && counter.get(baseName) < 10) {
+				writeEntry(out, "tomcat/logs/" + file.getName(), file);
+				counter.computeIfPresent(file.getName(), (k, v) -> v + 1);
+			}
 		}
 	}
 
-	private OrderedProperties writeContextProperties(ZipOutputStream out) throws IOException {
-		File buf = FileUtil.createTempFile("context", ".properties");
+	private void writeTomcatConfigFiles(ZipOutputStream out, File webappDir) throws IOException {
+		File confDir = new File(webappDir.getPath() + "/conf");
+		File[] files = confDir.listFiles();
+		for (File file : files) {
+			if (file.isDirectory())
+				continue;
+
+			// store just the logs of today
+			if (file.getName().toLowerCase().endsWith(".xml") || file.getName().toLowerCase().endsWith(DOT_PROPERTIES)
+					|| file.getName().toLowerCase().endsWith(".policy"))
+				writeEntry(out, "tomcat/conf/" + file.getName(), file);
+		}
+	}
+
+	private void writeConfigFiles(ZipOutputStream out) throws IOException {
+		File confDir = new File(Context.get().getProperties().getProperty("LDOCHOME") + "/conf");
+		File[] files = confDir.listFiles();
+		for (File file : files) {
+			if (file.isDirectory())
+				continue;
+
+			if (file.getName().toLowerCase().endsWith(DOT_PROPERTIES) || file.getName().toLowerCase().endsWith(".xml")
+					|| file.getName().toLowerCase().endsWith(".txt"))
+				writeEntry(out, "logicaldoc/conf/" + file.getName(), file);
+		}
+	}
+
+	private void writeUpdateLogs(ZipOutputStream out) throws IOException, PersistenceException {
+		/*
+		 * Write he log files in the updates/ folder
+		 */
+		Properties buildProperties = loadBuildProperties();
+		String dir = StrSubstitutor.replace(buildProperties.getProperty("update.dir"), buildProperties);
+		File logsDir = new File(dir);
+		File[] files = logsDir.listFiles();
+		if (files != null)
+			for (File file : files) {
+				if (file.getName().toLowerCase().endsWith(".log"))
+					writeEntry(out, "logicaldoc/updates/" + file.getName(), file);
+			}
+
+		/*
+		 * Collect the updates table
+		 */
+		dumpUpdateTable(out);
+	}
+
+	private void dumpUpdateTable(ZipOutputStream out) throws IOException, PersistenceException {
+		File buf = FileUtil.createTempFile("updates", ".csv");
+		try {
+			DocumentDAO dao = Context.get(DocumentDAO.class);
+			dao.queryForResultSet("select ld_update, ld_date, ld_version from ld_update order by ld_date desc", null,
+					null, rows -> {
+						try (CSVFileWriter csv = new CSVFileWriter(buf.getAbsolutePath(), ',')) {
+							SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+							while (rows.next()) {
+								csv.writeFields(
+										List.of(df.format(rows.getDate(2)), rows.getString(3), rows.getString(1)));
+							}
+						} catch (IOException e) {
+							throw new PersistenceException(e);
+						}
+					});
+
+			writeEntry(out, "logicaldoc/updates/updates.csv", buf);
+		} finally {
+			FileUtil.delete(buf);
+		}
+	}
+
+	private void writePatchLogs(ZipOutputStream out) throws IOException, PersistenceException {
+		/*
+		 * Write he log files in the patches/ folder
+		 */
+		Properties buildProperties = loadBuildProperties();
+		String dir = StrSubstitutor.replace(buildProperties.getProperty("patch.dir"), buildProperties);
+		File logsDir = new File(dir);
+		File[] files = logsDir.listFiles();
+		if (files != null)
+			for (File file : files) {
+				if (file.getName().toLowerCase().endsWith(".log"))
+					writeEntry(out, "logicaldoc/patches/" + file.getName(), file);
+			}
+
+		/*
+		 * Collect the updates table
+		 */
+		dumpPatchTable(out);
+	}
+
+	private void dumpPatchTable(ZipOutputStream out) throws IOException, PersistenceException {
+		File buf = FileUtil.createTempFile("patches", ".csv");
+		try {
+			DocumentDAO dao = Context.get(DocumentDAO.class);
+			dao.queryForResultSet("select ld_patch, ld_date, ld_version from ld_patch order by ld_date desc", null,
+					null, rows -> {
+						try (CSVFileWriter csv = new CSVFileWriter(buf.getAbsolutePath(), ',')) {
+							SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+							while (rows.next()) {
+								csv.writeFields(
+										List.of(df.format(rows.getDate(2)), rows.getString(3), rows.getString(1)));
+							}
+						} catch (IOException e) {
+							throw new PersistenceException(e);
+						}
+					});
+
+			writeEntry(out, "logicaldoc/patches/patches.csv", buf);
+		} finally {
+			FileUtil.delete(buf);
+		}
+	}
+
+	private Properties loadBuildProperties() throws IOException {
+		Properties buildProperties = new Properties();
+		try (InputStream is = new FileInputStream(
+				new File(Context.get().getProperties().getProperty("LDOCHOME") + "/conf/build.properties"))) {
+			buildProperties.load(is);
+		}
+		return buildProperties;
+	}
+
+	/**
+	 * Dumps the context properties as they are in memory
+	 * 
+	 * @param out The zip stream to write to
+	 * 
+	 * @return The written properties
+	 * 
+	 * @throws IOException error in writing the stream
+	 */
+	private OrderedProperties writeContextPropertiesDump(ZipOutputStream out) throws IOException {
+		File buf = FileUtil.createTempFile("context", DOT_PROPERTIES);
 		ContextProperties cp = Context.get().getProperties();
 		OrderedProperties prop = new OrderedProperties();
 		for (String key : cp.getKeys()) {
@@ -220,9 +384,8 @@ public class LogDownload extends HttpServlet {
 				prop.put(key, cp.get(key));
 		}
 		prop.store(new FileOutputStream(buf), "Support Request");
-
-		writeEntry(out, "context.properties", buf);
-		FileUtil.strongDelete(buf);
+		writeEntry(out, "logicaldoc/conf/context-dump.properties", buf);
+		FileUtil.delete(buf);
 		return prop;
 	}
 

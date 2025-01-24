@@ -1,11 +1,14 @@
 package com.logicaldoc.core.searchengine.folder;
 
 import java.io.Serializable;
+import java.lang.reflect.Field;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
+import org.apache.commons.lang3.builder.ToStringStyle;
 
 import com.logicaldoc.core.metadata.Attribute;
 
@@ -152,11 +155,7 @@ public class FolderCriterion implements Serializable {
 			return false;
 
 		switch (getType()) {
-		case Attribute.TYPE_INT:
-		case Attribute.TYPE_BOOLEAN:
-		case Attribute.TYPE_USER:
-		case TYPE_FOLDER:
-		case TYPE_TEMPLATE:
+		case Attribute.TYPE_INT, Attribute.TYPE_BOOLEAN, Attribute.TYPE_USER, TYPE_FOLDER, TYPE_TEMPLATE:
 			return getLongValue() == null;
 		case Attribute.TYPE_DOUBLE:
 			return getDoubleValue() == null;
@@ -178,22 +177,19 @@ public class FolderCriterion implements Serializable {
 			else
 				setStringValue((String) value);
 			break;
-		case Attribute.TYPE_INT:
-		case Attribute.TYPE_FOLDER:
-		case Attribute.TYPE_USER:
-		case Attribute.TYPE_BOOLEAN:
-			if (value instanceof Integer)
-				setLongValue(((Integer) value).longValue());
+		case Attribute.TYPE_INT, Attribute.TYPE_FOLDER, Attribute.TYPE_DOCUMENT, Attribute.TYPE_USER, Attribute.TYPE_BOOLEAN:
+			if (value instanceof Integer integer)
+				setLongValue(integer.longValue());
 			else
 				setLongValue((Long) value);
 			break;
 		case Attribute.TYPE_DOUBLE:
-			if (value instanceof Double)
-				setDoubleValue((Double) value);
-			else if (value instanceof Long)
-				setDoubleValue(((Long) value).doubleValue());
-			else
-				setDoubleValue(((Float) value).doubleValue());
+			switch (value) {
+			case Double doubleVal -> setDoubleValue(doubleVal);
+			case Long longVal -> setDoubleValue(longVal.doubleValue());
+			case Float floatVal -> setDoubleValue(floatVal.doubleValue());
+			default -> setDoubleValue(null);
+			}
 			break;
 		case Attribute.TYPE_DATE:
 			setDateValue((Date) value);
@@ -277,5 +273,21 @@ public class FolderCriterion implements Serializable {
 
 	public void setExtendedAttribute(boolean extendedAttribute) {
 		this.extendedAttribute = extendedAttribute;
+	}
+
+	@Override
+	public String toString() {
+		return new ReflectionToStringBuilder(this, ToStringStyle.NO_CLASS_NAME_STYLE) {
+			@Override
+			protected boolean accept(Field field) {
+				try {
+					Object value = field.get(getObject());
+					return super.accept(field) && value != null && StringUtils.isNotEmpty(value.toString())
+							&& !field.getName().equals("field");
+				} catch (IllegalAccessException | IllegalArgumentException | SecurityException e) {
+					return false;
+				}
+			}
+		}.toString();
 	}
 }

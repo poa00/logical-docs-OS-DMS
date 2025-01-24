@@ -1,5 +1,7 @@
 package com.logicaldoc.gui.common.client.services;
 
+import java.util.List;
+
 import com.google.gwt.core.client.GWT;
 import com.google.gwt.user.client.rpc.RemoteService;
 import com.google.gwt.user.client.rpc.RemoteServiceRelativePath;
@@ -24,7 +26,8 @@ public interface SecurityService extends RemoteService {
 	 * Logs-in a user by an existing session ID (session reuse)
 	 * 
 	 * @param locale the currently used language specification
-	 * @param sid the session ID (optional), if not provided it is taken by cookies
+	 * @param sid the session ID (optional), if not provided it is taken by
+	 *        cookies
 	 * 
 	 * @return session informations
 	 */
@@ -71,6 +74,23 @@ public interface SecurityService extends RemoteService {
 	 */
 	public String generatePassword2(int length, int uppercaseChars, int lowercaseChars, int digits, int specialChars,
 			int maxSequenceSize, int maxOccurrences);
+
+	/**
+	 * Validates a password
+	 * 
+	 * @param password the password to validate
+	 * @param length dimension of the password
+	 * @param uppercaseChars minimum number of upper case chars
+	 * @param lowercaseChars minimum number of lower case chars
+	 * @param digits minimum number of digits
+	 * @param specialChars minimum number of special chars
+	 * @param maxSequenceSize maximum size of a sequence
+	 * @param maxOccurrences maximum number of occurrences of the same char
+	 * 
+	 * @return the reasons for the failure or empty
+	 */
+	public List<String> validatePassword(String password, int length, int uppercaseChars, int lowercaseChars,
+			int digits, int specialChars, int maxSequenceSize, int maxOccurrences);
 
 	/**
 	 * Changes the status of a user
@@ -120,7 +140,7 @@ public interface SecurityService extends RemoteService {
 	 * 
 	 * @throws ServerException error generated in the server application
 	 */
-	public void replicateUsersSettings(long masterUserId, Long[] userIds, boolean gui, boolean groups)
+	public void replicateUsersSettings(long masterUserId, List<Long> userIds, boolean gui, boolean groups)
 			throws ServerException;
 
 	/**
@@ -191,11 +211,11 @@ public interface SecurityService extends RemoteService {
 	 * Removes users from a group
 	 * 
 	 * @param groupId identifier of the group
-	 * @param userIds array of user identifiers
+	 * @param userIds user identifiers
 	 * 
 	 * @throws ServerException error generated in the server application
 	 */
-	public void removeFromGroup(long groupId, long[] userIds) throws ServerException;
+	public void removeFromGroup(long groupId, List<Long> userIds) throws ServerException;
 
 	/**
 	 * Adds a user to a group
@@ -243,7 +263,7 @@ public interface SecurityService extends RemoteService {
 	 * 
 	 * @throws ServerException error generated in the server application
 	 */
-	public void applyRights(GUIMenu menu) throws ServerException;
+	public void saveACL(GUIMenu menu) throws ServerException;
 
 	/**
 	 * Retrieves the specified menu
@@ -268,7 +288,7 @@ public interface SecurityService extends RemoteService {
 	 * 
 	 * @throws ServerException error generated in the server application
 	 */
-	public GUIMenu[] getMenus(long parentId, String locale, boolean enabledOnly) throws ServerException;
+	public List<GUIMenu> getMenus(long parentId, String locale, boolean enabledOnly) throws ServerException;
 
 	/**
 	 * Saves a set of menus
@@ -278,7 +298,7 @@ public interface SecurityService extends RemoteService {
 	 * 
 	 * @throws ServerException error generated in the server application
 	 */
-	public void saveMenus(GUIMenu[] menus, String locale) throws ServerException;
+	public void saveMenus(List<GUIMenu> menus, String locale) throws ServerException;
 
 	/**
 	 * Saves a menu
@@ -311,7 +331,7 @@ public interface SecurityService extends RemoteService {
 	 * 
 	 * @throws ServerException error generated in the server application
 	 */
-	public GUIUser[] searchUsers(String username, String groupId) throws ServerException;
+	public List<GUIUser> searchUsers(String username, String groupId) throws ServerException;
 
 	/**
 	 * Retrieves the list of actually blocked usernames and IPs detected as
@@ -321,7 +341,7 @@ public interface SecurityService extends RemoteService {
 	 * 
 	 * @throws ServerException error generated in the server application
 	 */
-	public GUISequence[] loadBlockedEntities() throws ServerException;
+	public List<GUISequence> loadBlockedEntities() throws ServerException;
 
 	/**
 	 * Removes blocked entries detected as Brute Force Attack
@@ -330,7 +350,7 @@ public interface SecurityService extends RemoteService {
 	 * 
 	 * @throws ServerException error generated in the server application
 	 */
-	public void removeBlockedEntities(long[] id) throws ServerException;
+	public void removeBlockedEntities(List<Long> id) throws ServerException;
 
 	/**
 	 * Permanently trusts the current device for the current user
@@ -372,7 +392,7 @@ public interface SecurityService extends RemoteService {
 	 * 
 	 * @throws ServerException error generated in the server application
 	 */
-	public void deleteTrustedDevices(String[] deviceIds) throws ServerException;
+	public void deleteTrustedDevices(List<Long> deviceIds) throws ServerException;
 
 	/**
 	 * Downloads the most recent version of the Geolocation database
@@ -392,16 +412,46 @@ public interface SecurityService extends RemoteService {
 	 * 
 	 * @throws ServerException error generated in the server application
 	 */
-	void saveAvatar(long userId) throws ServerException;
+	public void saveAvatar(long userId) throws ServerException;
 
 	/**
-	 * Resets tha avatar to the default one
+	 * Resets the avatar to the default one
 	 * 
 	 * @param userId Identifier of the user
 	 * 
 	 * @throws ServerException error generated in the server application
 	 */
-	void resetAvatar(long userId) throws ServerException;
+	public void resetAvatar(long userId) throws ServerException;
+
+	/**
+	 * Creates a new API Key for the current user
+	 * 
+	 * @param name The name to give to the new key
+	 * 
+	 * @return The newly generated key
+	 * 
+	 * @throws ServerException error generated in the server application
+	 */
+	public String createApiKey(String name) throws ServerException;
+
+	/**
+	 * Deletes an API Key
+	 * 
+	 * @param keyId Identifier of the API Key
+	 * 
+	 * @throws ServerException error generated in the server application
+	 */
+	public void deleteApiKey(long keyId) throws ServerException;
+
+	/**
+	 * Updates an API Key
+	 * 
+	 * @param keyId Identifier of the API Key
+	 * @param newName The new name to assign
+	 * 
+	 * @throws ServerException error generated in the server application
+	 */
+	public void updateApiKey(long keyId, String newName) throws ServerException;
 
 	/**
 	 * Clones a work time to a set of other users
@@ -413,13 +463,14 @@ public interface SecurityService extends RemoteService {
 	 * 
 	 * @throws ServerException generic error
 	 */
-	void cloneWorkTimes(long srcUserId, long[] userIds, long[] groupIds) throws ServerException;
+	void cloneWorkTimes(long srcUserId, List<Long> userIds, List<Long> groupIds) throws ServerException;
 
 	public static class Instance {
 		private static SecurityServiceAsync inst;
 
-		private Instance() {}
-		
+		private Instance() {
+		}
+
 		public static SecurityServiceAsync get() {
 			if (inst == null) {
 				inst = GWT.create(SecurityService.class);

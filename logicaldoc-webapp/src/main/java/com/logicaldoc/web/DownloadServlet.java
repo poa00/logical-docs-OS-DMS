@@ -18,14 +18,12 @@ import org.slf4j.LoggerFactory;
 import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.conversion.FormatConverterManager;
 import com.logicaldoc.core.document.Document;
+import com.logicaldoc.core.document.DocumentDAO;
 import com.logicaldoc.core.document.Version;
-import com.logicaldoc.core.document.dao.DocumentDAO;
-import com.logicaldoc.core.document.dao.VersionDAO;
-import com.logicaldoc.core.folder.FolderDAO;
-import com.logicaldoc.core.security.Permission;
+import com.logicaldoc.core.document.VersionDAO;
 import com.logicaldoc.core.security.Session;
 import com.logicaldoc.core.security.authentication.InvalidSessionException;
-import com.logicaldoc.core.store.Storer;
+import com.logicaldoc.core.store.Store;
 import com.logicaldoc.util.Context;
 import com.logicaldoc.util.html.HTMLSanitizer;
 import com.logicaldoc.web.util.ServletUtil;
@@ -74,8 +72,8 @@ public class DownloadServlet extends HttpServlet {
 
 	private void downloadDocument(HttpServletRequest request, HttpServletResponse response, Session session)
 			throws IOException, ServletException, PersistenceException {
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
-		VersionDAO versDao = (VersionDAO) Context.get().getBean(VersionDAO.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
+		VersionDAO versDao = Context.get(VersionDAO.class);
 
 		// Flag indicating to download only indexed text
 		String downloadText = request.getParameter("downloadText");
@@ -192,8 +190,7 @@ public class DownloadServlet extends HttpServlet {
 				&& (doc.getDocRefType() != null && doc.getDocRefType().contains("pdf"))) {
 
 			// Generate the PDF conversion
-			FormatConverterManager manager = (FormatConverterManager) Context.get()
-					.getBean(FormatConverterManager.class);
+			FormatConverterManager manager = Context.get(FormatConverterManager.class);
 			try {
 				manager.convertToPdf(doc, fileVersion, session.getSid());
 			} catch (Exception e) {
@@ -206,8 +203,8 @@ public class DownloadServlet extends HttpServlet {
 	}
 
 	private void checkDownloadPermission(Session session, Document doc) throws PersistenceException, IOException {
-		FolderDAO folderDao = (FolderDAO) Context.get().getBean(FolderDAO.class);
-		if (!folderDao.isPermissionEnabled(Permission.DOWNLOAD, doc.getFolder().getId(), session.getUserId()))
+		DocumentDAO documentDao = Context.get(DocumentDAO.class);
+		if (!documentDao.isDownloadAllowed(doc.getId(), session.getUserId()))
 			throw new IOException("You don't have the DOWNLOAD permission");
 	}
 
@@ -228,16 +225,16 @@ public class DownloadServlet extends HttpServlet {
 
 	static void processSafeHtml(String suffix, Version version, Document doc) throws IOException {
 		if ("safe.html".equals(suffix)) {
-			Storer storer = (Storer) Context.get().getBean(Storer.class);
+			Store store = Context.get(Store.class);
 			if (doc != null) {
-				String safeResource = storer.getResourceName(doc,
+				String safeResource = store.getResourceName(doc,
 						version == null ? doc.getFileVersion() : version.getFileVersion(), suffix);
-				if (!storer.exists(doc.getId(), safeResource)) {
-					String unsafeResource = storer.getResourceName(doc,
+				if (!store.exists(doc.getId(), safeResource)) {
+					String unsafeResource = store.getResourceName(doc,
 							version == null ? doc.getFileVersion() : version.getFileVersion(), null);
-					String unsafe = storer.getString(doc.getId(), unsafeResource);
+					String unsafe = store.getString(doc.getId(), unsafeResource);
 					String safe = HTMLSanitizer.sanitize(unsafe);
-					storer.store(new ByteArrayInputStream(safe.getBytes(StandardCharsets.UTF_8)), doc.getId(),
+					store.store(new ByteArrayInputStream(safe.getBytes(StandardCharsets.UTF_8)), doc.getId(),
 							safeResource);
 				}
 			}

@@ -2,7 +2,7 @@
 <!DOCTYPE hibernate-mapping PUBLIC "-//Hibernate/Hibernate Mapping DTD 3.0//EN"
    "http://www.hibernate.org/dtd/hibernate-mapping-3.0.dtd">
 <hibernate-mapping default-lazy="false" auto-import="false">
-	<class name="com.logicaldoc.core.security.User" table="ld_user" where="ld_deleted=0">
+	<class name="com.logicaldoc.core.security.user.User" table="ld_user" where="ld_deleted=0">
 		<cache usage="read-write" />
 		<id name="id" type="long" column="ld_id" unsaved-value="0">
 			<generator class="org.hibernate.id.enhanced.TableGenerator">
@@ -11,10 +11,12 @@
 			</generator>
 		</id>
 		<version name="recordVersion" column="ld_recordversion" type="long" />
-		<property name="lastModified" type="timestamp" column="ld_lastmodified" />
+		<property name="lastModified" type="timestamp" column="ld_lastmodified" not-null="true"/>
+		<property name="creation" type="timestamp" column="ld_creation" not-null="true" />
 		<property name="deleted" type="int" column="ld_deleted" not-null="true" />
 		<property name="tenantId" type="long" column="ld_tenantid" not-null="true" />
 		<property name="enabled" type="int" column="ld_enabled" not-null="true" />
+		<property name="evalFormEnabled" type="int" column="ld_evalform" not-null="true" />
 		<property name="username" type="string" column="ld_username" length="255" not-null="true" />
 		<property name="password" type="string" column="ld_password" length="255" />
 		<property name="passwordmd4" type="string" column="ld_passwordmd4" length="255" />
@@ -35,6 +37,11 @@
 		<property name="emailSignature2" type="string" column="ld_emailsignature2" length="1000" />
 		<property name="telephone" type="string" column="ld_telephone" length="255" />
 		<property name="telephone2" type="string" column="ld_telephone2" length="255" />
+		<property name="department" type="string" column="ld_department" length="255" />
+		<property name="organizationalUnit" type="string" column="ld_organizationalunit" length="255" />
+		<property name="building" type="string" column="ld_building" length="255" />
+		<property name="company" type="string" column="ld_company" length="255" />
+				
 		<property name="type" type="int" column="ld_type" not-null="true" />
 		<property name="source" type="int" column="ld_source" not-null="true" />
 		<property name="quota" type="long" column="ld_quota" not-null="true" />
@@ -48,7 +55,6 @@
 		<property name="certDN" type="string" column="ld_certdn" length="1000" />
 		<property name="secondFactor" type="string" column="ld_secondfactor" length="255" />
 		<property name="key" type="string" column="ld_key" length="255" />
-        <property name="creation" type="timestamp" column="ld_creation" />
         <property name="docsGrid" type="string" column="ld_docsgrid" not-null="false" />
         <property name="hitsGrid" type="string" column="ld_hitsgrid" not-null="false" />
 		<property name="dateFormat" type="string" column="ld_dateformat" length="255" />
@@ -61,9 +67,10 @@
 		<property name="enforceWorkingTime" type="int" column="ld_enforcewrktime" not-null="true"/>
 		<property name="maxInactivity" type="int" column="ld_maxinactivity" />
 		
-		
 		<property name="timeZone" type="string" column="ld_timezone" />
 		
 		<property name="avatar" type="text" column="ld_avatar" />
+		
+		<property name="lastLogin" type="timestamp" column="ld_lastlogin" />
 	</class>
 </hibernate-mapping>

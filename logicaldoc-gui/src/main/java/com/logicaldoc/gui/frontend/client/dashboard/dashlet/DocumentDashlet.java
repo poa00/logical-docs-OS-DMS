@@ -1,20 +1,20 @@
 package com.logicaldoc.gui.frontend.client.dashboard.dashlet;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.logicaldoc.gui.common.client.Constants;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIDashlet;
 import com.logicaldoc.gui.common.client.beans.GUIDocument;
 import com.logicaldoc.gui.common.client.data.DocumentsDS;
+import com.logicaldoc.gui.common.client.grid.RefreshableListGrid;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.AwesomeFactory;
 import com.logicaldoc.gui.common.client.util.GridUtil;
-import com.logicaldoc.gui.common.client.widgets.grid.RefreshableListGrid;
 import com.logicaldoc.gui.frontend.client.document.DocumentsPanel;
 import com.logicaldoc.gui.frontend.client.document.grid.DocumentsListGrid;
 import com.logicaldoc.gui.frontend.client.services.DocumentService;
@@ -90,12 +90,7 @@ public class DocumentDashlet extends Dashlet {
 			event.cancel();
 			Record rec = event.getRecord();
 			DocumentService.Instance.get().getById(Long.parseLong(rec.getAttributeAsString(docIdAttribute)),
-					new AsyncCallback<GUIDocument>() {
-
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
-						}
+					new DefaultAsyncCallback<>() {
 
 						@Override
 						public void onSuccess(GUIDocument document) {
@@ -171,13 +166,8 @@ public class DocumentDashlet extends Dashlet {
 		if (document.getStatus() == Constants.DOC_LOCKED || document.getStatus() == Constants.DOC_CHECKED_OUT) {
 			MenuItem unlock = new MenuItem();
 			unlock.setTitle(I18N.message("unlock"));
-			unlock.addClickHandler(event -> DocumentService.Instance.get().unlock(new Long[] { document.getId() },
-					new AsyncCallback<Void>() {
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
-						}
-
+			unlock.addClickHandler(event -> DocumentService.Instance.get().unlock(Arrays.asList(document.getId()),
+					new DefaultAsyncCallback<>() {
 						@Override
 						public void onSuccess(Void result) {
 							Session.get().getUser().setLockedDocs(Session.get().getUser().getLockedDocs() - 1);
@@ -197,5 +187,15 @@ public class DocumentDashlet extends Dashlet {
 
 	protected DataSource getDataSource() {
 		return new DocumentsDS(getDataSourceUrl(), guiDashlet.getExtendedAttributes());
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+	
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

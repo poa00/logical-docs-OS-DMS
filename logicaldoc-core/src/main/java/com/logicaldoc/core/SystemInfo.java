@@ -32,9 +32,9 @@ public class SystemInfo {
 
 	protected String product = "LogicalDOC";
 
-	protected String release = "8.8.5";
+	protected String release = "9.1.1";
 
-	protected String year = "2006-2023";
+	protected String year = "2006-2025";
 
 	protected String help = "https://docs.logicaldoc.com";
 
@@ -42,7 +42,9 @@ public class SystemInfo {
 
 	protected String url = "https://www.logicaldoc.com";
 
-	protected String forum = "https://forums.logicaldoc.com";
+	protected String forum = "https://github.com/logicaldoc/community/discussions";
+
+	protected String evaluation = "";
 
 	protected String vendor = "LogicalDOC";
 
@@ -65,6 +67,13 @@ public class SystemInfo {
 	protected long tenantId = Tenant.DEFAULT_ID;
 
 	protected Date date = new Date();
+
+	/**
+	 * Deducted server's host name
+	 */
+	protected String hostName;
+
+	protected List<String> features = new ArrayList<>();
 
 	protected SystemInfo() {
 	}
@@ -108,21 +117,17 @@ public class SystemInfo {
 		/*
 		 * Collect installed features
 		 */
-		if (info.getFeatures() == null || info.getFeatures().length == 0)
-			try {
-				List<String> features = new ArrayList<>();
-				PluginRegistry registry = PluginRegistry.getInstance();
-				Collection<Extension> exts = registry.getExtensions("logicaldoc-core", "Feature");
-				for (Extension extension : exts) {
-					// Retrieve the task name
-					String name = extension.getParameter("name").valueAsString();
-					if (!features.contains(name))
-						features.add(name);
-				}
-				info.setFeatures(features.toArray(new String[0]));
-			} catch (Exception e) {
-				log.error(e.getMessage());
+		try {
+			PluginRegistry registry = PluginRegistry.getInstance();
+			Collection<Extension> exts = registry.getExtensions("logicaldoc-core", "Feature");
+			for (Extension extension : exts) {
+				// Retrieve the task name
+				String name = extension.getParameter("name").valueAsString();
+				info.getFeatures().add(name);
 			}
+		} catch (Exception e) {
+			log.error(e.getMessage());
+		}
 
 		/*
 		 * Read some informations from the context
@@ -183,13 +188,6 @@ public class SystemInfo {
 		else
 			return 0;
 	}
-
-	/**
-	 * Deducted server's host name
-	 */
-	protected String hostName;
-
-	protected String[] features;
 
 	public String getProductName() {
 		return productName;
@@ -343,11 +341,19 @@ public class SystemInfo {
 		this.hostName = hostName;
 	}
 
-	public String[] getFeatures() {
+	public List<String> getFeatures() {
 		return features;
 	}
 
-	public void setFeatures(String[] features) {
+	public void setFeatures(List<String> features) {
 		this.features = features;
+	}
+
+	public String getEvaluation() {
+		return evaluation;
+	}
+
+	public void setEvaluation(String evaluation) {
+		this.evaluation = evaluation;
 	}
 }

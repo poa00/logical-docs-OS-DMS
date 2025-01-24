@@ -1,22 +1,24 @@
 package com.logicaldoc.gui.frontend.client.subscription;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import java.util.ArrayList;
+import java.util.List;
+
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIDocument;
 import com.logicaldoc.gui.common.client.data.SubscriptionsDS;
+import com.logicaldoc.gui.common.client.grid.ColoredListGridField;
+import com.logicaldoc.gui.common.client.grid.DateListGridField;
+import com.logicaldoc.gui.common.client.grid.FileNameListGridField;
+import com.logicaldoc.gui.common.client.grid.TypeIconGridField;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.DocUtil;
 import com.logicaldoc.gui.common.client.util.LD;
-import com.logicaldoc.gui.common.client.util.Util;
-import com.logicaldoc.gui.common.client.widgets.grid.ColoredListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField;
 import com.logicaldoc.gui.frontend.client.document.DocumentsPanel;
 import com.logicaldoc.gui.frontend.client.services.AuditService;
 import com.logicaldoc.gui.frontend.client.services.DocumentService;
 import com.smartgwt.client.types.Alignment;
 import com.smartgwt.client.types.HeaderControls;
-import com.smartgwt.client.types.ListGridFieldType;
 import com.smartgwt.client.types.SelectionStyle;
 import com.smartgwt.client.types.SortDirection;
 import com.smartgwt.client.widgets.grid.ListGrid;
@@ -89,16 +91,9 @@ public class PersonalSubscriptions extends com.smartgwt.client.widgets.Window {
 		id.setWidth(50);
 		id.setHidden(true);
 
-		ListGridField icon = new ListGridField("icon", " ", 25);
-		icon.setType(ListGridFieldType.IMAGE);
-		icon.setCanSort(false);
-		icon.setAlign(Alignment.CENTER);
-		icon.setShowDefaultContextMenu(false);
-		icon.setImageURLPrefix(Util.imagePrefix());
-		icon.setImageURLSuffix(".png");
-		icon.setCanFilter(false);
+		ListGridField icon = new TypeIconGridField();
 
-		ListGridField name = new ColoredListGridField("name", I18N.message("name"));
+		FileNameListGridField name = new FileNameListGridField("name", "icon", "name", 210);
 		name.setWidth("*");
 		name.setCanFilter(true);
 
@@ -111,6 +106,8 @@ public class PersonalSubscriptions extends com.smartgwt.client.widgets.Window {
 		list.setSelectionType(SelectionStyle.MULTIPLE);
 		list.setFilterOnKeypress(true);
 		list.setShowFilterEditor(false);
+		list.setShowRecordComponents(true);
+		list.setShowRecordComponentsByCell(true);
 		list.setDataSource(new SubscriptionsDS(null, null));
 		list.setFields(id, icon, name, created);
 
@@ -146,22 +143,16 @@ public class PersonalSubscriptions extends com.smartgwt.client.widgets.Window {
 		final ListGridRecord[] selection = list.getSelectedRecords();
 		if (selection == null || selection.length == 0)
 			return;
-		final long[] ids = new long[selection.length];
-		for (int i = 0; i < selection.length; i++) {
-			ids[i] = Long.parseLong(selection[i].getAttribute("id"));
-		}
+		List<Long> ids = new ArrayList<>();
+		for (int i = 0; i < selection.length; i++)
+			ids.add(selection[i].getAttributeAsLong("id"));
 
 		MenuItem delete = new MenuItem();
 		delete.setTitle(I18N.message("ddelete"));
 		delete.addClickHandler(
 				event -> LD.ask(I18N.message("question"), I18N.message("confirmdelete"), (Boolean value) -> {
 					if (Boolean.TRUE.equals(value)) {
-						AuditService.Instance.get().deleteSubscriptions(ids, new AsyncCallback<Void>() {
-							@Override
-							public void onFailure(Throwable caught) {
-								GuiLog.serverError(caught);
-							}
-
+						AuditService.Instance.get().deleteSubscriptions(ids, new DefaultAsyncCallback<>() {
 							@Override
 							public void onSuccess(Void result) {
 								list.removeSelectedData();
@@ -184,13 +175,7 @@ public class PersonalSubscriptions extends com.smartgwt.client.widgets.Window {
 			if ("folder".equals(type))
 				DocumentsPanel.get().openInFolder(Long.parseLong(id), null);
 			else {
-				DocumentService.Instance.get().getById(Long.parseLong(id), new AsyncCallback<GUIDocument>() {
-
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				DocumentService.Instance.get().getById(Long.parseLong(id), new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(GUIDocument result) {
 						DocumentsPanel.get().openInFolder(result.getFolder().getId(), result.getId());
@@ -201,5 +186,15 @@ public class PersonalSubscriptions extends com.smartgwt.client.widgets.Window {
 
 		contextMenu.setItems(openInFolder, edit, delete);
 		contextMenu.showContextMenu();
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

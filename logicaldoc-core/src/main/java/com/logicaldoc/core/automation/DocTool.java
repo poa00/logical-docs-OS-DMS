@@ -7,7 +7,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
@@ -17,26 +16,26 @@ import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.conversion.FormatConverterManager;
 import com.logicaldoc.core.document.AbstractDocument;
 import com.logicaldoc.core.document.Document;
+import com.logicaldoc.core.document.DocumentDAO;
 import com.logicaldoc.core.document.DocumentHistory;
+import com.logicaldoc.core.document.DocumentHistoryDAO;
 import com.logicaldoc.core.document.DocumentLink;
+import com.logicaldoc.core.document.DocumentLinkDAO;
 import com.logicaldoc.core.document.DocumentManager;
 import com.logicaldoc.core.document.DocumentNote;
+import com.logicaldoc.core.document.DocumentNoteDAO;
 import com.logicaldoc.core.document.Version;
-import com.logicaldoc.core.document.dao.DocumentDAO;
-import com.logicaldoc.core.document.dao.DocumentHistoryDAO;
-import com.logicaldoc.core.document.dao.DocumentLinkDAO;
-import com.logicaldoc.core.document.dao.DocumentNoteDAO;
 import com.logicaldoc.core.folder.Folder;
 import com.logicaldoc.core.folder.FolderDAO;
 import com.logicaldoc.core.folder.FolderHistory;
 import com.logicaldoc.core.metadata.Template;
 import com.logicaldoc.core.metadata.TemplateDAO;
-import com.logicaldoc.core.parser.ParseException;
+import com.logicaldoc.core.parser.ParsingException;
 import com.logicaldoc.core.security.Tenant;
-import com.logicaldoc.core.security.User;
+import com.logicaldoc.core.security.TenantDAO;
 import com.logicaldoc.core.security.authorization.PermissionException;
-import com.logicaldoc.core.security.dao.TenantDAO;
-import com.logicaldoc.core.store.Storer;
+import com.logicaldoc.core.security.user.User;
+import com.logicaldoc.core.store.Store;
 import com.logicaldoc.core.ticket.Ticket;
 import com.logicaldoc.util.Context;
 import com.logicaldoc.util.config.ContextProperties;
@@ -86,7 +85,7 @@ public class DocTool {
 			url += "/";
 
 		try {
-			TenantDAO tenantDao = (TenantDAO) Context.get().getBean(TenantDAO.class);
+			TenantDAO tenantDao = Context.get(TenantDAO.class);
 			Tenant tenant = tenantDao.findById(tenantId);
 			url += "display?tenant=" + tenant.getName() + "&docId=" + docId;
 			return url;
@@ -163,7 +162,7 @@ public class DocTool {
 
 		User user = new SecurityTool().getUser(username);
 
-		DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+		DocumentManager manager = Context.get(DocumentManager.class);
 		DocumentHistory transaction = new DocumentHistory();
 		transaction.setUser(user);
 		try {
@@ -209,7 +208,7 @@ public class DocTool {
 
 		User user = new SecurityTool().getUser(username);
 
-		DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+		DocumentManager manager = Context.get(DocumentManager.class);
 		DocumentHistory transaction = new DocumentHistory();
 		transaction.setUser(user);
 		try {
@@ -255,7 +254,7 @@ public class DocTool {
 	 * 
 	 */
 	public void store(Document doc, DocumentHistory transaction) {
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
 		try {
 			docDao.store(doc, transaction);
 		} catch (Exception t) {
@@ -279,13 +278,35 @@ public class DocTool {
 	 * @param username the user in whose name the method is run
 	 */
 	public void store(Document doc, String username) {
-		User user = new SecurityTool().getUser(username);
-
 		DocumentHistory transaction = new DocumentHistory();
 		transaction.setDocument(doc);
 		transaction.setDate(new Date());
-		transaction.setUser(user);
+		transaction.setUser(new SecurityTool().getUser(username));
 		store(doc, transaction);
+	}
+
+	/**
+	 * Created a new document into the database
+	 * 
+	 * @param doc the document that carries the metadata
+	 * @param file the document's content
+	 * @param username the user in whose name the method is run
+	 * 
+	 * @return the created document
+	 */
+	public Document create(Document doc, File file, String username) {
+		DocumentHistory transaction = new DocumentHistory();
+		transaction.setDocument(doc);
+		transaction.setDate(new Date());
+		transaction.setUser(new SecurityTool().getUser(username));
+
+		DocumentManager manager = Context.get(DocumentManager.class);
+		try {
+			return manager.create(file, doc, transaction);
+		} catch (PersistenceException e) {
+			log.error(e.getMessage(), e);
+			return null;
+		}
 	}
 
 	/**
@@ -294,7 +315,7 @@ public class DocTool {
 	 * @param doc the document to initialize
 	 */
 	public void initialize(Document doc) {
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
 		docDao.initialize(doc);
 	}
 
@@ -307,7 +328,7 @@ public class DocTool {
 	 */
 	public void move(Document doc, String targetPath, String username) {
 		User user = new SecurityTool().getUser(username);
-		DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+		DocumentManager manager = Context.get(DocumentManager.class);
 
 		Folder folder = createPath(doc, targetPath, username);
 
@@ -324,6 +345,51 @@ public class DocTool {
 	}
 
 	/**
+	 * Instantiate a new document that is a clone of the given one. The returned
+	 * clone is not persisted.
+	 * 
+	 * @param doc The source document to clone
+	 * 
+	 * @return The cloned document
+	 */
+	public Document clone(Document doc) {
+		return new Document(doc);
+	}
+
+	/**
+	 * Copies a document into a target folder
+	 * 
+	 * @param doc the document
+	 * @param targetPath the full path of the target folder
+	 * @param links if the links must be copied too
+	 * @param notes if the notes must be copied too
+	 * @param security if the security settings must be copied too
+	 * 
+	 * @param username the user in whose name the method is run
+	 * 
+	 * @return the new document created
+	 */
+	public Document copy(Document doc, String targetPath, boolean links, boolean notes, boolean security,
+			String username) {
+		User user = new SecurityTool().getUser(username);
+
+		DocumentManager manager = Context.get(DocumentManager.class);
+
+		Folder folder = createPath(doc, targetPath, username);
+
+		DocumentHistory transaction = new DocumentHistory();
+		transaction.setDocId(doc.getId());
+		transaction.setUser(user);
+
+		try {
+			return manager.copyToFolder(doc, folder, transaction, links, notes, security);
+		} catch (PersistenceException | IOException e) {
+			log.error(e.getMessage(), e);
+			return null;
+		}
+	}
+
+	/**
 	 * Copies a document into a target folder
 	 * 
 	 * @param doc the document
@@ -333,22 +399,7 @@ public class DocTool {
 	 * @return the new document created
 	 */
 	public Document copy(Document doc, String targetPath, String username) {
-		User user = new SecurityTool().getUser(username);
-
-		DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
-
-		Folder folder = createPath(doc, targetPath, username);
-
-		DocumentHistory transaction = new DocumentHistory();
-		transaction.setDocId(doc.getId());
-		transaction.setUser(user);
-
-		try {
-			return manager.copyToFolder(doc, folder, transaction);
-		} catch (PersistenceException | IOException e) {
-			log.error(e.getMessage(), e);
-			return null;
-		}
+		return copy(doc, targetPath, false, false, true, username);
 	}
 
 	/**
@@ -361,8 +412,13 @@ public class DocTool {
 	 * @return the created link
 	 */
 	public DocumentLink link(Document doc1, Document doc2, String type) {
-		DocumentLinkDAO linkDao = (DocumentLinkDAO) Context.get().getBean(DocumentLinkDAO.class);
-		DocumentLink link = linkDao.findByDocIdsAndType(doc1.getId(), doc2.getId(), "default");
+		DocumentLinkDAO linkDao = Context.get(DocumentLinkDAO.class);
+		DocumentLink link = null;
+		try {
+			link = linkDao.findByDocIdsAndType(doc1.getId(), doc2.getId(), "default");
+		} catch (PersistenceException e) {
+			log.error(e.getMessage(), e);
+		}
 		if (link == null) {
 			// The link doesn't exist and must be created
 			link = new DocumentLink();
@@ -412,7 +468,7 @@ public class DocTool {
 	public Document createAlias(Document originalDoc, Folder targetFolder, String type, String username) {
 		User user = new SecurityTool().getUser(username);
 
-		DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+		DocumentManager manager = Context.get(DocumentManager.class);
 		DocumentHistory transaction = new DocumentHistory();
 		transaction.setUser(user);
 
@@ -433,7 +489,7 @@ public class DocTool {
 	public void lock(long docId, String username) {
 		User user = new SecurityTool().getUser(username);
 
-		DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+		DocumentManager manager = Context.get(DocumentManager.class);
 
 		DocumentHistory transaction = new DocumentHistory();
 		transaction.setDocId(docId);
@@ -455,7 +511,7 @@ public class DocTool {
 	public void unlock(long docId, String username) {
 		User user = new SecurityTool().getUser(username);
 
-		DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+		DocumentManager manager = Context.get(DocumentManager.class);
 
 		DocumentHistory transaction = new DocumentHistory();
 		transaction.setDocId(docId);
@@ -481,7 +537,7 @@ public class DocTool {
 		transaction.setDocId(docId);
 		transaction.setUser(user);
 
-		DocumentDAO dao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO dao = Context.get(DocumentDAO.class);
 		try {
 			dao.delete(docId, transaction);
 		} catch (PersistenceException e) {
@@ -506,14 +562,14 @@ public class DocTool {
 		DocumentHistory transaction = new DocumentHistory();
 		transaction.setUser(user);
 
-		Storer storer = (Storer) Context.get().getBean(Storer.class);
-		String resource = storer.getResourceName(doc, fileVersion, suffix);
+		Store store = Context.get(Store.class);
+		String resource = store.getResourceName(doc, fileVersion, suffix);
 
 		File tmpFile = null;
 
 		try {
 			tmpFile = FileUtil.createTempFile("res-", suffix);
-			storer.writeToFile(doc.getId(), resource, tmpFile);
+			store.writeToFile(doc.getId(), resource, tmpFile);
 
 			Document docVO = new Document();
 			docVO.setFileName(newFileName);
@@ -521,13 +577,13 @@ public class DocTool {
 			docVO.setFolder(doc.getFolder());
 			docVO.setLanguage(doc.getLanguage());
 
-			DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+			DocumentManager manager = Context.get(DocumentManager.class);
 			return manager.create(tmpFile, docVO, transaction);
 		} catch (IOException | PersistenceException e) {
 			log.error(e.getMessage(), e);
 			return null;
 		} finally {
-			FileUtil.strongDelete(tmpFile);
+			FileUtil.delete(tmpFile);
 		}
 	}
 
@@ -541,9 +597,9 @@ public class DocTool {
 	 * @return the file content as string
 	 */
 	public String readAsString(long docId, String fileVersion, String suffix) {
-		Storer storer = (Storer) Context.get().getBean(Storer.class);
-		String resource = storer.getResourceName(docId, fileVersion, suffix);
-		return storer.getString(docId, resource);
+		Store store = Context.get(Store.class);
+		String resource = store.getResourceName(docId, fileVersion, suffix);
+		return store.getString(docId, resource);
 	}
 
 	/**
@@ -555,10 +611,10 @@ public class DocTool {
 	 * @param outputFile the user in name of which to take this action
 	 */
 	public void writeToFile(long docId, String fileVersion, String suffix, String outputFile) {
-		Storer storer = (Storer) Context.get().getBean(Storer.class);
-		String resource = storer.getResourceName(docId, fileVersion, suffix);
+		Store store = Context.get(Store.class);
+		String resource = store.getResourceName(docId, fileVersion, suffix);
 		try {
-			storer.writeToFile(docId, resource, new File(outputFile));
+			store.writeToFile(docId, resource, new File(outputFile));
 		} catch (IOException e) {
 			log.error(e.getMessage(), e);
 		}
@@ -573,7 +629,7 @@ public class DocTool {
 	 * @param doc the document to convert
 	 */
 	public void convertPDF(Document doc) {
-		FormatConverterManager manager = (FormatConverterManager) Context.get().getBean(FormatConverterManager.class);
+		FormatConverterManager manager = Context.get(FormatConverterManager.class);
 		try {
 			manager.convertToPdf(doc, null);
 		} catch (IOException e) {
@@ -597,7 +653,7 @@ public class DocTool {
 		DocumentHistory transaction = new DocumentHistory();
 		transaction.setUser(user);
 
-		FormatConverterManager manager = (FormatConverterManager) Context.get().getBean(FormatConverterManager.class);
+		FormatConverterManager manager = Context.get(FormatConverterManager.class);
 		try {
 			return manager.convert(doc, null, format, transaction);
 		} catch (IOException | PersistenceException e) {
@@ -623,7 +679,7 @@ public class DocTool {
 		DocumentHistory transaction = new DocumentHistory();
 		transaction.setUser(user);
 
-		DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+		DocumentManager manager = Context.get(DocumentManager.class);
 		try {
 			return manager.merge(documents, targetFolderId, fileName, transaction);
 		} catch (IOException | PersistenceException e) {
@@ -640,7 +696,7 @@ public class DocTool {
 	 * @return the document object
 	 */
 	public Document findById(long docId) {
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
 		try {
 			Document doc = docDao.findDocument(docId);
 			docDao.initialize(doc);
@@ -671,7 +727,7 @@ public class DocTool {
 	 * @return the document object
 	 */
 	public Document findByPath(String path, Long tenantId) {
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
 		try {
 			return docDao.findByPath(path, tenantId != null ? tenantId : Tenant.DEFAULT_ID);
 		} catch (PersistenceException e) {
@@ -691,7 +747,7 @@ public class DocTool {
 		if (doc == null)
 			return "";
 		try {
-			FolderDAO folderDao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+			FolderDAO folderDao = Context.get(FolderDAO.class);
 			String path = folderDao.computePathExtended(doc.getFolder().getId());
 			if (!path.endsWith("/"))
 				path += "/";
@@ -713,7 +769,7 @@ public class DocTool {
 	public List<Long> getIds(Collection<Document> docs) {
 		if (docs == null || docs.isEmpty())
 			return new ArrayList<>();
-		return docs.stream().map(d -> d.getId()).collect(Collectors.toList());
+		return docs.stream().map(d -> d.getId()).toList();
 	}
 
 	/**
@@ -736,7 +792,7 @@ public class DocTool {
 
 		Folder folder = null;
 		try {
-			FolderDAO fdao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+			FolderDAO fdao = Context.get(FolderDAO.class);
 			Folder parent = doc.getFolder();
 
 			if (targetPath.startsWith("/")) {
@@ -780,8 +836,14 @@ public class DocTool {
 	 * @return list of histories
 	 */
 	public List<DocumentHistory> getHistories(long docId, String event) {
-		DocumentHistoryDAO hDao = (DocumentHistoryDAO) Context.get().getBean(DocumentHistoryDAO.class);
-		return hDao.findByDocIdAndEvent(docId, event);
+		DocumentHistoryDAO hDao = Context.get(DocumentHistoryDAO.class);
+
+		try {
+			return hDao.findByDocIdAndEvent(docId, event);
+		} catch (PersistenceException e) {
+			log.error(e.getMessage(), e);
+			return new ArrayList<>();
+		}
 	}
 
 	/**
@@ -809,7 +871,7 @@ public class DocTool {
 		transaction.setUser(user);
 
 		try {
-			DocumentNoteDAO dao = (DocumentNoteDAO) Context.get().getBean(DocumentNoteDAO.class);
+			DocumentNoteDAO dao = Context.get(DocumentNoteDAO.class);
 			dao.store(note, transaction);
 		} catch (Exception t) {
 			log.error(t.getMessage(), t);
@@ -825,11 +887,11 @@ public class DocTool {
 	 * @return the list of notes
 	 */
 	public List<DocumentNote> getNotes(long docId, String fileVersion) {
-		DocumentNoteDAO dao = (DocumentNoteDAO) Context.get().getBean(DocumentNoteDAO.class);
+		DocumentNoteDAO dao = Context.get(DocumentNoteDAO.class);
 
 		String fVer = fileVersion;
 		if (StringUtils.isEmpty(fileVersion)) {
-			DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+			DocumentDAO docDao = Context.get(DocumentDAO.class);
 			try {
 				Document doc = docDao.findDocument(docId);
 				fVer = doc.getFileVersion();
@@ -837,7 +899,12 @@ public class DocTool {
 				log.error(e.getMessage(), e);
 			}
 		}
-		return dao.findByDocId(docId, fVer);
+		try {
+			return dao.findByDocId(docId, fVer);
+		} catch (PersistenceException e) {
+			log.error(e.getMessage(), e);
+			return new ArrayList<>();
+		}
 	}
 
 	/**
@@ -862,8 +929,14 @@ public class DocTool {
 	 * @return Template with given name
 	 */
 	public Template findTemplateByName(String name, long tenantId) {
-		TemplateDAO dao = (TemplateDAO) Context.get().getBean(TemplateDAO.class);
-		return dao.findByName(name, tenantId);
+		TemplateDAO dao = Context.get(TemplateDAO.class);
+
+		try {
+			return dao.findByName(name, tenantId);
+		} catch (PersistenceException e) {
+			log.error(e.getMessage(), e);
+			return null;
+		}
 	}
 
 	/**
@@ -874,7 +947,7 @@ public class DocTool {
 	 * @return Template with given name
 	 */
 	public Template findTemplateById(long templateId) {
-		TemplateDAO dao = (TemplateDAO) Context.get().getBean(TemplateDAO.class);
+		TemplateDAO dao = Context.get(TemplateDAO.class);
 		try {
 			return dao.findById(templateId);
 		} catch (PersistenceException e) {
@@ -891,7 +964,7 @@ public class DocTool {
 	 * @return the number of pages
 	 */
 	public int countPages(Document document) {
-		DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+		DocumentManager manager = Context.get(DocumentManager.class);
 		return manager.countPages(document);
 	}
 
@@ -905,10 +978,10 @@ public class DocTool {
 	 * @return the extracted texts
 	 */
 	public String parse(Document document, String fileVersion) {
-		DocumentManager manager = (DocumentManager) Context.get().getBean(DocumentManager.class);
+		DocumentManager manager = Context.get(DocumentManager.class);
 		try {
 			return manager.parseDocument(document, fileVersion);
-		} catch (ParseException e) {
+		} catch (ParsingException e) {
 			log.error(e.getMessage(), e);
 			return null;
 		}

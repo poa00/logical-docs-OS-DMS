@@ -1,13 +1,13 @@
 package com.logicaldoc.gui.common.client.widgets;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.services.SecurityService;
 import com.smartgwt.client.types.HeaderControls;
 import com.smartgwt.client.widgets.Window;
 import com.smartgwt.client.widgets.form.DynamicForm;
 import com.smartgwt.client.widgets.form.fields.ButtonItem;
+import com.smartgwt.client.widgets.form.fields.FormItem;
 import com.smartgwt.client.widgets.form.fields.StaticTextItem;
 
 /**
@@ -18,25 +18,25 @@ import com.smartgwt.client.widgets.form.fields.StaticTextItem;
  */
 public class PasswordGenerator extends Window {
 
-	private DynamicForm form = new DynamicForm();
+	protected DynamicForm form = new DynamicForm();
 
-	private StaticTextItem password;
+	protected FormItem password;
 
-	private ButtonItem generate;
+	protected ButtonItem submit;
 
-	private Integer pwdSize;
+	protected Integer pwdSize;
 
-	private Integer pwdUpperCase;
+	protected Integer pwdUpperCase;
 
-	private Integer pwdLowerCase;
+	protected Integer pwdLowerCase;
 
-	private Integer pwdDigit;
+	protected Integer pwdDigit;
 
-	private Integer pwdSpecial;
+	protected Integer pwdSpecial;
 
-	private Integer pwdSequence;
+	protected Integer pwdSequence;
 
-	private Integer pwdOccurrence;
+	protected Integer pwdOccurrence;
 
 	public PasswordGenerator(Integer pwdSize, Integer pwdUpperCase, Integer pwdLowerCase, Integer pwdDigit,
 			Integer pwdSpecial, Integer pwdSequence, Integer pwdOccurrence) {
@@ -60,56 +60,72 @@ public class PasswordGenerator extends Window {
 		centerInPage();
 	}
 
-	private void generatePassword() {
-		generate.setDisabled(true);
+	protected void onSubmit() {
+		submit.setDisabled(true);
 		if (pwdSize == null)
-			SecurityService.Instance.get().generatePassword(new AsyncCallback<String>() {
+			SecurityService.Instance.get().generatePassword(new DefaultAsyncCallback<>() {
 				@Override
 				public void onFailure(Throwable caught) {
-					GuiLog.serverError(caught);
-					generate.setDisabled(false);
+					super.onFailure(caught);
+					submit.setDisabled(false);
 				}
 
 				@Override
 				public void onSuccess(String pswd) {
 					password.setValue(pswd);
-					generate.setDisabled(false);
+					submit.setDisabled(false);
 				}
 			});
 		else
 			SecurityService.Instance.get().generatePassword2(pwdSize, pwdUpperCase, pwdLowerCase, pwdDigit, pwdSpecial,
-					pwdSequence, pwdOccurrence, new AsyncCallback<String>() {
+					pwdSequence, pwdOccurrence, new DefaultAsyncCallback<>() {
 						@Override
 						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
-							generate.setDisabled(false);
+							super.onFailure(caught);
+							submit.setDisabled(false);
 						}
 
 						@Override
 						public void onSuccess(String pswd) {
 							password.setValue(pswd);
-							generate.setDisabled(false);
+							submit.setDisabled(false);
 						}
 					});
 	}
 
 	@Override
 	protected void onDraw() {
-		password = new StaticTextItem(I18N.message("password"));
-		password.setWrapTitle(false);
-		password.setWrap(false);
+		password = preparePasswordItem();
 
-		generate = new ButtonItem("generate", I18N.message("generate"));
-		generate.addClickHandler(event -> {
+		submit = new ButtonItem("generate", I18N.message("generate"));
+		submit.addClickHandler(event -> {
 			if (form.validate())
-				generatePassword();
+				onSubmit();
 		});
 
-		form.setWidth(1);
+		form.setWidth100();
 		form.setHeight(1);
-		form.setItems(password, generate);
+		form.setItems(password, submit);
 
 		addItem(form);
-		generatePassword();
+		onSubmit();
+	}
+
+	protected FormItem preparePasswordItem() {
+		StaticTextItem pswd = new StaticTextItem(I18N.message("password"));
+		pswd.setWrapTitle(false);
+		pswd.setWrap(false);
+		pswd.setIcons(new CopyTextFormItemIcon());
+		return pswd;
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+	
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

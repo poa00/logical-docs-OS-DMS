@@ -1,23 +1,22 @@
 package com.logicaldoc.gui.frontend.client.settings;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIDocument;
 import com.logicaldoc.gui.common.client.beans.GUIFolder;
 import com.logicaldoc.gui.common.client.data.OCRHistoryDS;
+import com.logicaldoc.gui.common.client.grid.ColoredListGridField;
+import com.logicaldoc.gui.common.client.grid.DateListGridField;
+import com.logicaldoc.gui.common.client.grid.FileNameListGridField;
+import com.logicaldoc.gui.common.client.grid.FileSizeListGridField;
+import com.logicaldoc.gui.common.client.grid.RefreshableListGrid;
+import com.logicaldoc.gui.common.client.grid.DateListGridField.DateCellFormatter;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
+import com.logicaldoc.gui.common.client.preview.PreviewPopup;
 import com.logicaldoc.gui.common.client.util.GridUtil;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.common.client.util.Util;
-import com.logicaldoc.gui.common.client.widgets.grid.ColoredListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField.DateCellFormatter;
-import com.logicaldoc.gui.common.client.widgets.grid.FileNameListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.FileSizeListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.RefreshableListGrid;
-import com.logicaldoc.gui.common.client.widgets.preview.PreviewPopup;
 import com.logicaldoc.gui.frontend.client.document.DocumentsPanel;
 import com.logicaldoc.gui.frontend.client.services.FolderService;
 import com.smartgwt.client.data.Record;
@@ -39,6 +38,8 @@ import com.smartgwt.client.widgets.toolbar.ToolStripButton;
  */
 public class OCRHistoryPanel extends VLayout {
 
+	private static final String EVENT = "event";
+
 	private static final String COMMENT = "comment";
 
 	private static final String DOC_ID = "docId";
@@ -56,7 +57,7 @@ public class OCRHistoryPanel extends VLayout {
 		ColoredListGridField id = new ColoredListGridField("id");
 		id.setHidden(true);
 
-		ListGridField eventLabel = new ListGridField("event", I18N.message("event"));
+		ListGridField eventLabel = new ListGridField(EVENT, I18N.message(EVENT));
 		eventLabel.setAlign(Alignment.CENTER);
 		eventLabel.setAutoFitWidth(true);
 		eventLabel.setCanFilter(true);
@@ -79,11 +80,11 @@ public class OCRHistoryPanel extends VLayout {
 
 		FileNameListGridField fileName = new FileNameListGridField();
 		fileName.setAutoFitWidth(true);
-		
+
 		ColoredListGridField path = new ColoredListGridField("path", I18N.message("path"));
 		path.setCanFilter(true);
 		path.setWidth(300);
-		
+
 		final RefreshableListGrid list = new RefreshableListGrid();
 		list.setEmptyMessage(I18N.message("notitemstoshow"));
 		list.setCanFreezeFields(true);
@@ -106,23 +107,21 @@ public class OCRHistoryPanel extends VLayout {
 
 		list.addCellContextClickHandler(e -> {
 			Menu contextMenu = new Menu();
+			Record selectedRecord = list.getSelectedRecord();
 
 			MenuItem openInFolder = new MenuItem();
 			openInFolder.setTitle(I18N.message("openinfolder"));
-			openInFolder.addClickHandler(evnt -> {
-				Record rec = list.getSelectedRecord();
-				DocumentsPanel.get().openInFolder(Long.parseLong(rec.getAttributeAsString(DOC_ID)));
-			});
+			openInFolder.addClickHandler(evnt -> DocumentsPanel.get()
+					.openInFolder(Long.parseLong(selectedRecord.getAttributeAsString(DOC_ID))));
 
 			MenuItem preview = new MenuItem();
 			preview.setTitle(I18N.message("preview"));
 			preview.addClickHandler(evnt -> {
-				Record rec = list.getSelectedRecord();
 				GUIDocument doc = new GUIDocument();
-				doc.setId(rec.getAttributeAsLong(DOC_ID));
-				doc.setFileName(rec.getAttributeAsString("filename"));
+				doc.setId(selectedRecord.getAttributeAsLong(DOC_ID));
+				doc.setFileName(selectedRecord.getAttributeAsString("filename"));
 
-				GUIFolder folder = new GUIFolder(rec.getAttributeAsLong("folderId"));
+				GUIFolder folder = new GUIFolder(selectedRecord.getAttributeAsLong("folderId"));
 				doc.setFolder(folder);
 
 				PreviewPopup iv = new PreviewPopup(doc);
@@ -133,25 +132,16 @@ public class OCRHistoryPanel extends VLayout {
 
 			MenuItem downloadIndexed = new MenuItem();
 			downloadIndexed.setTitle(I18N.message("downloadindexedtext"));
-			downloadIndexed.addClickHandler(evnt -> {
-				Record rec = list.getSelectedRecord();
-				FolderService.Instance.get().getFolder(rec.getAttributeAsLong("folderId"), false, false, false,
-						new AsyncCallback<GUIFolder>() {
-
-							@Override
-							public void onFailure(Throwable caught) {
-								GuiLog.serverError(caught);
-							}
-
-							@Override
-							public void onSuccess(GUIFolder folder) {
-								if (folder.isDownload())
-									Util.download(
-											Util.downloadURL(rec.getAttributeAsLong(DOC_ID)) + "&downloadText=true");
-							}
-						});
-
-			});
+			downloadIndexed.addClickHandler(evnt -> FolderService.Instance.get().getFolder(
+					selectedRecord.getAttributeAsLong("folderId"), false, false, false, new DefaultAsyncCallback<>() {
+						@Override
+						public void onSuccess(GUIFolder folder) {
+							if (folder.isDownload())
+								Util.download(Util.downloadURL(selectedRecord.getAttributeAsLong(DOC_ID))
+										+ "&downloadText=true");
+						}
+					}));
+			downloadIndexed.setEnabled(selectedRecord.getAttributeAsString(EVENT).contains("ocr.success"));
 
 			contextMenu.setItems(preview, downloadIndexed, openInFolder);
 			contextMenu.showContextMenu();

@@ -88,9 +88,8 @@
 <!ELEMENT value (#PCDATA)>
 ]>
 
-<plugin id="logicaldoc-core" version="8.8.6" class="com.logicaldoc.core.CorePlugin">
+<plugin id="logicaldoc-core" version="9.1.1" class="com.logicaldoc.core.CorePlugin">
   <extension-point id="DbInit">
-    <parameter-def id="name" />
     <parameter-def id="sqlFile" />
     <parameter-def id="position" />
   </extension-point>
@@ -149,7 +148,7 @@
   	<parameter-def id="name" />
     <parameter-def id="factory" />
   </extension-point>  
-  <extension-point id="Storer">
+  <extension-point id="Store">
     <parameter-def id="type" />
     <parameter-def id="class" />
   </extension-point>  
@@ -161,6 +160,10 @@
   <extension plugin-id="logicaldoc-core" point-id="Authentication" id="DefaultAuthentication">
     <parameter id="authenticatorId" value="DefaultAuthenticator" />
     <parameter id="position" value="100" />
+  </extension>
+  <extension plugin-id="logicaldoc-core" point-id="Authentication" id="ApiKeyAuthentication">
+    <parameter id="authenticatorId" value="ApiKeyAuthenticator" />
+    <parameter id="position" value="110" />
   </extension>
 
   <extension plugin-id="logicaldoc-core" point-id="Language" id="standardLanguage">
@@ -319,7 +322,11 @@
   <extension plugin-id="logicaldoc-core" point-id="ThumbnailBuilder" id="psdThumb">
     <parameter id="extension" value="psd" />
     <parameter id="class" value="com.logicaldoc.core.document.thumbnail.ImageThumbnailBuilder" />
-  </extension>  
+  </extension>
+  <extension plugin-id="logicaldoc-core" point-id="ThumbnailBuilder" id="heicThumb">
+    <parameter id="extension" value="heic" />
+    <parameter id="class" value="com.logicaldoc.core.document.thumbnail.ImageThumbnailBuilder" />
+  </extension>    
   <extension plugin-id="logicaldoc-core" point-id="ThumbnailBuilder" id="pdfThumb">
     <parameter id="extension" value="pdf" />
     <parameter id="class" value="com.logicaldoc.core.document.thumbnail.PdfThumbnailBuilder" />
@@ -366,7 +373,7 @@
   <extension plugin-id="logicaldoc-core" point-id="Search" id="tagSearch">
     <parameter id="type" value="1" />
     <parameter id="class" value="com.logicaldoc.core.searchengine.TagSearch" />
-    <parameter id="options" value="com.logicaldoc.core.searchengine.SearchOptions" />
+    <parameter id="options" value="com.logicaldoc.core.searchengine.TagSearchOptions" />
   </extension>
 
   <extension plugin-id="logicaldoc-core" point-id="Search" id="folderSearch">
@@ -377,7 +384,6 @@
   
   <extension plugin-id="logicaldoc-core" point-id="DbInit" id="coreDbInit">
 	<parameter id="position" value="1" />
-	<parameter id="name" value="logicaldoc-core" />
 	<parameter id="sqlFile" value="sql/logicaldoc-core.sql" />
   </extension>
   
@@ -447,9 +453,15 @@
   <extension plugin-id="logicaldoc-core" point-id="Aspect" id="aspInitialization">
     <parameter id="code" value="initialization" />
   </extension>
-  
+  <extension plugin-id="logicaldoc-core" point-id="Aspect" id="aspWriteCheck">
+    <parameter id="code" value="writeCheck" />
+  </extension> 
+    <extension plugin-id="logicaldoc-core" point-id="Aspect" id="aspSendingMessages">
+    <parameter id="code" value="sendingMessages" />
+  </extension> 
+
   <extension plugin-id="logicaldoc-core" point-id="FormatConverter" id="imageConv">
-		<parameter id="in" value="png,gif,jpg,jpeg,jfif,tif,tiff,bmp,psd,webp"/>
+		<parameter id="in" value="png,gif,jpg,jpeg,jfif,tif,tiff,bmp,psd,webp,heic"/>
 		<parameter id="out" value="pdf"/>
 		<parameter id="class" value="com.logicaldoc.core.conversion.ImageConverter"/>
   </extension>
@@ -502,7 +514,12 @@
 		<parameter id="in" value="pst"/>
 		<parameter id="out" value="txt,pdf"/>
 		<parameter id="class" value="com.logicaldoc.core.conversion.PstConverter"/>
-  </extension>  
+  </extension>
+  <extension plugin-id="logicaldoc-core" point-id="FormatConverter" id="mdConv">
+		<parameter id="in" value="md,mkd,mdwn,mdown,mdtxt,mdtext,markdown"/>
+		<parameter id="out" value="html,pdf"/>
+		<parameter id="class" value="com.logicaldoc.core.conversion.MarkdownConverter"/>
+  </extension>    
 
 
   <extension plugin-id="logicaldoc-core" point-id="DocumentListener" id="documentInitializationListener">

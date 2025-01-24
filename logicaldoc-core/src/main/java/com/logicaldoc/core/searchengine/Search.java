@@ -7,8 +7,11 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang.StringUtils;
@@ -18,11 +21,15 @@ import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.RowMapper;
 
 import com.logicaldoc.core.PersistenceException;
-import com.logicaldoc.core.document.dao.DocumentDAO;
+import com.logicaldoc.core.document.DocumentDAO;
+import com.logicaldoc.core.folder.FolderDAO;
 import com.logicaldoc.core.metadata.Attribute;
-import com.logicaldoc.core.security.User;
-import com.logicaldoc.core.security.dao.TenantDAO;
-import com.logicaldoc.core.security.dao.UserDAO;
+import com.logicaldoc.core.security.TenantDAO;
+import com.logicaldoc.core.security.user.User;
+import com.logicaldoc.core.security.user.UserDAO;
+import com.logicaldoc.core.security.user.UserEvent;
+import com.logicaldoc.core.security.user.UserHistory;
+import com.logicaldoc.core.security.user.UserHistoryDAO;
 import com.logicaldoc.util.Context;
 import com.logicaldoc.util.config.ContextProperties;
 import com.logicaldoc.util.plugin.PluginRegistry;
@@ -136,8 +143,13 @@ public abstract class Search {
 		internalSearch();
 
 		ContextProperties config = Context.get().getProperties();
-		TenantDAO tdao = (TenantDAO) Context.get().getBean(TenantDAO.class);
-		String extattrs = config.getProperty(tdao.getTenantName(searchUser.getTenantId()) + ".search.extattr");
+		TenantDAO tdao = Context.get(TenantDAO.class);
+		String extattrs;
+		try {
+			extattrs = config.getProperty(tdao.getTenantName(searchUser.getTenantId()) + ".search.extattr");
+		} catch (PersistenceException e) {
+			throw new SearchException(e);
+		}
 
 		if (StringUtils.isNotEmpty(extattrs) && !hits.isEmpty()) {
 			// the names of the extended attributes to show
@@ -152,7 +164,7 @@ public abstract class Search {
 			// Search for extended attributes, key is docId-name
 			final Map<String, Attribute> extAtt = new HashMap<>();
 
-			DocumentDAO ddao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+			DocumentDAO ddao = Context.get(DocumentDAO.class);
 			StringBuilder query = new StringBuilder();
 
 			if (hits.get(0).getType().startsWith("folder")) {
@@ -202,7 +214,91 @@ public abstract class Search {
 		log.info("Search completed in {} ms and found {} hits (estimated {})", execTime, hits.size(),
 				estimatedHitsNumber);
 
+		UserHistoryDAO historyDao = Context.get(UserHistoryDAO.class);
+		UserHistory transaction = options.getTransaction();
+		if (transaction == null)
+			transaction = new UserHistory();
+		transaction.setUser(searchUser);
+		transaction.setComment(StringUtils.left(options.toString(), 500));
+		transaction.setEvent(UserEvent.SEARCH.toString());
+		try {
+			historyDao.store(transaction);
+		} catch (PersistenceException e) {
+			log.info("Error trying to save search history", e);
+		}
 		return hits;
+	}
+
+	protected Collection<Long> getAccessibleFolderIds() throws SearchException {
+		FolderDAO fdao = Context.get(FolderDAO.class);
+
+		/*
+		 * We have to see what folders the user can access. But we need to
+		 * perform this check only if the search is not restricted to one folder
+		 * only.
+		 */
+		Collection<Long> accessibleFolderIds = new TreeSet<>();
+		boolean searchInSingleFolder = (options.getFolderId() != null && !options.isSearchInSubPath());
+		if (!searchInSingleFolder) {
+			try {
+				log.debug("Accessible folders search");
+				if (options.getFolderId() != null)
+					accessibleFolderIds = fdao.findFolderIdByUserIdInPath(options.getUserId(), options.getFolderId());
+				else
+					accessibleFolderIds = fdao.findFolderIdByUserId(options.getUserId(), null, true);
+				log.debug("End of accessible folders search");
+			} catch (PersistenceException e) {
+				throw new SearchException(e);
+			}
+		}
+		return accessibleFolderIds;
+	}
+
+	/**
+	 * Retrieves the ids of those document inside a hits collection that cannot
+	 * be accessed by the search user
+	 * 
+	 * @param hits The hists resulting from the search
+	 * @param accessibleFolderIds The ids of the folders accessible by the user
+	 * 
+	 * @return A collection of document IDs not accessible by the user
+	 * 
+	 * @throws SearchException error in the data layer
+	 */
+	protected Set<Long> getDeniedDocIds(List<Hit> hits, Collection<Long> accessibleFolderIds) throws SearchException {
+		HashSet<Long> denied = new HashSet<>();
+		if (searchUser.isAdmin() || hits.isEmpty())
+			return denied;
+
+		DocumentDAO dao = Context.get(DocumentDAO.class);
+
+		// Detect those hits outside the accessible folders
+		for (Hit hit : hits)
+			if (accessibleFolderIds != null && !accessibleFolderIds.contains(hit.getFolder().getId()))
+				denied.add(hit.getId());
+
+		// Detect those hits with specific read prohibition for the search user.
+		try {
+			StringBuilder query = new StringBuilder(
+					"select ld_docid from ld_document_acl where ld_read=0 and ld_docid in (");
+			query.append(hits.stream().map(h -> Long.toString(h.getId())).collect(Collectors.joining(",")));
+			query.append(") and ld_groupid in (");
+			query.append(searchUser.getGroups().stream().map(g -> Long.toString(g.getId()))
+					.collect(Collectors.joining(",")));
+			query.append(") ");
+			if (!denied.isEmpty()) {
+				// skip those docs already marked as denied
+				query.append(" and not ld_docid in (");
+				query.append(denied.stream().map(Object::toString).collect(Collectors.joining(",")));
+				query.append(")");
+			}
+			denied.addAll(dao.queryForList(query.toString(), Long.class));
+		} catch (PersistenceException e) {
+			throw new SearchException(e.getMessage(), e);
+		}
+
+		return denied;
+
 	}
 
 	private void copyExtendedAttributesToHits(List<String> atributeNames, final Map<String, Attribute> extAttribute) {
@@ -218,16 +314,16 @@ public abstract class Search {
 	}
 
 	private void initSearchUser() throws SearchException {
-		UserDAO uDao = (UserDAO) Context.get().getBean(UserDAO.class);
+		UserDAO uDao = Context.get(UserDAO.class);
 		try {
 			searchUser = uDao.findById(options.getUserId());
+			uDao.initialize(searchUser);
 		} catch (PersistenceException e1) {
 			throw new SearchException(e1);
 		}
-		if (searchUser != null) {
-			uDao.initialize(searchUser);
+
+		if (searchUser != null && log.isInfoEnabled())
 			log.info("Search User: {}", searchUser.getUsername());
-		}
 	}
 
 	/**

@@ -1,10 +1,11 @@
 package com.logicaldoc.gui.frontend.client.security.twofactorsauth;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import java.util.List;
+
 import com.logicaldoc.gui.common.client.Constants;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIUser;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.WindowUtils;
 import com.logicaldoc.gui.frontend.client.services.TwoFactorsAuthenticationService;
@@ -27,7 +28,7 @@ import com.smartgwt.client.widgets.layout.VLayout;
 public class GoogleAuthenticatorSetup extends TwoFactorsAuthenticationSetup {
 
 	private GUIUser user;
-	
+
 	public GoogleAuthenticatorSetup(final GUIUser user) {
 		super();
 		setWidth100();
@@ -35,7 +36,7 @@ public class GoogleAuthenticatorSetup extends TwoFactorsAuthenticationSetup {
 		setMembersMargin(5);
 		setMargin(5);
 
-		this.user=user;
+		this.user = user;
 	}
 
 	private void init(String account, String key, String qrUrl) {
@@ -52,7 +53,7 @@ public class GoogleAuthenticatorSetup extends TwoFactorsAuthenticationSetup {
 		form.setTitleOrientation(TitleOrientation.LEFT);
 		form.setItems(accountItem, keyItem);
 
-		Label formTitle = new Label("<b>" + I18N.message(Constants.TWOFA_GOOGLE_AUTHENTICATOR+".hint1") + "</b>");
+		Label formTitle = new Label("<b>" + I18N.message(Constants.TWOFA_GOOGLE_AUTHENTICATOR + ".hint1") + "</b>");
 		formTitle.setWrap(true);
 		formTitle.setMinWidth(250);
 
@@ -62,10 +63,11 @@ public class GoogleAuthenticatorSetup extends TwoFactorsAuthenticationSetup {
 		formLayout.setAlign(VerticalAlignment.TOP);
 
 		// Prepare the QR Code
-		HTMLFlow qrCode = new HTMLFlow("<img width='200' height='200' src='" + qrUrl + "' style='float:body' align='body'/>");
+		HTMLFlow qrCode = new HTMLFlow(
+				"<img width='200' height='200' src='" + qrUrl + "' style='float:body' align='body'/>");
 		qrCode.setOverflow(Overflow.VISIBLE);
 
-		Label qrCodeTitle = new Label("<b>" + I18N.message(Constants.TWOFA_GOOGLE_AUTHENTICATOR+".hint2") + "</b>");
+		Label qrCodeTitle = new Label("<b>" + I18N.message(Constants.TWOFA_GOOGLE_AUTHENTICATOR + ".hint2") + "</b>");
 		qrCodeTitle.setWrap(true);
 		qrCodeTitle.setMinWidth(250);
 
@@ -89,18 +91,23 @@ public class GoogleAuthenticatorSetup extends TwoFactorsAuthenticationSetup {
 		account = user.getUsername() + "@" + WindowUtils.getRequestInfo().getHostName();
 
 		TwoFactorsAuthenticationService.Instance.get().generateGoogleAuthorizationCredentials(account,
-				new AsyncCallback<String[]>() {
+				new DefaultAsyncCallback<>() {
 					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
-					@Override
-					public void onSuccess(String[] arg) {
-						user.setKey(arg[0]);
-						key = arg[0];
-						init(account, arg[0], arg[1]);
+					public void onSuccess(List<String> arg) {
+						user.setKey(arg.get(0));
+						key = arg.get(0);
+						init(account, arg.get(0), arg.get(1));
 					}
 				});
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

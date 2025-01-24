@@ -10,25 +10,28 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import javax.annotation.Resource;
+
 import org.apache.commons.lang.StringUtils;
 import org.java.plugin.registry.Extension;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
 
 import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.document.Document;
+import com.logicaldoc.core.document.DocumentDAO;
 import com.logicaldoc.core.document.DocumentEvent;
 import com.logicaldoc.core.document.DocumentHistory;
 import com.logicaldoc.core.document.DocumentManager;
-import com.logicaldoc.core.document.dao.DocumentDAO;
 import com.logicaldoc.core.security.Session;
 import com.logicaldoc.core.security.SessionManager;
 import com.logicaldoc.core.security.Tenant;
-import com.logicaldoc.core.security.UserEvent;
-import com.logicaldoc.core.security.UserHistory;
-import com.logicaldoc.core.security.dao.TenantDAO;
-import com.logicaldoc.core.security.dao.UserHistoryDAO;
-import com.logicaldoc.core.store.Storer;
+import com.logicaldoc.core.security.TenantDAO;
+import com.logicaldoc.core.security.user.UserEvent;
+import com.logicaldoc.core.security.user.UserHistory;
+import com.logicaldoc.core.security.user.UserHistoryDAO;
+import com.logicaldoc.core.store.Store;
 import com.logicaldoc.core.util.DocUtil;
 import com.logicaldoc.util.Context;
 import com.logicaldoc.util.config.ContextProperties;
@@ -45,6 +48,7 @@ import com.logicaldoc.util.plugin.PluginRegistry;
  * @author Marco Meschieri - LogicalDOC
  * @since 7.1.3
  */
+@Component("formatConverterManager")
 public class FormatConverterManager {
 
 	/*
@@ -54,12 +58,16 @@ public class FormatConverterManager {
 
 	protected static Logger log = LoggerFactory.getLogger(FormatConverterManager.class);
 
-	private Storer storer;
+	@Resource(name = "Store")
+	private Store store;
 
+	@Resource(name = "TenantDAO")
 	private TenantDAO tenantDao;
 
+	@Resource(name = "documentManager")
 	private DocumentManager documentManager;
 
+	@Resource(name = "ContextProperties")
 	private ContextProperties config;
 
 	// Key is the src_extension-dst_extension, value is a collection of
@@ -68,6 +76,15 @@ public class FormatConverterManager {
 
 	// All the available converters
 	private Map<String, FormatConverter> availableConverters = new HashMap<>();
+
+	public FormatConverterManager(Store store, TenantDAO tenantDao, DocumentManager documentManager,
+			ContextProperties config) {
+		super();
+		this.store = store;
+		this.tenantDao = tenantDao;
+		this.documentManager = documentManager;
+		this.config = config;
+	}
 
 	/**
 	 * Retrieves the content of the Pdf conversion. If the Pdf conversion is not
@@ -81,13 +98,13 @@ public class FormatConverterManager {
 	 * @throws IOException If something went wrong
 	 */
 	public byte[] getPdfContent(Document document, String fileVersion, String sid) throws IOException {
-		String resource = storer.getResourceName(document.getId(), getSuitableFileVersion(document, fileVersion),
+		String resource = store.getResourceName(document.getId(), getSuitableFileVersion(document, fileVersion),
 				PDF_CONVERSION_SUFFIX);
 		if ("pdf".equals(AbstractFormatConverter.getExtension(document.getFileName())))
-			resource = storer.getResourceName(document, getSuitableFileVersion(document, fileVersion), null);
-		if (!storer.exists(document.getId(), resource))
+			resource = store.getResourceName(document, getSuitableFileVersion(document, fileVersion), null);
+		if (!store.exists(document.getId(), resource))
 			convertToPdf(document, fileVersion, sid);
-		return storer.getBytes(document.getId(), resource);
+		return store.getBytes(document.getId(), resource);
 	}
 
 	/**
@@ -102,13 +119,13 @@ public class FormatConverterManager {
 	 * @throws IOException If something went wrong
 	 */
 	public void writePdfToFile(Document document, String fileVersion, File out, String sid) throws IOException {
-		String resource = storer.getResourceName(document.getId(), getSuitableFileVersion(document, fileVersion),
+		String resource = store.getResourceName(document.getId(), getSuitableFileVersion(document, fileVersion),
 				PDF_CONVERSION_SUFFIX);
 		if ("pdf".equals(AbstractFormatConverter.getExtension(document.getFileName())))
-			resource = storer.getResourceName(document.getId(), getSuitableFileVersion(document, fileVersion), null);
-		if (!storer.exists(document.getId(), resource))
+			resource = store.getResourceName(document.getId(), getSuitableFileVersion(document, fileVersion), null);
+		if (!store.exists(document.getId(), resource))
 			convertToPdf(document, fileVersion, sid);
-		storer.writeToFile(document.getId(), resource, out);
+		store.writeToFile(document.getId(), resource, out);
 	}
 
 	/**
@@ -130,10 +147,10 @@ public class FormatConverterManager {
 			return;
 		}
 
-		String resource = storer.getResourceName(document, getSuitableFileVersion(document, fileVersion),
+		String resource = store.getResourceName(document, getSuitableFileVersion(document, fileVersion),
 				PDF_CONVERSION_SUFFIX);
 
-		if (storer.size(document.getId(), resource) > 0L) {
+		if (store.size(document.getId(), resource) > 0L) {
 			log.debug("Pdf conversion already available for document {}", document.getId());
 			return;
 		}
@@ -159,11 +176,11 @@ public class FormatConverterManager {
 						String.format("The converter %s was unable to convert as pdf the document: %s - %s",
 								converter.getClass().getSimpleName(), document.getId(), fileName));
 
-			storer.store(dest, document.getId(), resource);
+			store.store(dest, document.getId(), resource);
 		} finally {
 			// Delete temporary resources
-			FileUtil.strongDelete(src);
-			FileUtil.strongDelete(dest);
+			FileUtil.delete(src);
+			FileUtil.delete(dest);
 		}
 	}
 
@@ -221,7 +238,7 @@ public class FormatConverterManager {
 				throw new IOException("The conversion was not done");
 		} finally {
 			// Delete temporary resources
-			FileUtil.strongDelete(out);
+			FileUtil.delete(out);
 		}
 	}
 
@@ -243,7 +260,7 @@ public class FormatConverterManager {
 		if (converter == null)
 			return;
 
-		FileUtil.strongDelete(out);
+		FileUtil.delete(out);
 
 		// Prepare I/O files
 		File src = null;
@@ -261,7 +278,7 @@ public class FormatConverterManager {
 			if (transaction != null) {
 				transaction.setEvent(DocumentEvent.CONVERTED.toString());
 				transaction.setComment("format: " + FileUtil.getExtension(out.getName()));
-				DocumentDAO dao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+				DocumentDAO dao = Context.get(DocumentDAO.class);
 				try {
 					dao.initialize(document);
 					dao.store(document, transaction);
@@ -271,7 +288,7 @@ public class FormatConverterManager {
 			}
 		} finally {
 			// Delete temporary resources
-			FileUtil.strongDelete(src);
+			FileUtil.delete(src);
 		}
 	}
 
@@ -296,7 +313,7 @@ public class FormatConverterManager {
 		if (!in.exists() || in.length() == 0)
 			throw new IOException(String.format("Unexisting source file %s", in));
 
-		FileUtil.strongDelete(out);
+		FileUtil.delete(out);
 
 		converter.convert(in, out);
 
@@ -318,7 +335,7 @@ public class FormatConverterManager {
 				history.setComment(String.format("%s -> %s", history.getFilenameOld(), history.getFilename()));
 				history.setIp(session.getClient().getAddress());
 
-				UserHistoryDAO dao = (UserHistoryDAO) Context.get().getBean(UserHistoryDAO.class);
+				UserHistoryDAO dao = Context.get(UserHistoryDAO.class);
 				try {
 					dao.store(history);
 				} catch (PersistenceException e) {
@@ -434,19 +451,19 @@ public class FormatConverterManager {
 
 		String inOutkey = composeKey(inFileName, outFileName);
 
-		List<FormatConverter> convrters = getConverters().get(inOutkey);
-		if (convrters == null || convrters.isEmpty())
-			convrters = getConverters().get("*-pdf");
-		if (convrters == null || convrters.isEmpty())
+		List<FormatConverter> formatConverters = getConverters().get(inOutkey);
+		if (formatConverters == null || formatConverters.isEmpty())
+			formatConverters = getConverters().get("*-pdf");
+		if (formatConverters == null || formatConverters.isEmpty())
 			log.warn("No format converter for file {}", inFileName);
 
 		// Get the first available converter
-		FormatConverter converter = convrters != null ? convrters.get(0) : null;
+		FormatConverter converter = formatConverters != null ? formatConverters.get(0) : null;
 
 		// Check if a special binding is configured
 		String currentConverter = config.getProperty("converter." + inOutkey);
-		if (StringUtils.isNotEmpty(currentConverter))
-			for (FormatConverter formatConverter : convrters) {
+		if (StringUtils.isNotEmpty(currentConverter) && formatConverters != null)
+			for (FormatConverter formatConverter : formatConverters) {
 				if (formatConverter.getClass().getName().equals(currentConverter)) {
 					converter = formatConverter;
 				}
@@ -486,8 +503,8 @@ public class FormatConverterManager {
 		File target = FileUtil.createTempFile("scr",
 				"." + AbstractFormatConverter.getExtension(document.getFileName()));
 		String fver = getSuitableFileVersion(document, fileVersion);
-		String resource = storer.getResourceName(document, fver, null);
-		storer.writeToFile(document.getId(), resource, target);
+		String resource = store.getResourceName(document, fver, null);
+		store.writeToFile(document.getId(), resource, target);
 		return target;
 	}
 
@@ -510,16 +527,18 @@ public class FormatConverterManager {
 	/**
 	 * Initializes the converters map
 	 */
-	private void initConverters() {
-		converters.clear();
-		// Acquire the 'ThumbnailBuilder' extensions of the core plugin
+	public synchronized void init() {
+		if (!converters.isEmpty())
+			return;
+
+		// Acquire the 'FormatConverter' extensions of the core plugin
 		PluginRegistry registry = PluginRegistry.getInstance();
 		Collection<Extension> exts = registry.getExtensions("logicaldoc-core", "FormatConverter");
 
 		for (Extension ext : exts) {
 			String className = ext.getParameter("class").valueAsString();
 
-			// Try to instantiate the builder
+			// Try to instantiate the converter
 			Object converter;
 			try {
 				Class<?> clazz = Class.forName(className);
@@ -528,9 +547,9 @@ public class FormatConverterManager {
 					throw new ClassNotFoundException(String.format(
 							"The specified converter %s doesn't implement FormatConverter interface", className));
 			} catch (ClassNotFoundException | InstantiationException | IllegalAccessException | IllegalArgumentException
-					| InvocationTargetException | NoSuchMethodException | SecurityException e) {
-				log.error(e.getMessage(), e);
-				break;
+					| InvocationTargetException | NoSuchMethodException e) {
+				log.warn(e.getMessage(), e);
+				continue;
 			}
 
 			FormatConverter cnvrt = (FormatConverter) converter;
@@ -562,23 +581,7 @@ public class FormatConverterManager {
 
 	public Map<String, List<FormatConverter>> getConverters() {
 		if (converters.isEmpty())
-			initConverters();
+			init();
 		return converters;
-	}
-
-	public void setStorer(Storer storer) {
-		this.storer = storer;
-	}
-
-	public void setTenantDao(TenantDAO tenantDao) {
-		this.tenantDao = tenantDao;
-	}
-
-	public void setDocumentManager(DocumentManager documentManager) {
-		this.documentManager = documentManager;
-	}
-
-	public void setConfig(ContextProperties config) {
-		this.config = config;
 	}
 }

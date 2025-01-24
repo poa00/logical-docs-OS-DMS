@@ -7,7 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.web.context.ContextLoaderListener;
 
 import com.logicaldoc.core.SystemInfo;
-import com.logicaldoc.core.security.dao.SessionDAO;
+import com.logicaldoc.core.security.SessionDAO;
 import com.logicaldoc.util.Context;
 import com.logicaldoc.util.config.ContextProperties;
 
@@ -31,9 +31,7 @@ public class ContextListener extends ContextLoaderListener {
 	@Override
 	public void contextInitialized(ServletContextEvent event) {
 		super.contextInitialized(event);
-
 		cleanupSessions();
-		
 		log.info("Application started and ready");
 	}
 
@@ -41,7 +39,7 @@ public class ContextListener extends ContextLoaderListener {
 		try {
 			log.info("Cleanup past sessions of the current node {}", SystemInfo.get().getInstallationId());
 			if (Context.get() != null) {
-				SessionDAO sessionDAO = (SessionDAO) Context.get().getBean(SessionDAO.class);
+				SessionDAO sessionDAO = Context.get(SessionDAO.class);
 				sessionDAO.deleteCurrentNodeSessions();
 
 				ContextProperties config = Context.get().getProperties();

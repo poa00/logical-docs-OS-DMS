@@ -236,7 +236,7 @@ public class EmailAccountFiltersPanel extends EmailAccountDetailsTab {
 					rules.add(rule);
 				}
 
-				account.setRules(rules.toArray(new GUIEmailRule[0]));
+				account.setRules(rules);
 			}
 			return true;
 		} catch (Exception t) {
@@ -258,5 +258,15 @@ public class EmailAccountFiltersPanel extends EmailAccountDetailsTab {
 
 		contextMenu.setItems(delete);
 		contextMenu.showContextMenu();
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

@@ -1,8 +1,8 @@
 package com.logicaldoc.gui.common.client.beans;
 
 import java.io.Serializable;
-
-import com.logicaldoc.gui.common.client.Constants;
+import java.util.ArrayList;
+import java.util.List;
 
 public class GUIAutomationRoutine extends GUIExtensibleObject implements Serializable {
 
@@ -14,9 +14,9 @@ public class GUIAutomationRoutine extends GUIExtensibleObject implements Seriali
 
 	private String automation;
 
-	private GUIRight[] rights = new GUIRight[] {};
+	private List<GUIAccessControlEntry> accessControlList = new ArrayList<>();
 
-	private String[] permissions = new String[] {};
+	private List<String> permissions = new ArrayList<>();
 
 	public GUIAutomationRoutine(long id) {
 		super(id);
@@ -50,24 +50,51 @@ public class GUIAutomationRoutine extends GUIExtensibleObject implements Seriali
 		this.automation = automation;
 	}
 
-	public GUIRight[] getRights() {
-		return rights;
+	public GUIAccessControlEntry getAce(long entityId) {
+		for (GUIAccessControlEntry ace : accessControlList) {
+			if (ace.getEntityId() == entityId)
+				return ace;
+		}
+		return null;
 	}
 
-	public void setRights(GUIRight[] rights) {
-		this.rights = rights;
+	public void removeAce(long entityId) {
+		List<GUIAccessControlEntry> newAcls = new ArrayList<>();
+		for (GUIAccessControlEntry ace : accessControlList) {
+			if (ace.getEntityId() != entityId)
+				newAcls.add(ace);
+		}
+		accessControlList = newAcls;
 	}
 
-	public String[] getPermissions() {
+	public void addAce(GUIAccessControlEntry ace) {
+		GUIAccessControlEntry existingAce = getAce(ace.getEntityId());
+		if(existingAce==null) {
+			accessControlList.add(ace);
+		} else {
+			existingAce.setRead(ace.isRead());
+			existingAce.setWrite(ace.isWrite());
+		}
+	}
+	
+	public List<GUIAccessControlEntry> getAccessControlList() {
+		return accessControlList;
+	}
+
+	public void setAccessControlList(List<GUIAccessControlEntry> accessControlList) {
+		this.accessControlList = accessControlList;
+	}
+
+	public List<String> getPermissions() {
 		return permissions;
 	}
 
-	public void setPermissions(String[] permissions) {
+	public void setPermissions(List<String> permissions) {
 		this.permissions = permissions;
 	}
 
 	public boolean isWrite() {
-		return hasPermission(Constants.PERMISSION_WRITE);
+		return hasPermission(GUIAccessControlEntry.PERMISSION_WRITE);
 	}
 
 	public boolean hasPermission(String permission) {
@@ -77,5 +104,36 @@ public class GUIAutomationRoutine extends GUIExtensibleObject implements Seriali
 			if (p.equals(permission))
 				return true;
 		return false;
+	}
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = super.hashCode();
+		result = prime * result + ((automation == null) ? 0 : automation.hashCode());
+		result = prime * result + ((name == null) ? 0 : name.hashCode());
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (!super.equals(obj))
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		GUIAutomationRoutine other = (GUIAutomationRoutine) obj;
+		if (automation == null) {
+			if (other.automation != null)
+				return false;
+		} else if (!automation.equals(other.automation))
+			return false;
+		if (name == null) {
+			if (other.name != null)
+				return false;
+		} else if (!name.equals(other.name))
+			return false;
+		return true;
 	}
 }

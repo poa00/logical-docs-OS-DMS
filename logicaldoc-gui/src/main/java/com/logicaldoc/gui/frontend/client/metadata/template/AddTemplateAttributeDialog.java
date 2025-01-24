@@ -1,10 +1,9 @@
 package com.logicaldoc.gui.frontend.client.metadata.template;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIAttribute;
 import com.logicaldoc.gui.common.client.beans.GUIAttributeSet;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.frontend.client.services.AttributeSetService;
 import com.smartgwt.client.types.HeaderControls;
@@ -125,13 +124,7 @@ public class AddTemplateAttributeDialog extends Window {
 	}
 
 	protected void fillSetAttributesList(Long setId) {
-		AttributeSetService.Instance.get().getAttributeSet(setId, new AsyncCallback<GUIAttributeSet>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
+		AttributeSetService.Instance.get().getAttributeSet(setId, new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(GUIAttributeSet set) {
 				ListGridRecord[] records = setAttributesList.getRecords();
@@ -139,13 +132,7 @@ public class AddTemplateAttributeDialog extends Window {
 					for (ListGridRecord rec : records)
 						setAttributesList.removeData(rec);
 
-				GUIAttribute[] attributes = set.getAttributes();
-
-				if (attributes == null)
-					return;
-
-				for (int i = 0; i < attributes.length; i++) {
-					GUIAttribute att = attributes[i];
+				for (GUIAttribute att : set.getAttributes()) {
 					ListGridRecord rec = new ListGridRecord();
 					rec.setAttribute("name", att.getName());
 					rec.setAttribute(LABEL, att.getLabel());
@@ -164,5 +151,15 @@ public class AddTemplateAttributeDialog extends Window {
 				}
 			}
 		});
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

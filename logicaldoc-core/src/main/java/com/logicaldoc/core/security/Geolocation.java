@@ -1,26 +1,20 @@
 package com.logicaldoc.core.security;
 
-import java.io.BufferedOutputStream;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.InetAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.text.SimpleDateFormat;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import org.apache.commons.io.FileUtils;
-import org.apache.http.HttpStatus;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.logicaldoc.util.Context;
+import com.logicaldoc.util.http.FileHttpClientResponseHandler;
 import com.logicaldoc.util.http.HttpUtil;
 import com.logicaldoc.util.io.FileUtil;
 import com.logicaldoc.util.io.ZipUtil;
@@ -157,25 +151,9 @@ public class Geolocation {
 
 			log.info("Downloading geolocation database {}", downloadUrl);
 
-			HttpGet get = new HttpGet(downloadUrl);
-			CloseableHttpClient httpclient = HttpUtil.getNotValidatingClient(60);
-
-			try (CloseableHttpResponse response = httpclient.execute(get)) {
-				int result = response.getStatusLine().getStatusCode();
-				if (result != HttpStatus.SC_OK)
-					throw new IOException("HTTP error " + result);
-
+			try (CloseableHttpClient httpclient = HttpUtil.getNotValidatingClient(60);) {
 				gzFile = FileUtil.createTempFile(CONST_GEOLOCATION, ".tar.gz");
-
-				try (InputStream in = HttpUtil.getBodyStream(response);
-						FileOutputStream fos = new FileOutputStream(gzFile);
-						BufferedOutputStream bout = new BufferedOutputStream(fos, 1024)) {
-					byte[] data = new byte[1024];
-					int x = 0;
-
-					while ((x = in.read(data, 0, 1024)) >= 0)
-						bout.write(data, 0, x);
-				}
+				httpclient.execute(new HttpGet(downloadUrl), new FileHttpClientResponseHandler(gzFile));
 			}
 
 			log.info("Downloaded geolocation database {}", gzFile.getPath());
@@ -184,15 +162,17 @@ public class Geolocation {
 			 * Prepare a temporary folder and hunzip the downloaded file in it
 			 */
 			tmpDir = FileUtil.createTempFile(CONST_GEOLOCATION, null);
-			FileUtil.strongDelete(tmpDir);
+			FileUtil.delete(tmpDir);
 			tmpDir.mkdir();
-			new ZipUtil().unGZipUnTar(gzFile, tmpDir);
+			try (ZipUtil zipUtil = new ZipUtil()) {
+				zipUtil.unGZipUnTar(gzFile, tmpDir);
+			}
 
 			// Search for the .mmdb file
 			File mmdbFile = null;
 			try (Stream<Path> paths = Files.walk(tmpDir.toPath())) {
-				mmdbFile = paths.filter(p -> p.toFile().isFile() && p.toFile().getName().endsWith(".mmdb"))
-						.collect(Collectors.toList()).get(0).toFile();
+				mmdbFile = paths.filter(p -> p.toFile().isFile() && p.toFile().getName().endsWith(".mmdb")).toList()
+						.get(0).toFile();
 			}
 
 			if (!mmdbFile.exists())
@@ -200,21 +180,12 @@ public class Geolocation {
 
 			FileUtil.copyFile(mmdbFile, getDatabaseFile());
 
-			FileUtil.strongDelete(mmdbFile);
+			FileUtil.delete(mmdbFile);
 
 			dispose();
 		} finally {
-			try {
-				FileUtils.forceDelete(gzFile);
-			} catch (Exception t) {
-				log.warn(t.getMessage());
-			}
-
-			try {
-				FileUtils.forceDelete(tmpDir);
-			} catch (Exception t) {
-				log.warn(t.getMessage());
-			}
+			FileUtil.delete(gzFile);
+			FileUtil.delete(tmpDir);
 		}
 	}
 

@@ -2,9 +2,6 @@ package com.logicaldoc.web.listener;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.net.URL;
-import java.net.URLDecoder;
 import java.sql.Driver;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -19,14 +16,12 @@ import javax.servlet.http.HttpSessionEvent;
 import javax.servlet.http.HttpSessionListener;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.logging.log4j.core.LoggerContext;
-import org.apache.logging.log4j.core.config.Configurator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.logicaldoc.core.automation.Automation;
 import com.logicaldoc.util.config.ContextProperties;
-import com.logicaldoc.util.config.LoggingConfigurator;
+import com.logicaldoc.util.config.LogConfigurator;
 import com.logicaldoc.util.config.WebConfigurator;
 import com.logicaldoc.util.config.WebContextConfigurator;
 import com.logicaldoc.util.dbinit.DBInit;
@@ -68,7 +63,7 @@ public class ApplicationListener implements ServletContextListener, HttpSessionL
 			onShutdown();
 		} finally {
 			if (pidCreated)
-				FileUtil.strongDelete(getPidFile());
+				FileUtil.delete(getPidFile());
 		}
 	}
 
@@ -149,7 +144,7 @@ public class ApplicationListener implements ServletContextListener, HttpSessionL
 			ServletContext context = sce.getServletContext();
 
 			// Initialize logging
-			initializeLogging();
+			new LogConfigurator().initializeLogging();
 
 			// Update the web descriptor with the correct transport guarantee
 			try {
@@ -202,7 +197,9 @@ public class ApplicationListener implements ServletContextListener, HttpSessionL
 			if (PluginRegistry.getInstance().isRestartRequired()) {
 				restartRequired();
 				log.warn("The application has to be restarted");
-				System.out.println("The application has to be restarted");
+
+				Logger console = LoggerFactory.getLogger("console");
+				console.warn("The application has to be restarted");
 			}
 		} finally {
 			writePidFile();
@@ -235,43 +232,6 @@ public class ApplicationListener implements ServletContextListener, HttpSessionL
 		}
 	}
 
-	private void initializeLogging() {
-		String log4jPath = null;
-		try {
-			log4jPath = getLogConfigFilePath();
-
-			// Setup the correct logs folder
-			ContextProperties config = new ContextProperties();
-			LoggingConfigurator lconf = new LoggingConfigurator();
-			lconf.setLogsRoot(config.getProperty("conf.logdir"));
-			lconf.write();
-
-			// Init the logs
-			System.out.println(String.format("Taking log configuration from %s", log4jPath));
-			LoggerContext lContext = Configurator.initialize(null, log4jPath);
-			if (lContext == null)
-				throw new IOException("Null logger context");
-		} catch (Exception e) {
-			System.err.println(String.format("Cannot initialize the log: %s", e.getMessage()));
-		}
-	}
-
-	private String getLogConfigFilePath() throws UnsupportedEncodingException {
-		String log4jPath;
-		URL configFile = null;
-		try {
-			configFile = LoggingConfigurator.class.getClassLoader().getResource("/log.xml");
-		} catch (Exception t) {
-			// Nothing to do
-		}
-
-		if (configFile == null)
-			configFile = LoggingConfigurator.class.getClassLoader().getResource("log.xml");
-
-		log4jPath = URLDecoder.decode(configFile.getPath(), "UTF-8");
-		return log4jPath;
-	}
-
 	/**
 	 * Unpacks the plugin that are newly installed and positioned in the plugins
 	 * folder
@@ -286,8 +246,9 @@ public class ApplicationListener implements ServletContextListener, HttpSessionL
 		if (archives != null)
 			for (File archive : archives) {
 				log.info("Unpack plugin {}", archive.getName());
-				ZipUtil zipUtil = new ZipUtil();
-				zipUtil.unzip(archive.getPath(), webappDir.getPath());
+				try (ZipUtil zipUtil = new ZipUtil()) {
+					zipUtil.unzip(archive, webappDir);
+				}
 
 				// Delete the plugin.xml file
 				FileUtils.deleteQuietly(new File(webappDir, "plugin.xml"));
@@ -351,7 +312,9 @@ public class ApplicationListener implements ServletContextListener, HttpSessionL
 			pidCreated = true;
 		} catch (IOException e) {
 			log.warn(e.getMessage());
-			System.err.println("Cannot create pid file " + pidFile.getAbsolutePath());
+
+			Logger console = LoggerFactory.getLogger("console");
+			console.warn("Cannot create pid file {}", pidFile.getAbsolutePath());
 		}
 	}
 

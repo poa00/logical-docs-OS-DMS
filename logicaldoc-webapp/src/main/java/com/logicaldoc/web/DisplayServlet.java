@@ -13,8 +13,8 @@ import org.slf4j.LoggerFactory;
 import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.folder.Folder;
 import com.logicaldoc.core.folder.FolderDAO;
-import com.logicaldoc.core.security.User;
-import com.logicaldoc.core.security.dao.UserDAO;
+import com.logicaldoc.core.security.user.User;
+import com.logicaldoc.core.security.user.UserDAO;
 import com.logicaldoc.util.Context;
 
 /**
@@ -59,10 +59,10 @@ public class DisplayServlet extends HttpServlet {
 			else if (StringUtils.isNotEmpty(folderId))
 				redirectUrl += FOLDER_ID + "=" + folderId;
 			else if (StringUtils.isNotEmpty(folderPath)) {
-				UserDAO uDao = (UserDAO) Context.get().getBean(UserDAO.class);
+				UserDAO uDao = Context.get(UserDAO.class);
 				User user = uDao.findByUsername(username);
 
-				FolderDAO fDao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+				FolderDAO fDao = Context.get(FolderDAO.class);
 				Folder folder = fDao.findByPathExtended(folderPath, user.getTenantId());
 				redirectUrl += FOLDER_ID + "=" + folder.getId();
 			}

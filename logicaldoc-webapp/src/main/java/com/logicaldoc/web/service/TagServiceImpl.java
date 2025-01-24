@@ -7,8 +7,8 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.logicaldoc.core.document.DocumentDAO;
 import com.logicaldoc.core.document.TagCloud;
-import com.logicaldoc.core.document.dao.DocumentDAO;
 import com.logicaldoc.core.security.Session;
 import com.logicaldoc.gui.common.client.ServerException;
 import com.logicaldoc.gui.common.client.beans.GUIParameter;
@@ -30,11 +30,11 @@ public class TagServiceImpl extends AbstractRemoteService implements TagService 
 	protected static Logger log = LoggerFactory.getLogger(TagServiceImpl.class);
 
 	@Override
-	public GUITag[] getTagCloud() throws ServerException {
-		Session session = validateSession(getThreadLocalRequest());
+	public List<GUITag> getTagCloud() throws ServerException {
+		Session session = validateSession();
 		try {
 			ArrayList<GUITag> ret = new ArrayList<>();
-			DocumentDAO dao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+			DocumentDAO dao = Context.get(DocumentDAO.class);
 			List<TagCloud> list = dao.getTagCloud(session.getSid());
 
 			for (TagCloud tagCloud : list) {
@@ -45,9 +45,9 @@ public class TagServiceImpl extends AbstractRemoteService implements TagService 
 				ret.add(c);
 			}
 
-			return ret.toArray(new GUITag[0]);
+			return ret;
 		} catch (Exception t) {
-			return (GUITag[]) throwServerException(session, log, t);
+			return throwServerException(session, log, t);
 		}
 	}
 
@@ -78,8 +78,8 @@ public class TagServiceImpl extends AbstractRemoteService implements TagService 
 	}
 
 	@Override
-	public GUIParameter[] getSettings() throws ServerException {
-		Session session = validateSession(getThreadLocalRequest());
+	public List<GUIParameter> getSettings() throws ServerException {
+		Session session = validateSession();
 
 		ContextProperties conf = Context.get().getProperties();
 		List<GUIParameter> params = new ArrayList<>();
@@ -93,6 +93,6 @@ public class TagServiceImpl extends AbstractRemoteService implements TagService 
 			}
 		}
 
-		return params.toArray(new GUIParameter[0]);
+		return params;
 	}
 }

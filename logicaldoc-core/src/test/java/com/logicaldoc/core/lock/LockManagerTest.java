@@ -1,6 +1,5 @@
 package com.logicaldoc.core.lock;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.SQLException;
 
@@ -8,10 +7,12 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.logicaldoc.core.AbstractCoreTestCase;
+import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.generic.Generic;
 import com.logicaldoc.core.generic.GenericDAO;
 import com.logicaldoc.core.security.Tenant;
 import com.logicaldoc.util.config.ContextProperties;
+import com.logicaldoc.util.plugin.PluginException;
 
 import junit.framework.Assert;
 
@@ -22,6 +23,7 @@ import junit.framework.Assert;
  * @since 6.5
  */
 public class LockManagerTest extends AbstractCoreTestCase {
+	
 	private LockManager manager;
 
 	private GenericDAO dao;
@@ -29,16 +31,16 @@ public class LockManagerTest extends AbstractCoreTestCase {
 	private ContextProperties config;
 
 	@Before
-	public void setUp() throws FileNotFoundException, IOException, SQLException {
+	public void setUp() throws IOException, SQLException, PluginException {
 		super.setUp();
 
-		manager = (LockManager) context.getBean("LockManager");
+		manager = (LockManager) context.getBean("lockManager");
 		dao = (GenericDAO) context.getBean("GenericDAO");
 		config = (ContextProperties) context.getBean("ContextProperties");
 	}
 
 	@Test
-	public void testGet() {
+	public void testGet() throws PersistenceException {
 		Assert.assertTrue(manager.get("test", "t1"));
 		Assert.assertTrue(manager.get("test", "t1"));
 		Assert.assertFalse(manager.get("test", "t2"));

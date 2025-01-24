@@ -1,57 +1,53 @@
 package com.logicaldoc.util.io;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.sql.SQLException;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
-import org.apache.commons.io.FileUtils;
+import java.io.File;
+import java.io.IOException;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import junit.framework.Assert;
-
 public class JarUtilTest {
+	private File dir = new File("target/test");
+
+	private File file = new File("target/test.zip");
+
+	private JarUtil testSubject = new JarUtil();
+
 	@Before
-	public void setUp() throws FileNotFoundException, IOException, SQLException {
-		File dir = new File("target/test");
+	public void setUp() throws IOException {
 		dir.mkdirs();
 		dir.mkdir();
+
+		FileUtil.copyResource("/test.zip", file);
 	}
 
 	@After
-	public void tearDown() throws Exception {
-		File dir = new File("target/test");
-		if (dir.exists())
-			try {
-				FileUtils.forceDelete(dir);
-			} catch (IOException e) {
-				// Nothing to do
-			}
+	public void tearDown() {
+		FileUtil.delete(dir);
 	}
 
 	@Test
 	public void testUnjar() throws IOException {
-		File file = new File("target/test.zip");
-		FileUtil.copyResource("/test.zip", file);
-
-		Assert.assertFalse(new File("target/test/index.xml").exists());
-
-		Assert.assertTrue(new JarUtil().unjar(file.getPath(), "target/test"));
-
-		Assert.assertTrue(new File("target/test/index.xml").exists());
+		File test = new File(dir, "index.xml");
+		try {
+			assertFalse(test.exists());
+			testSubject.unjar(file.getPath(), "target/test");
+			assertTrue(test.exists());
+		} finally {
+			FileUtil.delete(test);
+		}
 	}
-	
+
 	@Test
-	public void testSaveEntry() throws IOException {
-		File file = new File("target/test.zip");
-		FileUtil.copyResource("/test.zip", file);
+	public void testUnjarEntry() throws IOException {
+		final File test = new File(dir, "test.txt");
+		assertFalse(test.exists());
+		testSubject.unjar(file.getPath(), "abc/test.txt", test.getPath());
+		assertTrue(test.exists());
 
-		Assert.assertFalse(new File("target/test/index.xml").exists());
-
-		Assert.assertTrue(new JarUtil().unjar(file.getPath(), "index.xml", "target/test/index.xml"));
-
-		Assert.assertTrue(new File("target/test/index.xml").exists());
 	}
 }

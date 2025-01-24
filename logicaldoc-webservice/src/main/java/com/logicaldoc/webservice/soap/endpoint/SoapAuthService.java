@@ -1,15 +1,12 @@
 package com.logicaldoc.webservice.soap.endpoint;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.xml.ws.handler.MessageContext;
-
-import org.apache.cxf.transport.http.AbstractHTTPDestination;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.logicaldoc.core.security.Session;
 import com.logicaldoc.core.security.SessionManager;
 import com.logicaldoc.core.security.authentication.AuthenticationException;
+import com.logicaldoc.util.Context;
 import com.logicaldoc.webservice.AbstractService;
 import com.logicaldoc.webservice.soap.AuthService;
 
@@ -24,37 +21,36 @@ public class SoapAuthService extends AbstractService implements AuthService {
 
 	@Override
 	public String login(String username, String password) throws AuthenticationException {
-		HttpServletRequest request = null;
-		if (context != null) {
-			MessageContext ctx = context.getMessageContext();
-			if (ctx != null)
-				request = (HttpServletRequest) ctx.get(AbstractHTTPDestination.HTTP_REQUEST);
-		}
+		if (Context.get().getProperties().getBoolean("webservice.basicauth.enabled", false))
+			return SessionManager.get().newSession(username, password, getCurrentRequest()).getSid();
+		else
+			throw new AuthenticationException("Basic Authentication is disabled");
+	}
 
-		if (request == null)
-			request = messageContext.getHttpServletRequest();
-
-		Session session = SessionManager.get().newSession(username, password,
-				SessionManager.get().buildClient(request));
+	@Override
+	public String loginApiKey(String apiKey) throws AuthenticationException {
+		Session session = SessionManager.get().newSession(apiKey, getCurrentRequest());
 		return session.getSid();
 	}
 
 	@Override
-	public void logout(String sid) {
-		SessionManager.get().kill(sid);
+	public void logout(String sidOrApiKey) {
+		SessionManager.get().kill(sessionId(sidOrApiKey));
 	}
 
 	@Override
-	public boolean valid(String sid) {
+	public boolean valid(String sidOrApiKey) {
 		if (!isWebserviceEnabled())
 			return false;
-		return SessionManager.get().isOpen(sid);
+
+		return SessionManager.get().isOpen(sessionId(sidOrApiKey));
 	}
 
 	@Override
-	public void renew(String sid) {
+	public void renew(String sidOrApiKey) {
 		if (!isWebserviceEnabled())
 			return;
+		String sid = sessionId(sidOrApiKey);
 		if (SessionManager.get().isOpen(sid))
 			SessionManager.get().renew(sid);
 	}

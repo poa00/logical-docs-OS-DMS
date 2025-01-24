@@ -1,6 +1,8 @@
 package com.logicaldoc.gui.frontend.client.document.signature;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import java.util.List;
+
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.i18n.I18N;
 import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
@@ -34,9 +36,9 @@ public class DigitalSignatureDialog extends Window {
 
 	private DynamicForm form = new DynamicForm();
 
-	private Long[] docIds;
+	private List<Long> docIds;
 
-	public DigitalSignatureDialog(Long[] docIds) {
+	public DigitalSignatureDialog(List<Long> docIds) {
 		super();
 
 		this.docIds = docIds;
@@ -85,13 +87,7 @@ public class DigitalSignatureDialog extends Window {
 
 		addItem(layout);
 
-		SignService.Instance.get().isVisualSignatureEnabled(new AsyncCallback<Boolean>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
+		SignService.Instance.get().isVisualSignatureEnabled(new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(Boolean enabled) {
 				visualPositioning.setDisabled(!enabled);
@@ -104,21 +100,13 @@ public class DigitalSignatureDialog extends Window {
 			return;
 
 		if (Boolean.TRUE.equals(visualPositioning.getValueAsBoolean())) {
-			VisualPositioningDigitalSignatureDialog dialog = new VisualPositioningDigitalSignatureDialog(docIds,
-					vm.getValueAsString(REASON));
-			dialog.show();
+			new VisualPositioningDigitalSignatureDialog(docIds, vm.getValueAsString(REASON)).show();
 			destroy();
 		} else {
 			destroy();
 			LD.contactingServer();
 			SignService.Instance.get().signDocuments(docIds, vm.getValueAsString(REASON), 1, null, null, null,
-					new AsyncCallback<Void>() {
-						@Override
-						public void onFailure(Throwable caught) {
-							LD.clearPrompt();
-							GuiLog.serverError(caught);
-						}
-
+					new DefaultAsyncCallback<>() {
 						@Override
 						public void onSuccess(Void arg) {
 							GuiLog.info(I18N.message("event.signed"), null);
@@ -126,5 +114,16 @@ public class DigitalSignatureDialog extends Window {
 						}
 					});
 		}
+	}
+	
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+	
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

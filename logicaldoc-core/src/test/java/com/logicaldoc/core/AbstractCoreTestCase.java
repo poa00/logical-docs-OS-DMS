@@ -1,16 +1,21 @@
 package com.logicaldoc.core;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.SQLException;
+import java.util.List;
 
 import org.junit.Before;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import com.logicaldoc.core.store.Storer;
+import com.logicaldoc.core.security.apikey.ApiKey;
+import com.logicaldoc.core.security.apikey.ApiKeyDAO;
+import com.logicaldoc.core.store.Store;
 import com.logicaldoc.util.Context;
 import com.logicaldoc.util.io.FileUtil;
 import com.logicaldoc.util.junit.AbstractTestCase;
+import com.logicaldoc.util.plugin.PluginException;
 
 /**
  * Abstract test case for the Core module. This class initialises a test
@@ -24,38 +29,60 @@ import com.logicaldoc.util.junit.AbstractTestCase;
  */
 public abstract class AbstractCoreTestCase extends AbstractTestCase {
 
+	protected static Logger log = LoggerFactory.getLogger(AbstractCoreTestCase.class);
+
+	protected File rootStoreOne;
+
+	protected File rootStoreTwo;
+
+	protected ApiKey apiKey;
+
 	@Before
 	@Override
-	public void setUp() throws FileNotFoundException, IOException, SQLException {
+	public void setUp() throws IOException, SQLException, PluginException {
 		super.setUp();
 		prepareStore();
+
+		// Prepare an API Key
+		ApiKeyDAO dao = Context.get(ApiKeyDAO.class);
+		apiKey = new ApiKey(1L, "MyKey");
+		dao.store(apiKey);
 	}
 
 	@Override
-	protected String[] getSqlScripts() {
-		return new String[] { "/sql/logicaldoc-core.sql", "/data.sql" };
+	protected List<String> getDatabaseScripts() {
+		return List.of("/sql/logicaldoc-core.sql", "/data.sql");
 	}
 
 	private void prepareStore() throws IOException {
-		String storePath = Context.get().getProperties().getProperty("store.1.dir");
-		new File(storePath).mkdir();
-		new File(Context.get().getProperties().getProperty("store.2.dir")).mkdir();
+		/**
+		 * For each test we must prepare different stores folders because
+		 * re-using the same paths cause locks
+		 */
+		rootStoreOne = new File(Context.get().getProperties().getProperty("store.1.dir"));
+		rootStoreTwo = new File(Context.get().getProperties().getProperty("store.2.dir"));
 
-		Storer storer = (Storer) context.getBean("Storer");
-		storer.init();
+		Store store = (Store) context.getBean("Store");
+		store.init();
+
+		/*
+		 * In order to minimize the locks, we write the file only if really
+		 * needed
+		 */
 
 		// Store the file of document 1
-		FileUtil.copyResource("/Digital_Day.pdf", new File(storePath + "/1/doc/1.0"));
-		FileUtil.copyResource("/Digital_Day.pdf", new File(storePath + "/1/doc/1.0-conversion.pdf"));
+		FileUtil.copyResource("/loremipsum.pdf", new File(rootStoreOne.getPath() + "/1/doc/1.0"));
+		FileUtil.copyResource("/loremipsum.pdf", new File(rootStoreOne.getPath() + "/1/doc/1.0-conversion.pdf"));
 
 		// Store the file of document 3
-		FileUtil.copyResource("/small.pdf", new File(storePath + "/3/doc/1.3"));
+		FileUtil.copyResource("/small.pdf", new File(rootStoreOne.getPath() + "/3/doc/1.3"));
 	}
 
 	@Override
 	public void tearDown() throws SQLException {
 		super.tearDown();
-		FileUtil.strongDelete(new File("target/store"));
-		FileUtil.strongDelete(new File("target/store2"));
+
+		FileUtil.delete(rootStoreOne);
+		FileUtil.delete(rootStoreTwo);
 	}
 }

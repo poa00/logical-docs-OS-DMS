@@ -1,9 +1,12 @@
 package com.logicaldoc.gui.frontend.client.search;
 
+import java.util.List;
+
 import com.google.gwt.i18n.client.NumberFormat;
-import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.logicaldoc.gui.common.client.CookiesManager;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
+import com.logicaldoc.gui.common.client.beans.GUIAccessControlEntry;
 import com.logicaldoc.gui.common.client.beans.GUIDocument;
 import com.logicaldoc.gui.common.client.beans.GUIFolder;
 import com.logicaldoc.gui.common.client.beans.GUISearchOptions;
@@ -13,8 +16,8 @@ import com.logicaldoc.gui.common.client.controllers.FolderController;
 import com.logicaldoc.gui.common.client.controllers.FolderObserver;
 import com.logicaldoc.gui.common.client.i18n.I18N;
 import com.logicaldoc.gui.common.client.log.GuiLog;
+import com.logicaldoc.gui.common.client.preview.PreviewPopup;
 import com.logicaldoc.gui.common.client.util.DocUtil;
-import com.logicaldoc.gui.common.client.widgets.preview.PreviewPopup;
 import com.logicaldoc.gui.frontend.client.document.DocumentsPanel;
 import com.logicaldoc.gui.frontend.client.document.grid.ContextMenu;
 import com.logicaldoc.gui.frontend.client.document.grid.Cursor;
@@ -22,6 +25,7 @@ import com.logicaldoc.gui.frontend.client.document.grid.DocumentGridUtil;
 import com.logicaldoc.gui.frontend.client.document.grid.DocumentsGrid;
 import com.logicaldoc.gui.frontend.client.document.grid.DocumentsListGrid;
 import com.logicaldoc.gui.frontend.client.document.grid.DocumentsTileGrid;
+import com.logicaldoc.gui.frontend.client.services.DocumentService;
 import com.logicaldoc.gui.frontend.client.services.FolderService;
 import com.smartgwt.client.widgets.Canvas;
 import com.smartgwt.client.widgets.layout.VLayout;
@@ -47,8 +51,7 @@ public class HitsListPanel extends VLayout implements SearchObserver, DocumentOb
 	public HitsListPanel() {
 		try {
 			if (CookiesManager.get(CookiesManager.COOKIE_HITSLIST_MODE) != null) {
-				visualizationMode = Integer
-						.parseInt(CookiesManager.get(CookiesManager.COOKIE_HITSLIST_MODE));
+				visualizationMode = Integer.parseInt(CookiesManager.get(CookiesManager.COOKIE_HITSLIST_MODE));
 			}
 		} catch (Exception t) {
 			// Nothing to do
@@ -88,21 +91,14 @@ public class HitsListPanel extends VLayout implements SearchObserver, DocumentOb
 				final GUIDocument doc = grid.getSelectedDocument();
 
 				FolderService.Instance.get().getFolder(doc.getFolder().getId(), false, false, false,
-						new AsyncCallback<GUIFolder>() {
-
-							@Override
-							public void onFailure(Throwable caught) {
-								GuiLog.serverError(caught);
-							}
-
+						new DefaultAsyncCallback<>() {
 							@Override
 							public void onSuccess(GUIFolder folder) {
 								if (folder.isDownload()
 										&& "download".equals(Session.get().getInfo().getConfig("gui.doubleclick")))
 									DocUtil.download(doc.getId(), null);
 								else {
-									PreviewPopup iv = new PreviewPopup(doc);
-									iv.show();
+									new PreviewPopup(doc).show();
 								}
 							}
 						});
@@ -129,13 +125,7 @@ public class HitsListPanel extends VLayout implements SearchObserver, DocumentOb
 					/*
 					 * We need to retrieve the folder from the server
 					 */
-					FolderService.Instance.get().getFolder(id, false, false, false, new AsyncCallback<GUIFolder>() {
-
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
-						}
-
+					FolderService.Instance.get().getFolder(id, false, false, false, new DefaultAsyncCallback<>() {
 						@Override
 						public void onSuccess(GUIFolder folder) {
 							showContextMenu(folder, !type.contains(FOLDER));
@@ -173,8 +163,8 @@ public class HitsListPanel extends VLayout implements SearchObserver, DocumentOb
 		 */
 		NumberFormat format = NumberFormat.getFormat("#.###");
 
-		String stats = I18N.message("aboutresults", new String[] { "" + Search.get().getEstimatedHits(),
-				format.format((double) Search.get().getTime() / (double) 1000) });
+		String stats = I18N.message("aboutresults", Long.toString(Search.get().getEstimatedHits()),
+				format.format((double) Search.get().getTime() / (double) 1000));
 		stats += " (<b>" + format.format((double) Search.get().getTime() / (double) 1000) + "</b> "
 				+ I18N.message("seconds").toLowerCase() + ")";
 		searchCursor.setMessage(stats);
@@ -182,9 +172,8 @@ public class HitsListPanel extends VLayout implements SearchObserver, DocumentOb
 		GUISearchOptions options = Search.get().getOptions();
 		if (options.getType() == GUISearchOptions.TYPE_FULLTEXT)
 			grid.setCanExpandRows();
-		GUIDocument[] result = Search.get().getLastResult();
-		if (result != null)
-			grid.setDocuments(result);
+
+		grid.setDocuments(Search.get().getLastResult());
 
 		if (Search.get().isHasMore())
 			GuiLog.warn(I18N.message("possiblemorehits"), I18N.message("possiblemorehitsdetail"));
@@ -212,19 +201,14 @@ public class HitsListPanel extends VLayout implements SearchObserver, DocumentOb
 	}
 
 	private void showContextMenu(GUIFolder folder, final boolean document) {
-		Menu contextMenu = new Menu();
-
 		if (document) {
-			contextMenu = new ContextMenu(folder, grid);
-			if (com.logicaldoc.gui.common.client.Menu.enabled(com.logicaldoc.gui.common.client.Menu.DOCUMENTS)) {
-				MenuItem openInFolder = new MenuItem();
-				openInFolder.setTitle(I18N.message("openinfolder"));
-				openInFolder.addClickHandler(event -> {
-					GUIDocument doc = grid.getSelectedDocument();
-					DocumentsPanel.get().openInFolder(doc.getFolder().getId(), doc.getId());
-				});
-				contextMenu.addItem(openInFolder);
-			}
+			DocumentService.Instance.get().getAllowedPermissions(grid.getSelectedIds(), new DefaultAsyncCallback<>() {
+				@Override
+				public void onSuccess(GUIAccessControlEntry enabledPermissions) {
+					new ContextMenu(folder, grid, enabledPermissions).showContextMenu();
+				}
+			});
+
 		} else {
 			if (com.logicaldoc.gui.common.client.Menu.enabled(com.logicaldoc.gui.common.client.Menu.DOCUMENTS)) {
 				MenuItem openInFolder = new MenuItem();
@@ -233,11 +217,13 @@ public class HitsListPanel extends VLayout implements SearchObserver, DocumentOb
 					GUIDocument doc = grid.getSelectedDocument();
 					DocumentsPanel.get().openInFolder(doc.getFolder().getId(), null);
 				});
+
+				Menu contextMenu = new Menu();
 				contextMenu.addItem(openInFolder);
+				contextMenu.showContextMenu();
 			}
 		}
 
-		contextMenu.showContextMenu();
 	}
 
 	public DocumentsGrid getList() {
@@ -266,6 +252,10 @@ public class HitsListPanel extends VLayout implements SearchObserver, DocumentOb
 
 	@Override
 	public void onFolderChanged(GUIFolder folder) {
+		// Skip record update if it is not a folder
+		if (!isSelectionFolder())
+			return;
+
 		GUIDocument doc = grid.getSelectedDocument();
 		if (doc != null) {
 			doc.setFileName(folder.getName());
@@ -273,6 +263,16 @@ public class HitsListPanel extends VLayout implements SearchObserver, DocumentOb
 			doc.getFolder().setDescription(folder.getDescription());
 			grid.updateDocument(doc);
 		}
+	}
+
+	/**
+	 * This panel can show folders and documents depending on the search, so
+	 * this method check is the currently selected item is a folder
+	 * 
+	 * @return if the currently selection is a folder
+	 */
+	private boolean isSelectionFolder() {
+		return FOLDER.equals(grid.getSelectedDocument().getType());
 	}
 
 	@Override
@@ -291,7 +291,7 @@ public class HitsListPanel extends VLayout implements SearchObserver, DocumentOb
 	}
 
 	@Override
-	public void onDocumentsDeleted(GUIDocument[] documents) {
+	public void onDocumentsDeleted(List<GUIDocument> documents) {
 		// Nothing to do
 	}
 
@@ -302,6 +302,9 @@ public class HitsListPanel extends VLayout implements SearchObserver, DocumentOb
 
 	@Override
 	public void onDocumentModified(GUIDocument document) {
+		// Skip record update if it is a folder
+		if (isSelectionFolder())
+			return;
 		grid.updateDocument(document);
 	}
 
@@ -385,5 +388,15 @@ public class HitsListPanel extends VLayout implements SearchObserver, DocumentOb
 
 	public Cursor getSearchCursor() {
 		return searchCursor;
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

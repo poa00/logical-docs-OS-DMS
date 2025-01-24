@@ -1,5 +1,7 @@
 package com.logicaldoc.gui.frontend.client.services;
 
+import java.util.List;
+
 import com.google.gwt.core.client.GWT;
 import com.google.gwt.user.client.rpc.RemoteService;
 import com.google.gwt.user.client.rpc.RemoteServiceRelativePath;
@@ -65,7 +67,7 @@ public interface WorkflowService extends RemoteService {
 	 * 
 	 * @throws ServerException an error happened in the server application
 	 */
-	public void deleteInstances(String[] ids) throws ServerException;
+	public void deleteInstances(List<String> ids) throws ServerException;
 
 	/**
 	 * Imports a new workflow schema already uploaded
@@ -87,6 +89,15 @@ public interface WorkflowService extends RemoteService {
 	 */
 	public GUIWorkflow save(GUIWorkflow workflow) throws ServerException;
 
+	/**
+	 * Saves just the ACL of a workflow
+	 * 
+	 * @param workflow the workflow to save the ACL
+	 * 
+	 * @throws ServerException an error happened in the server application
+	 */
+	public void saveACL(GUIWorkflow workflow) throws ServerException;
+	
 	/**
 	 * Deploys a given workflow
 	 * 
@@ -114,7 +125,7 @@ public interface WorkflowService extends RemoteService {
 	 * 
 	 * @throws ServerException an error happened in the server applications
 	 */
-	public GUIWorkflow[] list() throws ServerException;
+	public List<GUIWorkflow> list() throws ServerException;
 
 	/**
 	 * Deletes a workflow trigger
@@ -159,9 +170,11 @@ public interface WorkflowService extends RemoteService {
 	 * @param docIds identifiers of the documents appended to the new workflow
 	 *        instance
 	 * 
+	 * @return the new instance's identifier
+	 * 
 	 * @throws ServerException an error happened in the server applications
 	 */
-	public void startWorkflow(String workflowName, String workflowDescription, String tag, String color, Long[] docIds)
+	public String startWorkflow(String workflowName, String workflowDescription, String tag, String color, List<Long> docIds)
 			throws ServerException;
 
 	/**
@@ -186,7 +199,7 @@ public interface WorkflowService extends RemoteService {
 	 * 
 	 * @throws ServerException an error happened in the server applications
 	 */
-	public GUIWorkflow claimTask(String taskId, String userId) throws ServerException;
+	public GUIWorkflow claimTask(String taskId, long userId) throws ServerException;
 
 	/**
 	 * The task is assigned to another user
@@ -198,7 +211,7 @@ public interface WorkflowService extends RemoteService {
 	 * 
 	 * @throws ServerException an error happened in the server applications
 	 */
-	public GUIWorkflow reassignTask(String taskId, String userId) throws ServerException;
+	public GUIWorkflow reassignTask(String taskId, long userId) throws ServerException;
 
 	/**
 	 * The task is reassigned to the pooled users
@@ -239,7 +252,7 @@ public interface WorkflowService extends RemoteService {
 	 * 
 	 * @throws ServerException an error happened in the server applications
 	 */
-	public void appendDocuments(String taskId, Long[] docIds) throws ServerException;
+	public void appendDocuments(String taskId, List<Long> docIds) throws ServerException;
 
 	/**
 	 * Detaches a document from a workflow
@@ -255,13 +268,14 @@ public interface WorkflowService extends RemoteService {
 	 * Adds a new note on the workflow instance
 	 * 
 	 * @param taskId identifier of the task
+	 * @param transitionName name of the transitions (optional)
 	 * @param note the new note
 	 * 
 	 * @return identifier of the new note
 	 * 
 	 * @throws ServerException an error happened in the server applications
 	 */
-	public long addNote(String taskId, String note) throws ServerException;
+	public long addNote(String taskId, String transitionName, String note) throws ServerException;
 
 	/**
 	 * Deletes a note

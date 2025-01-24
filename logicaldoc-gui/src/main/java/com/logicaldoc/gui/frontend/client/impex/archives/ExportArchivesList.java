@@ -1,21 +1,19 @@
 package com.logicaldoc.gui.frontend.client.impex.archives;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIArchive;
 import com.logicaldoc.gui.common.client.data.ArchivesDS;
+import com.logicaldoc.gui.common.client.grid.DateListGridField;
+import com.logicaldoc.gui.common.client.grid.FileSizeListGridField;
+import com.logicaldoc.gui.common.client.grid.IdListGridField;
+import com.logicaldoc.gui.common.client.grid.RefreshableListGrid;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.LD;
-import com.logicaldoc.gui.common.client.util.Util;
 import com.logicaldoc.gui.common.client.widgets.HTMLPanel;
 import com.logicaldoc.gui.common.client.widgets.InfoPanel;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.FileSizeListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.RefreshableListGrid;
 import com.logicaldoc.gui.frontend.client.services.ImpexService;
 import com.smartgwt.client.types.Alignment;
-import com.smartgwt.client.types.ListGridFieldType;
 import com.smartgwt.client.types.SelectionStyle;
 import com.smartgwt.client.widgets.Canvas;
 import com.smartgwt.client.widgets.grid.ListGrid;
@@ -71,8 +69,7 @@ public class ExportArchivesList extends VLayout {
 		listing.setHeight("60%");
 		listing.setShowResizeBar(true);
 
-		ListGridField id = new ListGridField("id", 50);
-		id.setHidden(true);
+		ListGridField id = new IdListGridField();
 
 		ListGridField name = new ListGridField("name", I18N.message("name"), 250);
 		name.setCanFilter(true);
@@ -82,14 +79,7 @@ public class ExportArchivesList extends VLayout {
 		ListGridField typeLabel = new ListGridField("typelabel", I18N.message("type"), 130);
 		typeLabel.setCanFilter(false);
 
-		ListGridField status = new ListGridField(STATUSICON, I18N.message(STATUS), 50);
-		status.setType(ListGridFieldType.IMAGE);
-		status.setCanSort(false);
-		status.setAlign(Alignment.CENTER);
-		status.setShowDefaultContextMenu(false);
-		status.setImageURLPrefix(Util.imagePrefix());
-		status.setImageURLSuffix(".png");
-		status.setCanFilter(false);
+		ListGridField status = new ArchiveStatusListGridField();
 
 		ListGridField created = new DateListGridField("created", "createdon");
 
@@ -113,7 +103,7 @@ public class ExportArchivesList extends VLayout {
 		list.setAutoFetchData(true);
 		list.setWidth100();
 		list.setHeight100();
-		if (this.archivesType == GUIArchive.TYPE_STORAGE)
+		if (this.archivesType == GUIArchive.TYPE_STORE)
 			list.setFields(id, created, name, size, status, creator, closer, aosManager, pathOnServer);
 		else
 			list.setFields(id, created, name, size, status, creator, closer, pathOnServer);
@@ -123,7 +113,7 @@ public class ExportArchivesList extends VLayout {
 		list.setCanFreezeFields(true);
 		list.setFilterOnKeypress(true);
 		list.setShowFilterEditor(true);
-		if (this.archivesType == GUIArchive.TYPE_STORAGE && this.showHistory)
+		if (this.archivesType == GUIArchive.TYPE_STORE && this.showHistory)
 			list.setDataSource(new ArchivesDS(GUIArchive.MODE_EXPORT, this.archivesType, GUIArchive.STATUS_FINALIZED,
 					Session.get().getUser().getId()));
 		else
@@ -161,7 +151,7 @@ public class ExportArchivesList extends VLayout {
 			ListGridRecord rec = list.getSelectedRecord();
 			try {
 				showDetails(Long.parseLong(rec.getAttribute("id")),
-						!Integer.toString(GUIArchive.STATUS_OPENED).equals(rec.getAttribute(STATUS)));
+						!Integer.toString(GUIArchive.STATUS_OPEN).equals(rec.getAttribute(STATUS)));
 			} catch (Exception t) {
 				// Nothing to do
 			}
@@ -189,12 +179,7 @@ public class ExportArchivesList extends VLayout {
 		delete.setTitle(I18N.message("ddelete"));
 		delete.addClickHandler(event -> LD.ask(I18N.message("question"), I18N.message("confirmdelete"), confirm -> {
 			if (Boolean.TRUE.equals(confirm)) {
-				ImpexService.Instance.get().delete(id, new AsyncCallback<Void>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				ImpexService.Instance.get().delete(id, new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Void result) {
 						list.removeSelectedData();
@@ -211,13 +196,14 @@ public class ExportArchivesList extends VLayout {
 
 		MenuItem close = new MenuItem();
 		close.setTitle(I18N.message("close"));
-		close.addClickHandler(event -> LD.ask(I18N.message("question"), I18N.message("confirmarchiveclose"), confirm -> {
-			if (Boolean.TRUE.equals(confirm)) {
-				onClosingArchive(rec);
-			}
-		}));
+		close.addClickHandler(
+				event -> LD.ask(I18N.message("question"), I18N.message("confirmarchiveclose"), confirm -> {
+					if (Boolean.TRUE.equals(confirm)) {
+						onClosingArchive(rec);
+					}
+				}));
 
-		if (GUIArchive.STATUS_OPENED != Integer.parseInt(rec.getAttributeAsString(STATUS)))
+		if (GUIArchive.STATUS_OPEN != Integer.parseInt(rec.getAttributeAsString(STATUS)))
 			close.setEnabled(false);
 
 		if (GUIArchive.STATUS_ERROR != Integer.parseInt(rec.getAttributeAsString(STATUS)))
@@ -244,12 +230,7 @@ public class ExportArchivesList extends VLayout {
 
 	protected void closeArchive(final ListGridRecord rec) {
 		ImpexService.Instance.get().setStatus(Long.parseLong(rec.getAttributeAsString("id")), GUIArchive.STATUS_CLOSED,
-				new AsyncCallback<Void>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Void result) {
 						rec.setAttribute(STATUS, "1");
@@ -281,13 +262,8 @@ public class ExportArchivesList extends VLayout {
 	}
 
 	protected void openArchive(final ListGridRecord rec) {
-		ImpexService.Instance.get().setStatus(Long.parseLong(rec.getAttributeAsString("id")), GUIArchive.STATUS_OPENED,
-				new AsyncCallback<Void>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+		ImpexService.Instance.get().setStatus(Long.parseLong(rec.getAttributeAsString("id")), GUIArchive.STATUS_OPEN,
+				new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Void result) {
 						rec.setAttribute(STATUS, "0");
@@ -305,7 +281,7 @@ public class ExportArchivesList extends VLayout {
 	}
 
 	public void refresh() {
-		if (archivesType == GUIArchive.TYPE_STORAGE && showHistory)
+		if (archivesType == GUIArchive.TYPE_STORE && showHistory)
 			list.refresh(new ArchivesDS(GUIArchive.MODE_EXPORT, archivesType, GUIArchive.STATUS_FINALIZED,
 					Session.get().getUser().getId()));
 		else
@@ -313,5 +289,15 @@ public class ExportArchivesList extends VLayout {
 		detailsContainer.removeMembers(detailsContainer.getMembers());
 		details = SELECT_ELEMENT;
 		detailsContainer.setMembers(details);
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

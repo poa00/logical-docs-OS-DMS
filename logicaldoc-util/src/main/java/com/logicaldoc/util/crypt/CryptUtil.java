@@ -78,7 +78,7 @@ public class CryptUtil {
 			byte[] clearContent = FileUtils.readFileToByteArray(inputFile);
 			byte[] encryptedContent = cipher.doFinal(clearContent);
 			outputFile.mkdirs();
-			FileUtil.strongDelete(outputFile);
+			FileUtil.delete(outputFile);
 			boolean created = outputFile.createNewFile();
 			if (!created)
 				throw new IOException("Cannot create file " + outputFile.getAbsolutePath());
@@ -99,7 +99,7 @@ public class CryptUtil {
 			byte[] encryptedContent = FileUtils.readFileToByteArray(inputFile);
 			byte[] clearContent = cipher.doFinal(encryptedContent);
 			outputFile.mkdirs();
-			FileUtil.strongDelete(outputFile);
+			FileUtil.delete(outputFile);
 			boolean created = outputFile.createNewFile();
 			if (!created)
 				throw new IOException("Cannot create file " + outputFile.getAbsolutePath());
@@ -149,49 +149,22 @@ public class CryptUtil {
 	}
 
 	/**
-	 * This method encodes a given string using the SHA algorithm. This method
-	 * will be dismissed in the future.
-	 * 
-	 * @param original String to encode
-	 * 
-	 * @return Encoded string
-	 */
-	public static String cryptStringLegacy(String original) {
-		StringBuilder copy = new StringBuilder();
-
-		try {
-			MessageDigest md = MessageDigest.getInstance("SHA");
-			byte[] digest = md.digest(original.getBytes(StandardCharsets.UTF_8));
-
-			for (int i = 0; i < digest.length; i++) {
-				copy.append(Integer.toHexString(digest[i] & 0xFF));
-			}
-		} catch (NoSuchAlgorithmException nsae) {
-			log.error(nsae.getMessage());
-		}
-
-		return copy.toString();
-	}
-
-	/**
 	 * This method encodes a given string using the SHA-256 algorithm
 	 * 
 	 * @param original String to encode
 	 * 
 	 * @return Encoded string
+	 * 
+	 * @throws NoSuchAlgorithmException Cripting exception
 	 */
-	public static String cryptString(String original) {
+	public static String encryptSHA256(String original) throws NoSuchAlgorithmException {
 		StringBuilder copy = new StringBuilder();
 
-		try {
-			MessageDigest md = MessageDigest.getInstance("SHA-256");
-			byte[] digest = md.digest(original.getBytes(StandardCharsets.UTF_8));
+		MessageDigest md = MessageDigest.getInstance("SHA-256");
+		byte[] digest = md.digest(original.getBytes(StandardCharsets.UTF_8));
 
-			for (int i = 0; i < digest.length; i++) {
-				copy.append(String.format("%02X", digest[i]));
-			}
-		} catch (NoSuchAlgorithmException nsae) {
-			log.error(nsae.getMessage());
+		for (int i = 0; i < digest.length; i++) {
+			copy.append(String.format("%02X", digest[i]));
 		}
 
 		return copy.toString();

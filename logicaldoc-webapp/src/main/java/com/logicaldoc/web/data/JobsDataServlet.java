@@ -3,6 +3,7 @@ package com.logicaldoc.web.data;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.text.DateFormat;
+import java.util.Date;
 import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -20,7 +21,7 @@ import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.job.JobManager;
 import com.logicaldoc.core.security.Session;
 import com.logicaldoc.core.security.Tenant;
-import com.logicaldoc.core.security.dao.TenantDAO;
+import com.logicaldoc.core.security.TenantDAO;
 import com.logicaldoc.util.Context;
 
 /**
@@ -54,7 +55,7 @@ public class JobsDataServlet extends AbstractDataServlet {
 		 */
 		if (groupsonly) {
 			try {
-				JobManager jobManager = (JobManager) Context.get().getBean(JobManager.class);
+				JobManager jobManager = Context.get(JobManager.class);
 				for (String name : jobManager.getGroups()) {
 					writer.print("<job>");
 					writer.print("<group><![CDATA[" + name + "]]></group>");
@@ -64,7 +65,6 @@ public class JobsDataServlet extends AbstractDataServlet {
 				logger.warn(e.getMessage(), e);
 			}
 		} else {
-
 			try {
 				writeJobs(writer, session, maxRecords, group);
 			} catch (SchedulerException e) {
@@ -75,15 +75,15 @@ public class JobsDataServlet extends AbstractDataServlet {
 	}
 
 	private void writeJobs(PrintWriter writer, Session session, int maxRecords, String group)
-			throws SchedulerException {
+			throws SchedulerException, PersistenceException {
 		DateFormat df = getDateFormat();
 
-		TenantDAO tDao = (TenantDAO) Context.get().getBean(TenantDAO.class);
+		TenantDAO tDao = Context.get(TenantDAO.class);
 		Map<Long, String> tenants = tDao.findAll().stream().collect(Collectors.toMap(t -> t.getId(), Tenant::getName));
 
 		int count = 0;
 
-		JobManager jobManager = (JobManager) Context.get().getBean(JobManager.class);
+		JobManager jobManager = Context.get(JobManager.class);
 		for (Trigger trigger : jobManager.getTriggers(group,
 				session.getTenantId() == Tenant.DEFAULT_ID ? null : session.getTenantId())) {
 			if (count++ >= maxRecords)
@@ -103,10 +103,15 @@ public class JobsDataServlet extends AbstractDataServlet {
 			if (job.getDescription() != null)
 				writer.print("<description><![CDATA[" + job.getDescription() + "]]></description>");
 
-			if (trigger.getPreviousFireTime() != null)
-				writer.print("<previousFire>" + df.format(trigger.getPreviousFireTime()) + "</previousFire>");
-			if (trigger.getNextFireTime() != null)
-				writer.print("<nextFire>" + df.format(trigger.getNextFireTime()) + "</nextFire>");
+			final Date previousFireTime = trigger.getPreviousFireTime();
+			Date nextFireTime = trigger.getNextFireTime();
+			if (previousFireTime != null) {
+				writer.print("<previousFire>" + df.format(previousFireTime) + "</previousFire>");
+				nextFireTime=trigger.getFireTimeAfter(previousFireTime);
+			}
+			
+			if (nextFireTime != null )
+				writer.print("<nextFire>" + df.format(nextFireTime) + "</nextFire>");
 			writer.print("</job>");
 		}
 	}

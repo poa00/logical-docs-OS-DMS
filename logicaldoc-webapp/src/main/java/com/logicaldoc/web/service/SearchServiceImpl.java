@@ -2,7 +2,7 @@ package com.logicaldoc.web.service;
 
 import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.Collections;
+import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -10,15 +10,14 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.logicaldoc.core.PersistenceException;
+import com.logicaldoc.core.document.BookmarkDAO;
 import com.logicaldoc.core.document.Document;
-import com.logicaldoc.core.document.dao.BookmarkDAO;
-import com.logicaldoc.core.document.dao.DocumentDAO;
+import com.logicaldoc.core.document.DocumentDAO;
 import com.logicaldoc.core.i18n.Language;
 import com.logicaldoc.core.i18n.LanguageManager;
 import com.logicaldoc.core.metadata.Attribute;
@@ -30,8 +29,9 @@ import com.logicaldoc.core.searchengine.folder.FolderCriterion;
 import com.logicaldoc.core.searchengine.folder.FolderSearchOptions;
 import com.logicaldoc.core.searchengine.saved.SearchDAO;
 import com.logicaldoc.core.security.Session;
-import com.logicaldoc.core.security.User;
-import com.logicaldoc.core.security.dao.UserDAO;
+import com.logicaldoc.core.security.user.User;
+import com.logicaldoc.core.security.user.UserDAO;
+import com.logicaldoc.core.security.user.UserHistory;
 import com.logicaldoc.gui.common.client.ServerException;
 import com.logicaldoc.gui.common.client.beans.GUIAttribute;
 import com.logicaldoc.gui.common.client.beans.GUICriterion;
@@ -57,17 +57,17 @@ public class SearchServiceImpl extends AbstractRemoteService implements SearchSe
 
 	@Override
 	public GUIResult search(GUISearchOptions options) throws ServerException {
-		Session session = validateSession(getThreadLocalRequest());
+		Session session = validateSession();
 		options.setUserId(session.getUserId());
 
 		GUIResult result = new GUIResult();
 		try {
 			List<Hit> hits = doSearch(options, session, result);
 
-			BookmarkDAO bDao = (BookmarkDAO) Context.get().getBean(BookmarkDAO.class);
+			BookmarkDAO bDao = Context.get(BookmarkDAO.class);
 			List<Long> bookmarks = bDao.findBookmarkedDocs(session.getUserId());
 
-			DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+			DocumentDAO docDao = Context.get(DocumentDAO.class);
 			List<GUIDocument> guiResults = new ArrayList<>();
 			DocumentServiceImpl documentServiceImpl = new DocumentServiceImpl();
 			for (Hit hit : hits) {
@@ -77,7 +77,13 @@ public class SearchServiceImpl extends AbstractRemoteService implements SearchSe
 					guiHit.setIcon(hit.getType());
 				} else {
 					Document doc = docDao.findById(hit.getId());
+					docDao.initialize(doc);
 					if (doc != null) {
+						/*
+						 * Apply the extended attributes. The template object in
+						 * search hits may have not been fully compiled so the
+						 * DocumentServiceImpl.fromDocument doesn't do the job
+						 */
 						guiHit = documentServiceImpl.fromDocument(doc, null, null);
 					} else {
 						log.debug("Unexisting document {}", hit.getId());
@@ -89,11 +95,11 @@ public class SearchServiceImpl extends AbstractRemoteService implements SearchSe
 
 				guiResults.add(guiHit);
 			}
-			result.setHits(guiResults.toArray(new GUIDocument[0]));
+			result.setHits(guiResults);
 
 			return result;
 		} catch (Exception t) {
-			return (GUIResult) throwServerException(session, log, t);
+			return throwServerException(session, log, t);
 		}
 	}
 
@@ -111,9 +117,8 @@ public class SearchServiceImpl extends AbstractRemoteService implements SearchSe
 			guiHit.setIcon(FileUtil.getBaseName(hit.getIcon()));
 
 		/*
-		 * Apply the extended attributes. The template object in search hits may
-		 * have not been fully compiled so the DocumentServiceImpl.fromDocument
-		 * doesn't do the job
+		 * If any extended attribute was retrieved from the fulltext index,
+		 * apply them
 		 */
 		List<GUIAttribute> extList = new ArrayList<>();
 		for (String name : hit.getAttributeNames()) {
@@ -136,7 +141,7 @@ public class SearchServiceImpl extends AbstractRemoteService implements SearchSe
 				ext.setUsername(ext.getStringValue());
 			extList.add(ext);
 		}
-		guiHit.setAttributes(extList.toArray(new GUIAttribute[0]));
+		guiHit.setAttributes(extList);
 	}
 
 	private List<Hit> doSearch(GUISearchOptions options, Session session, GUIResult result) {
@@ -164,8 +169,9 @@ public class SearchServiceImpl extends AbstractRemoteService implements SearchSe
 	private SearchOptions prepareSearchOptions(GUISearchOptions options, Session session) {
 		SearchOptions searchOptions = toSearchOptions(options);
 		searchOptions.setTenantId(session.getTenantId());
+		searchOptions.setTransaction(new UserHistory(session));
 
-		if (searchOptions instanceof FulltextSearchOptions) {
+		if (searchOptions instanceof FulltextSearchOptions fulltextOptions) {
 			Locale exprLoc = LocaleUtil.toLocale(options.getExpressionLanguage());
 
 			Language lang = LanguageManager.getInstance().getLanguage(exprLoc);
@@ -174,7 +180,7 @@ public class SearchServiceImpl extends AbstractRemoteService implements SearchSe
 				exprLoc = LocaleUtil.toLocale(exprLoc.getLanguage());
 
 				if (exprLoc != null)
-					((FulltextSearchOptions) searchOptions).setExpressionLanguage(exprLoc.getLanguage());
+					fulltextOptions.setExpressionLanguage(exprLoc.getLanguage());
 			}
 		}
 		return searchOptions;
@@ -182,7 +188,7 @@ public class SearchServiceImpl extends AbstractRemoteService implements SearchSe
 
 	@Override
 	public boolean save(GUISearchOptions options) throws ServerException {
-		Session session = validateSession(getThreadLocalRequest());
+		Session session = validateSession();
 
 		try {
 			SearchOptions opt = toSearchOptions(options);
@@ -194,20 +200,20 @@ public class SearchServiceImpl extends AbstractRemoteService implements SearchSe
 			search.setDescription(options.getDescription());
 			search.saveOptions(opt);
 
-			SearchDAO dao = (SearchDAO) Context.get().getBean(SearchDAO.class);
+			SearchDAO dao = Context.get(SearchDAO.class);
 			dao.store(search);
 
-			log.debug("Saved query {}", opt.getName());
+			log.debug("Saved search {}", opt.getName());
 			return true;
 		} catch (Exception t) {
-			return (Boolean) throwServerException(session, log, t);
+			return throwServerException(session, log, t);
 		}
 	}
 
 	@Override
-	public void delete(String[] names) throws ServerException {
-		Session session = validateSession(getThreadLocalRequest());
-		SearchDAO dao = (SearchDAO) Context.get().getBean(SearchDAO.class);
+	public void delete(List<String> names) throws ServerException {
+		Session session = validateSession();
+		SearchDAO dao = Context.get(SearchDAO.class);
 
 		try {
 			for (String name : names) {
@@ -223,15 +229,15 @@ public class SearchServiceImpl extends AbstractRemoteService implements SearchSe
 
 	@Override
 	public GUISearchOptions load(String name) throws ServerException {
-		Session session = validateSession(getThreadLocalRequest());
-		SearchDAO dao = (SearchDAO) Context.get().getBean(SearchDAO.class);
+		Session session = validateSession();
+		SearchDAO dao = Context.get(SearchDAO.class);
 
 		try {
 			com.logicaldoc.core.searchengine.saved.SavedSearch search = dao.findByUserIdAndName(session.getUserId(),
 					name);
 			return toGUIOptions(search.readOptions());
 		} catch (Exception t) {
-			return (GUISearchOptions) throwServerException(session, log, t);
+			return throwServerException(session, log, t);
 		}
 	}
 
@@ -246,7 +252,7 @@ public class SearchServiceImpl extends AbstractRemoteService implements SearchSe
 	 * @throws PersistenceException A problem at db level
 	 */
 	public static List<SearchOptions> getSearches(Session session) throws PersistenceException {
-		SearchDAO dao = (SearchDAO) Context.get().getBean(SearchDAO.class);
+		SearchDAO dao = Context.get(SearchDAO.class);
 
 		Map<String, SearchOptions> map = new HashMap<>();
 		List<com.logicaldoc.core.searchengine.saved.SavedSearch> searches = dao.findByUserId(session.getUserId());
@@ -254,13 +260,13 @@ public class SearchServiceImpl extends AbstractRemoteService implements SearchSe
 			try {
 				map.put(search.getName(), search.readOptions());
 			} catch (Exception e) {
-				log.error("Cannot process saved search {} of user {}", search.getName(), session.getUsername(), e);
+				log.error("Cannot process saved search {} of user {}", search.getName(), session.getUsername());
+				log.error(e.getMessage(), e);
 			}
 		}
 
 		return map.values().stream()
-				.sorted((SearchOptions s1, SearchOptions s2) -> s1.getName().compareTo(s2.getName()))
-				.collect(Collectors.toList());
+				.sorted((SearchOptions s1, SearchOptions s2) -> s1.getName().compareTo(s2.getName())).toList();
 	}
 
 	protected GUISearchOptions toGUIOptions(SearchOptions searchOptions) {
@@ -284,7 +290,7 @@ public class SearchServiceImpl extends AbstractRemoteService implements SearchSe
 			op.setCreationFrom(((FulltextSearchOptions) searchOptions).getCreationFrom());
 			op.setCreationTo(((FulltextSearchOptions) searchOptions).getCreationTo());
 			op.setExpressionLanguage(((FulltextSearchOptions) searchOptions).getExpressionLanguage());
-			op.setFields(((FulltextSearchOptions) searchOptions).getFields());
+			op.setFields(new ArrayList<>(((FulltextSearchOptions) searchOptions).getFields()));
 			op.setFormat(((FulltextSearchOptions) searchOptions).getFormat());
 			op.setLanguage(((FulltextSearchOptions) searchOptions).getLanguage());
 			op.setSizeMax(((FulltextSearchOptions) searchOptions).getSizeMax());
@@ -307,32 +313,29 @@ public class SearchServiceImpl extends AbstractRemoteService implements SearchSe
 				criterion.setOperator(crit.getOperator().toLowerCase());
 				criteria.add(criterion);
 			}
-			op.setCriteria(criteria.toArray(new GUICriterion[0]));
+			op.setCriteria(criteria);
 		}
 
-		if (!searchOptions.getFilterIds().isEmpty()) {
-			op.setFilterIds(searchOptions.getFilterIds().toArray(new Long[0]));
-		}
+		op.setFilterIds(new ArrayList<>(searchOptions.getFilterIds()));
 
 		return op;
 	}
 
 	@Override
-	public void shareSearch(String name, long[] userIds, long[] groupIds) throws ServerException {
-		Session session = validateSession(getThreadLocalRequest());
+	public void shareSearch(String name, List<Long> userIds, List<Long> groupIds) throws ServerException {
+		Session session = validateSession();
 
 		try {
 			com.logicaldoc.core.searchengine.saved.SavedSearch search = loadSavedSearch(name, session);
 			if (search == null)
 				return;
 
-			HashSet<Long> users = prepareUsersSet(userIds);
+			List<Long> allUsers = new ArrayList<>();
+			allUsers.addAll(userIds);
+			addUsersFromGroups(groupIds, allUsers);
 
-			addUsersFromGroups(groupIds, users);
-
-			for (Long userId : users) {
+			for (Long userId : allUsers)
 				store(search, userId);
-			}
 		} catch (Exception t) {
 			throwServerException(session, log, t);
 		}
@@ -340,7 +343,7 @@ public class SearchServiceImpl extends AbstractRemoteService implements SearchSe
 
 	private void store(com.logicaldoc.core.searchengine.saved.SavedSearch search, Long userId) {
 		try {
-			SearchDAO dao = (SearchDAO) Context.get().getBean(SearchDAO.class);
+			SearchDAO dao = Context.get(SearchDAO.class);
 			com.logicaldoc.core.searchengine.saved.SavedSearch clone = new com.logicaldoc.core.searchengine.saved.SavedSearch(
 					search);
 			clone.setUserId(userId);
@@ -350,32 +353,20 @@ public class SearchServiceImpl extends AbstractRemoteService implements SearchSe
 		}
 	}
 
-	private void addUsersFromGroups(long[] groupIds, HashSet<Long> users) {
-		if (groupIds != null) {
-			UserDAO gDao = (UserDAO) Context.get().getBean(UserDAO.class);
-			for (Long gId : groupIds) {
-				Set<User> usrs = gDao.findByGroup(gId);
-				for (User user : usrs) {
-					if (!users.contains(user.getId()))
-						users.add(user.getId());
-				}
+	private void addUsersFromGroups(Collection<Long> groupIds, Collection<Long> users) throws PersistenceException {
+		UserDAO gDao = Context.get(UserDAO.class);
+		for (Long gId : groupIds) {
+			Set<User> usrs = gDao.findByGroup(gId);
+			for (User user : usrs) {
+				if (!users.contains(user.getId()))
+					users.add(user.getId());
 			}
 		}
 	}
 
-	private HashSet<Long> prepareUsersSet(long[] userIds) {
-		HashSet<Long> users = new HashSet<>();
-		if (userIds != null)
-			for (Long uId : userIds) {
-				if (!users.contains(uId))
-					users.add(uId);
-			}
-		return users;
-	}
-
 	private com.logicaldoc.core.searchengine.saved.SavedSearch loadSavedSearch(String name, Session session)
 			throws PersistenceException {
-		SearchDAO dao = (SearchDAO) Context.get().getBean(SearchDAO.class);
+		SearchDAO dao = Context.get(SearchDAO.class);
 		return dao.findByUserIdAndName(session.getUserId(), name);
 	}
 
@@ -408,7 +399,7 @@ public class SearchServiceImpl extends AbstractRemoteService implements SearchSe
 			((FulltextSearchOptions) searchOptions).setCreationFrom(convertToJavaDate(options.getCreationFrom()));
 			((FulltextSearchOptions) searchOptions).setCreationTo(convertToJavaDate(options.getCreationTo()));
 			((FulltextSearchOptions) searchOptions).setExpressionLanguage(options.getExpressionLanguage());
-			((FulltextSearchOptions) searchOptions).setFields(options.getFields());
+			((FulltextSearchOptions) searchOptions).setFields(new HashSet<>(options.getFields()));
 			((FulltextSearchOptions) searchOptions).setFormat(options.getFormat());
 			((FulltextSearchOptions) searchOptions).setLanguage(options.getLanguage());
 			((FulltextSearchOptions) searchOptions).setSizeMax(options.getSizeMax());
@@ -443,16 +434,8 @@ public class SearchServiceImpl extends AbstractRemoteService implements SearchSe
 			((FolderSearchOptions) searchOptions).setCriteria(criteria);
 		}
 
-		putFilterIdOptions(options, searchOptions);
+		searchOptions.setFilterIds(new HashSet<>(options.getFilterIds()));
 
 		return searchOptions;
-	}
-
-	private void putFilterIdOptions(GUISearchOptions options, SearchOptions searchOptions) {
-		if (options.getFilterIds() != null && options.getFilterIds().length > 0) {
-			Set<Long> ids = new HashSet<>();
-			Collections.addAll(ids, options.getFilterIds());
-			searchOptions.setFilterIds(ids);
-		}
 	}
 }

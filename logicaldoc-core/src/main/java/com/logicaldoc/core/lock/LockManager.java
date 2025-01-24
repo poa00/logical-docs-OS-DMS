@@ -6,8 +6,11 @@ import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.List;
 
+import javax.annotation.Resource;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
 
 import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.generic.Generic;
@@ -21,21 +24,29 @@ import com.logicaldoc.util.config.ContextProperties;
  * @author Marco Meschieri - LogicalDOC
  * @since 6.5
  */
+@Component("lockManager")
 public class LockManager {
 	private static final String LOCK = "lock";
 
 	protected Logger log = LoggerFactory.getLogger(LockManager.class);
 
+	@Resource(name = "GenericDAO")
 	private GenericDAO genericDao;
 
+	@Resource(name = "ContextProperties")
 	private ContextProperties config;
+	
+	public LockManager(GenericDAO genericDao, ContextProperties config) {
+		super();
+		this.genericDao = genericDao;
+		this.config = config;
+	}
 
 	/**
 	 * Gets all the transaction ids associated to the locks
 	 * 
 	 * @return the lists of transactions
 	 */
-	@SuppressWarnings("unchecked")
 	public List<String> getAllTransactions() {
 		try {
 			return genericDao.queryForList(
@@ -56,20 +67,26 @@ public class LockManager {
 	 */
 	public boolean get(String lockName, String transactionId) {
 		GregorianCalendar cal = new GregorianCalendar();
-		cal.add(Calendar.SECOND, config.getInt("lock.wait"));
+		cal.add(Calendar.SECOND, config.getInt("lock.wait", 10));
 		Date ldDate = cal.getTime();
 		while (new Date().before(ldDate)) {
-			if (getInternal(lockName, transactionId)) {
-				log.debug("Acquired lock {}", lockName);
-				return true;
-			} else
-				synchronized (this) {
-					try {
+			try {
+				if (getInternal(lockName, transactionId)) {
+					log.debug("Acquired lock {}", lockName);
+					return true;
+				} else {
+					synchronized (this) {
 						wait(1000);
-					} catch (InterruptedException e) {
-						Thread.currentThread().interrupt();
 					}
 				}
+			} catch (PersistenceException e) {
+				log.warn(e.getMessage(), e);
+			} catch (InterruptedException ie) {
+				log.warn("Interrupted", ie);
+				
+				// Restore interrupted state
+				Thread.currentThread().interrupt();
+			}
 		}
 
 		log.warn("Unable to get lock  {}", lockName);
@@ -85,8 +102,9 @@ public class LockManager {
 	 * 
 	 * @param lockName The lock name
 	 * @param transactionId The transaction ID
+	 * @throws PersistenceException
 	 */
-	public void release(String lockName, String transactionId) {
+	public void release(String lockName, String transactionId) throws PersistenceException {
 		if (lockName == null || transactionId == null)
 			return;
 
@@ -103,7 +121,7 @@ public class LockManager {
 		}
 	}
 
-	protected boolean getInternal(String lockName, String transactionId) {
+	protected boolean getInternal(String lockName, String transactionId) throws PersistenceException {
 		Date today = new Date();
 		Generic lock = genericDao.findByAlternateKey(LOCK, getSubType(lockName), null, Tenant.DEFAULT_ID);
 		try {
@@ -139,11 +157,4 @@ public class LockManager {
 		}
 	}
 
-	public void setGenericDao(GenericDAO genericDao) {
-		this.genericDao = genericDao;
-	}
-
-	public void setConfig(ContextProperties config) {
-		this.config = config;
-	}
 }

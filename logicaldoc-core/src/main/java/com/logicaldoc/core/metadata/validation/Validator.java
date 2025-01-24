@@ -11,16 +11,17 @@ import org.hibernate.LazyInitializationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.logicaldoc.core.History;
 import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.RunLevel;
 import com.logicaldoc.core.automation.Automation;
+import com.logicaldoc.core.automation.AutomationException;
+import com.logicaldoc.core.history.History;
 import com.logicaldoc.core.metadata.Attribute;
 import com.logicaldoc.core.metadata.ExtensibleObject;
 import com.logicaldoc.core.metadata.Template;
 import com.logicaldoc.core.metadata.TemplateDAO;
-import com.logicaldoc.core.security.User;
-import com.logicaldoc.core.security.dao.UserDAO;
+import com.logicaldoc.core.security.user.User;
+import com.logicaldoc.core.security.user.UserDAO;
 import com.logicaldoc.util.Context;
 
 /**
@@ -43,8 +44,11 @@ public class Validator {
 	 * 
 	 * @throws ValidationException in case of invalid object, this exception
 	 *         contains all the errors descriptions
+	 * @throws AutomationException the automation has been evaluated but
+	 *         produced an error
 	 */
-	public void validate(ExtensibleObject object, Template template, History transaction) throws ValidationException {
+	public void validate(ExtensibleObject object, Template template, History transaction)
+			throws ValidationException, AutomationException {
 		if (!RunLevel.current().aspectEnabled("validation"))
 			return;
 
@@ -93,7 +97,7 @@ public class Validator {
 				// not
 				// be loaded, so load the bean again and initialize it.
 				log.debug("Got error {} trying to reload the template {}", e.getMessage(), template.getId());
-				TemplateDAO tDao = (TemplateDAO) Context.get().getBean(TemplateDAO.class);
+				TemplateDAO tDao = Context.get(TemplateDAO.class);
 				try {
 					template = tDao.findById(template.getId());
 					tDao.initialize(template);
@@ -106,7 +110,7 @@ public class Validator {
 	}
 
 	private void validateAttributes(ExtensibleObject object, Template template, History transaction,
-			Map<String, String> errors) {
+			Map<String, String> errors) throws AutomationException {
 		for (String attributeName : template.getAttributeNames()) {
 			Attribute attribute = object.getAttribute(attributeName);
 			if (attribute == null)
@@ -119,7 +123,7 @@ public class Validator {
 	}
 
 	private void executeObjectValidation(ExtensibleObject object, Template template, History transaction,
-			Map<String, String> errors) {
+			Map<String, String> errors) throws AutomationException {
 
 		Map<String, Object> automationDictionary = new HashMap<>();
 		automationDictionary.put("object", object);
@@ -141,7 +145,7 @@ public class Validator {
 	}
 
 	private void executeAttributeValidation(ExtensibleObject object, History transaction, Map<String, String> errors,
-			String attributeName, Attribute attribute, Attribute templateAttribute) {
+			String attributeName, Attribute attribute, Attribute templateAttribute) throws AutomationException {
 		Map<String, Object> fieldValidationDictionary = new HashMap<>();
 		fieldValidationDictionary.put("object", object);
 		fieldValidationDictionary.put("event", transaction);
@@ -165,7 +169,7 @@ public class Validator {
 	private void setUser(History transaction) {
 		User user = transaction != null && transaction.getUser() != null ? transaction.getUser() : null;
 		if (user == null && transaction != null && transaction.getUserId() != null) {
-			UserDAO uDao = (UserDAO) Context.get().getBean(UserDAO.class);
+			UserDAO uDao = Context.get(UserDAO.class);
 			try {
 				user = uDao.findById(transaction.getUserId());
 				transaction.setUser(user);

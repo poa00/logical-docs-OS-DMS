@@ -1,6 +1,8 @@
 package com.logicaldoc.gui.common.client.beans;
 
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Represents a Menu from the GUI view
@@ -34,9 +36,7 @@ public class GUIMenu implements Serializable {
 
 	private int position = 0;
 
-	private GUIRight[] rights = new GUIRight[] {};
-
-	private Long securityRef;
+	private List<GUIAccessControlEntry> accessControlList = new ArrayList<>();
 
 	private int type = 0;
 
@@ -56,12 +56,12 @@ public class GUIMenu implements Serializable {
 		this.name = name;
 	}
 
-	public GUIRight[] getRights() {
-		return rights;
+	public List<GUIAccessControlEntry> getAccessControlList() {
+		return accessControlList;
 	}
 
-	public void setRights(GUIRight[] rights) {
-		this.rights = rights;
+	public void setAccessControlList(List<GUIAccessControlEntry> accessControlList) {
+		this.accessControlList = accessControlList;
 	}
 
 	public boolean isEnabled() {
@@ -112,19 +112,31 @@ public class GUIMenu implements Serializable {
 		this.parentId = parentId;
 	}
 
-	public Long getSecurityRef() {
-		return securityRef;
-	}
-
-	public void setSecurityRef(Long securityRef) {
-		this.securityRef = securityRef;
-	}
-
 	public int getType() {
 		return type;
 	}
 
 	public void setType(int type) {
 		this.type = type;
+	}
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result + (int) (id ^ (id >>> 32));
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		GUIMenu other = (GUIMenu) obj;
+		return id == other.id;
 	}
 }

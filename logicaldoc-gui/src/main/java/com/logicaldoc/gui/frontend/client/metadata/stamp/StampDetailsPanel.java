@@ -1,9 +1,8 @@
 package com.logicaldoc.gui.frontend.client.metadata.stamp;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIStamp;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.widgets.EditingTabSet;
 import com.logicaldoc.gui.frontend.client.services.StampService;
 import com.smartgwt.client.widgets.form.fields.events.ChangedEvent;
@@ -34,9 +33,9 @@ public class StampDetailsPanel extends VLayout {
 
 	private StampParameters parametersPanel;
 
-	private Layout usersTabPanel;
+	private Layout securityTabPanel;
 
-	private StampUsersPanel usersPanel;
+	private StampSecurity securityPanel;
 
 	public StampDetailsPanel(StampsPanel stampsPanel) {
 		super();
@@ -48,12 +47,7 @@ public class StampDetailsPanel extends VLayout {
 
 		tabSet = new EditingTabSet(saveEvent -> onSave(), cancelEvent -> {
 			if (stamp.getId() != 0) {
-				StampService.Instance.get().getStamp(stamp.getId(), new AsyncCallback<GUIStamp>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				StampService.Instance.get().getStamp(stamp.getId(), new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(GUIStamp stamp) {
 						setStamp(stamp);
@@ -80,12 +74,12 @@ public class StampDetailsPanel extends VLayout {
 		parametersTab.setPane(parametersTabPanel);
 		tabSet.addTab(parametersTab);
 
-		Tab usersTab = new Tab(I18N.message("users"));
-		usersTabPanel = new HLayout();
-		usersTabPanel.setWidth100();
-		usersTabPanel.setHeight100();
-		usersTab.setPane(usersTabPanel);
-		tabSet.addTab(usersTab);
+		Tab securityTab = new Tab(I18N.message("security"));
+		securityTabPanel = new HLayout();
+		securityTabPanel.setWidth100();
+		securityTabPanel.setHeight100();
+		securityTab.setPane(securityTabPanel);
+		tabSet.addTab(securityTab);
 
 		addMember(tabSet);
 	}
@@ -105,10 +99,10 @@ public class StampDetailsPanel extends VLayout {
 				parametersTabPanel.removeMember(parametersPanel);
 		}
 
-		if (usersPanel != null) {
-			usersPanel.destroy();
-			if (Boolean.TRUE.equals(usersTabPanel.contains(usersPanel)))
-				usersTabPanel.removeMember(usersPanel);
+		if (securityPanel != null) {
+			securityPanel.destroy();
+			if (Boolean.TRUE.equals(securityTabPanel.contains(securityPanel)))
+				securityTabPanel.removeMember(securityPanel);
 		}
 
 		ChangedHandler changeHandler = (ChangedEvent event) -> onModified();
@@ -119,8 +113,8 @@ public class StampDetailsPanel extends VLayout {
 		parametersPanel = new StampParameters(stamp, changeHandler);
 		parametersTabPanel.addMember(parametersPanel);
 
-		usersPanel = new StampUsersPanel(stamp.getId());
-		usersTabPanel.addMember(usersPanel);
+		securityPanel = new StampSecurity(stamp, changeHandler);
+		securityTabPanel.addMember(securityPanel);
 	}
 
 	public GUIStamp getStamp() {
@@ -148,12 +142,7 @@ public class StampDetailsPanel extends VLayout {
 
 	public void onSave() {
 		if (validate()) {
-			StampService.Instance.get().save(stamp, new AsyncCallback<GUIStamp>() {
-				@Override
-				public void onFailure(Throwable caught) {
-					GuiLog.serverError(caught);
-				}
-
+			StampService.Instance.get().save(stamp, new DefaultAsyncCallback<>() {
 				@Override
 				public void onSuccess(GUIStamp stamp) {
 					tabSet.hideSave();
@@ -163,5 +152,15 @@ public class StampDetailsPanel extends VLayout {
 				}
 			});
 		}
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

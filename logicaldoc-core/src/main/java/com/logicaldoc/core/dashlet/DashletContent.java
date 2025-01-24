@@ -30,17 +30,18 @@ import org.springframework.jdbc.core.RowMapper;
 
 import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.automation.Automation;
+import com.logicaldoc.core.automation.AutomationException;
 import com.logicaldoc.core.document.Document;
+import com.logicaldoc.core.document.DocumentDAO;
 import com.logicaldoc.core.document.DocumentHistory;
+import com.logicaldoc.core.document.DocumentHistoryDAO;
 import com.logicaldoc.core.document.DocumentNote;
-import com.logicaldoc.core.document.dao.DocumentDAO;
-import com.logicaldoc.core.document.dao.DocumentHistoryDAO;
-import com.logicaldoc.core.document.dao.DocumentNoteDAO;
+import com.logicaldoc.core.document.DocumentNoteDAO;
 import com.logicaldoc.core.metadata.Attribute;
-import com.logicaldoc.core.security.Menu;
 import com.logicaldoc.core.security.Session;
 import com.logicaldoc.core.security.SessionManager;
-import com.logicaldoc.core.security.dao.MenuDAO;
+import com.logicaldoc.core.security.menu.Menu;
+import com.logicaldoc.core.security.menu.MenuDAO;
 import com.logicaldoc.core.util.IconSelector;
 import com.logicaldoc.i18n.I18N;
 import com.logicaldoc.util.Context;
@@ -69,19 +70,19 @@ public class DashletContent extends HttpServlet {
 		try {
 			Session session = validateSession(request);
 
-			MenuDAO mDao = (MenuDAO) Context.get().getBean(MenuDAO.class);
+			MenuDAO mDao = Context.get(MenuDAO.class);
 			boolean showSid = mDao.isReadEnable(Menu.SESSIONS, session.getUserId());
 
 			Locale locale = LocaleUtil.toLocale(request.getParameter("locale"));
 			long dashletId = Long.parseLong(request.getParameter("dashletId"));
 
 			// Avoid resource caching
+			response.setHeader("Cache-Control", "no-cache,no-store,must-revalidate");
+			response.setHeader("Expires", "0");
 			response.setHeader("Pragma", "no-cache");
-			response.setHeader("Cache-Control", "no-store");
-			response.setDateHeader("Expires", 0);
 			response.setCharacterEncoding("UTF-8");
 
-			DashletDAO dao = (DashletDAO) Context.get().getBean(DashletDAO.class);
+			DashletDAO dao = Context.get(DashletDAO.class);
 			Dashlet dashlet = dao.findById(dashletId);
 			if (Dashlet.TYPE_CONTENT.equals(dashlet.getType()))
 				response.setContentType("text/html");
@@ -106,7 +107,8 @@ public class DashletContent extends HttpServlet {
 				handleNote(dashlet, dashletDictionary, automation, writer);
 			else if (Dashlet.TYPE_CONTENT.equals(dashlet.getType()))
 				handleContent(dashlet, dashletDictionary, automation, writer);
-		} catch (NumberFormatException | ServletException | PersistenceException | IOException e) {
+		} catch (NumberFormatException | ServletException | PersistenceException | IOException
+				| AutomationException e) {
 			log.error(e.getMessage(), e);
 			try {
 				response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, e.getMessage());
@@ -124,7 +126,7 @@ public class DashletContent extends HttpServlet {
 
 	private void handleDocumentEvent(boolean showSid, Locale locale, Dashlet dashlet,
 			Map<String, Object> dashletDictionary, Automation automation, PrintWriter writer)
-			throws PersistenceException {
+			throws PersistenceException, AutomationException {
 		if (StringUtils.isNotEmpty(dashlet.getContent())) {
 			String content = automation.evaluate(dashlet.getContent(), dashletDictionary);
 			if (StringUtils.isNotEmpty(content))
@@ -132,7 +134,7 @@ public class DashletContent extends HttpServlet {
 		} else {
 			writer.write(LIST_TAG);
 
-			DocumentHistoryDAO hdao = (DocumentHistoryDAO) Context.get().getBean(DocumentHistoryDAO.class);
+			DocumentHistoryDAO hdao = Context.get(DocumentHistoryDAO.class);
 			String query = automation.evaluate(dashlet.getQuery(), dashletDictionary);
 			List<DocumentHistory> records = hdao.findByObjectQuery(query.trim(), (Map<String, Object>) null,
 					dashlet.getUnique() == 0 ? dashlet.getMax() : null);
@@ -146,7 +148,7 @@ public class DashletContent extends HttpServlet {
 			if (!uniqueRecords.isEmpty()) {
 				String docIds = uniqueRecords.stream().map(h -> Long.toString(h.getDocId()))
 						.collect(Collectors.joining(","));
-				DocumentDAO ddao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+				DocumentDAO ddao = Context.get(DocumentDAO.class);
 				List<Document> docs = ddao.findByObjectQuery("from Document where id in (" + docIds + ")",
 						(Map<String, Object>) null, null);
 				for (Document document : docs)
@@ -283,7 +285,7 @@ public class DashletContent extends HttpServlet {
 		qry.append(attrs.stream().map(a -> "'" + a + "'").collect(Collectors.joining(",")));
 		qry.append(")");
 
-		DocumentDAO dao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO dao = Context.get(DocumentDAO.class);
 		dao.query(qry.toString(), new EntendedAttributesRowMapper(locale, extValues), null);
 	}
 
@@ -318,16 +320,14 @@ public class DashletContent extends HttpServlet {
 			Object val = extValues.get(key);
 			if (val != null) {
 				writer.print("<ext_" + name + ">");
-				if (val instanceof Date)
-					writer.print(df.format((Date) val));
-				else if (val instanceof Integer)
-					writer.print(Integer.toString((Integer) val));
-				else if (val instanceof Long)
-					writer.print(Long.toString((Long) val));
-				else if (val instanceof Double)
-					writer.print(Double.toString((Double) val));
-				else
-					writer.print("<![CDATA[" + val + "]]>");
+				switch (val) {
+					case Date date -> writer.print(df.format(date));
+					case Integer integer -> writer.print(Integer.toString(integer));
+					case Long longVal -> writer.print(Long.toString(longVal));
+					case Double doubleVal -> writer.print(Double.toString(doubleVal));
+					case String str -> writer.print(str);
+					default -> throw new IllegalArgumentException("Unexpected value: " + val);
+				}
 				writer.print("</ext_" + name + ">");
 			}
 		}
@@ -346,21 +346,21 @@ public class DashletContent extends HttpServlet {
 		if (value == null)
 			return;
 		writer.write("<" + fieldName + ">");
-		if (value instanceof String)
-			writer.write("<![CDATA[" + (String) value + "]]>");
+		if (value instanceof String string)
+			writer.write("<![CDATA[" + string + "]]>");
 		else
 			writer.write(value.toString());
 		writer.write("</" + fieldName + ">");
 	}
 
 	private void handleDocument(Locale locale, Dashlet dashlet, Map<String, Object> dashletDictionary,
-			Automation automation, PrintWriter writer) throws PersistenceException {
+			Automation automation, PrintWriter writer) throws PersistenceException, AutomationException {
 		if (StringUtils.isNotEmpty(dashlet.getContent())) {
 			String content = automation.evaluate(dashlet.getContent(), dashletDictionary);
 			if (StringUtils.isNotEmpty(content))
 				writer.write(content.trim());
 		} else {
-			DocumentDAO dao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+			DocumentDAO dao = Context.get(DocumentDAO.class);
 			String query = automation.evaluate(dashlet.getQuery(), dashletDictionary);
 
 			List<Document> records = dao.findByObjectQuery(query.trim(), (Map<String, Object>) null, dashlet.getMax());
@@ -507,7 +507,7 @@ public class DashletContent extends HttpServlet {
 	}
 
 	private void handleNote(Dashlet dashlet, Map<String, Object> dashletDictionary, Automation automation,
-			PrintWriter writer) {
+			PrintWriter writer) throws AutomationException {
 
 		if (StringUtils.isNotEmpty(dashlet.getContent())) {
 			String content = automation.evaluate(dashlet.getContent(), dashletDictionary);
@@ -516,7 +516,7 @@ public class DashletContent extends HttpServlet {
 		} else {
 			writer.write(LIST_TAG);
 
-			DocumentNoteDAO dao = (DocumentNoteDAO) Context.get().getBean(DocumentNoteDAO.class);
+			DocumentNoteDAO dao = Context.get(DocumentNoteDAO.class);
 			String query = automation.evaluate(dashlet.getQuery(), dashletDictionary);
 			List<DocumentNote> records = new ArrayList<>();
 			try {
@@ -554,7 +554,7 @@ public class DashletContent extends HttpServlet {
 	}
 
 	private void handleContent(Dashlet dashlet, Map<String, Object> dashletDictionary, Automation automation,
-			PrintWriter writer) {
+			PrintWriter writer) throws AutomationException {
 		String content = automation.evaluate(dashlet.getContent(), dashletDictionary);
 		if (StringUtils.isNotEmpty(content))
 			writer.write(content.trim());
@@ -607,7 +607,8 @@ public class DashletContent extends HttpServlet {
 				extValues.put(key, rs.getDouble(6));
 			} else if (type == Attribute.TYPE_DATE) {
 				extValues.put(key, rs.getTimestamp(7));
-			} else if (type == Attribute.TYPE_USER || type == Attribute.TYPE_FOLDER) {
+			} else if (type == Attribute.TYPE_USER || type == Attribute.TYPE_FOLDER
+					|| type == Attribute.TYPE_DOCUMENT) {
 				extValues.put(key, rs.getString(4));
 			} else if (type == Attribute.TYPE_BOOLEAN) {
 				extValues.put(key, rs.getLong(5) == 1L ? I18N.message("true", locale) : I18N.message("false", locale));

@@ -1,5 +1,7 @@
 package com.logicaldoc.core.searchengine;
 
+import java.util.Objects;
+
 import com.logicaldoc.core.document.Document;
 
 /**
@@ -44,30 +46,38 @@ public class Hit extends Document implements Comparable<Hit> {
 
 	@Override
 	public int compareTo(Hit other) {
-		try {
-			if (other == null)
-				return -1;
-
-			if (this.equals(other))
-				return 0;
-
-			if (other.score == this.score) {
-				if (this.getFileName() != null)
-					return this.getFileName().compareToIgnoreCase(other.getFileName());
-				else
-					return 0;
-			} else
-				return -1 * Integer.compare(this.score, other.score);
-		} catch (Exception t) {
+		if (this.equals(other))
 			return 0;
-		}
+
+		if (other.score == this.score) {
+			if (Objects.toString(this.getFileName(), "").equalsIgnoreCase(Objects.toString(other.getFileName(), "")))
+				return Long.compare(getId(), other.getId());
+			else
+				return Objects.toString(this.getFileName(), "")
+						.compareToIgnoreCase(Objects.toString(other.getFileName(), ""));
+		} else
+			return Integer.compare(other.score, this.score);
+	}
+
+	@Override
+	public int hashCode() {
+		int result;
+		result = getClass().getName().hashCode();
+		result = 29 * result + Long.valueOf(getId()).hashCode();
+		return result;
 	}
 
 	@Override
 	public boolean equals(Object obj) {
-		if (!(obj instanceof Hit))
+		if (this == obj)
+			return true;
+
+		if (obj == null)
 			return false;
-		Hit other = (Hit) obj;
-		return other.getId() == this.getId();
+
+		if (obj instanceof Hit other)
+			return other.getId() == this.getId();
+		else
+			return false;
 	}
 }

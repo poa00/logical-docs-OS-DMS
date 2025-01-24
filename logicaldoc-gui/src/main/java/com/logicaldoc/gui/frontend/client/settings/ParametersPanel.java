@@ -1,8 +1,9 @@
 package com.logicaldoc.gui.frontend.client.settings;
 
 import java.util.ArrayList;
+import java.util.List;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIParameter;
 import com.logicaldoc.gui.common.client.i18n.I18N;
@@ -38,22 +39,16 @@ public class ParametersPanel extends AdminPanel {
 
 	@Override
 	protected void onDraw() {
-		SettingService.Instance.get().loadSettings(new AsyncCallback<GUIParameter[]>() {
-
+		SettingService.Instance.get().loadSettings(new DefaultAsyncCallback<>() {
 			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
-			@Override
-			public void onSuccess(GUIParameter[] settings) {
+			public void onSuccess(List<GUIParameter> settings) {
 				initGUI(settings);
 			}
 
 		});
 	}
 
-	private void initGUI(GUIParameter[] settings) {
+	private void initGUI(List<GUIParameter> settings) {
 		ListGridField parameter = new ListGridField(PARAMETER, I18N.message(PARAMETER));
 		parameter.setAutoFitWidth(true);
 		parameter.setCanEdit(false);
@@ -68,6 +63,7 @@ public class ParametersPanel extends AdminPanel {
 		parametersGrid.setHeight100();
 		parametersGrid.setAutoFetchData(true);
 		parametersGrid.setCanSelectAll(false);
+		parametersGrid.setCanSort(false);
 		parametersGrid.setSelectionType(SelectionStyle.SINGLE);
 		parametersGrid
 				.setCanEdit(!Session.get().isDemo() && Session.get().isAdmin() && Session.get().isDefaultTenant());
@@ -78,15 +74,14 @@ public class ParametersPanel extends AdminPanel {
 		parametersGrid.setShowRecordComponentsByCell(true);
 		parametersGrid.setFields(parameter, value);
 
-		ListGridRecord[] records = new ListGridRecord[settings.length];
-		int i = 0;
+		List<ListGridRecord> records = new ArrayList<>();
 		for (GUIParameter guiParameter : settings) {
-			records[i] = new ListGridRecord();
-			records[i].setAttribute(VALUE, guiParameter.getValue());
-			records[i].setAttribute(PARAMETER, guiParameter.getName());
-			i++;
+			ListGridRecord rec = new ListGridRecord();
+			rec.setAttribute(VALUE, guiParameter.getValue());
+			rec.setAttribute(PARAMETER, guiParameter.getName());
+			records.add(rec);
 		}
-		parametersGrid.setRecords(records);
+		parametersGrid.setRecords(records.toArray(new ListGridRecord[0]));
 
 		IButton save = new IButton();
 		save.setTitle(I18N.message("save"));
@@ -99,13 +94,7 @@ public class ParametersPanel extends AdminPanel {
 				params.add(param);
 			}
 
-			SettingService.Instance.get().saveSettings(params.toArray(new GUIParameter[0]), new AsyncCallback<Void>() {
-
-				@Override
-				public void onFailure(Throwable caught) {
-					GuiLog.serverError(caught);
-				}
-
+			SettingService.Instance.get().saveSettings(params, new DefaultAsyncCallback<>() {
 				@Override
 				public void onSuccess(Void ret) {
 					GuiLog.info(I18N.message("settingssaved"), null);

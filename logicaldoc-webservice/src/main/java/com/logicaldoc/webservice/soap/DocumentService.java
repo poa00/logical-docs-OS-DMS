@@ -1,6 +1,7 @@
 package com.logicaldoc.webservice.soap;
 
 import java.io.IOException;
+import java.util.List;
 
 import javax.activation.DataHandler;
 import javax.jws.WebMethod;
@@ -10,11 +11,13 @@ import javax.jws.WebService;
 import javax.mail.MessagingException;
 
 import com.logicaldoc.core.PersistenceException;
-import com.logicaldoc.core.parser.ParseException;
+import com.logicaldoc.core.parser.ParsingException;
 import com.logicaldoc.core.security.authentication.AuthenticationException;
 import com.logicaldoc.core.security.authorization.PermissionException;
+import com.logicaldoc.core.security.authorization.UnexistingResourceException;
 import com.logicaldoc.webservice.WebserviceException;
 import com.logicaldoc.webservice.doc.WSDoc;
+import com.logicaldoc.webservice.model.WSAccessControlEntry;
 import com.logicaldoc.webservice.model.WSDocument;
 import com.logicaldoc.webservice.model.WSLink;
 import com.logicaldoc.webservice.model.WSNote;
@@ -90,6 +93,7 @@ public interface DocumentService {
 	 * @throws AuthenticationException Invalid session
 	 * @throws PermissionException The user does not have the required
 	 *         permission
+	 * @throws UnexistingResourceException The requested document does not exist
 	 */
 	@WebMethod(action = "lock")
 	@WSDoc(description = "locks an existing document with the given identifier")
@@ -97,7 +101,8 @@ public interface DocumentService {
 	@WebParam(name = "sid")
 	String sid, @WSDoc(description = "Document ID", required = true)
 	@WebParam(name = "docId")
-	long docId) throws AuthenticationException, WebserviceException, PersistenceException, PermissionException;
+	long docId) throws AuthenticationException, WebserviceException, PersistenceException, PermissionException,
+			UnexistingResourceException;
 
 	/**
 	 * Unlocks an existing document with the given identifier.
@@ -110,6 +115,7 @@ public interface DocumentService {
 	 * @throws AuthenticationException Invalid session
 	 * @throws PermissionException The user does not have the required
 	 *         permission
+	 * @throws UnexistingResourceException The specified document does not exist
 	 */
 	@WebMethod(action = "unlock")
 	@WSDoc(description = "unlocks an existing document with the given identifier")
@@ -117,7 +123,8 @@ public interface DocumentService {
 	@WebParam(name = "sid")
 	String sid, @WSDoc(description = "identifier of the document", required = true)
 	@WebParam(name = "docId")
-	long docId) throws AuthenticationException, WebserviceException, PersistenceException, PermissionException;
+	long docId) throws AuthenticationException, WebserviceException, PersistenceException, PermissionException,
+			UnexistingResourceException;
 
 	/**
 	 * Renames the title of an existing document with the given identifier.
@@ -131,6 +138,7 @@ public interface DocumentService {
 	 * @throws AuthenticationException Invalid session
 	 * @throws PermissionException The user does not have the required
 	 *         permission
+	 * @throws UnexistingResourceException The specified document does not exist
 	 */
 	@WebMethod(action = "rename")
 	@WSDoc(description = "renames the title of an existing document with the given identifier")
@@ -139,7 +147,8 @@ public interface DocumentService {
 	String sid, @WSDoc(description = "Document ID", required = true)
 	@WebParam(name = "docId")
 	long docId, @WebParam(name = "name")
-	String name) throws AuthenticationException, WebserviceException, PersistenceException, PermissionException;
+	String name) throws AuthenticationException, WebserviceException, PersistenceException, PermissionException,
+			UnexistingResourceException;
 
 	/**
 	 * Moves an existing document with the given identifier.
@@ -153,6 +162,7 @@ public interface DocumentService {
 	 * @throws AuthenticationException Invalid session
 	 * @throws PermissionException The user does not have the required
 	 *         permission
+	 * @throws UnexistingResourceException The specified document does not exist
 	 */
 	@WebMethod(action = "move")
 	@WSDoc(description = "moves an existing document with the given identifier")
@@ -162,7 +172,8 @@ public interface DocumentService {
 	@WebParam(name = "docId")
 	long docId, @WSDoc(description = "identifier of the new document's folder")
 	@WebParam(name = "folderId")
-	long folderId) throws AuthenticationException, WebserviceException, PersistenceException, PermissionException;
+	long folderId) throws AuthenticationException, WebserviceException, PersistenceException, PermissionException,
+			UnexistingResourceException;
 
 	/**
 	 * Copies a document into another folder.
@@ -170,6 +181,8 @@ public interface DocumentService {
 	 * @param sid identifier of the session
 	 * @param docId The document id
 	 * @param folderId Identifier of the new document's folder
+	 * @param links If links must be copied too
+	 * @param notes If notes and annotations must be copied too
 	 * 
 	 * @return The created copy
 	 * 
@@ -189,7 +202,13 @@ public interface DocumentService {
 	@WebParam(name = "docId")
 	long docId, @WSDoc(description = "identifier of the new document's folder")
 	@WebParam(name = "folderId")
-	long folderId)
+	long folderId, @WSDoc(description = "if the links must be copied too")
+	@WebParam(name = "links")
+	boolean links, @WSDoc(description = "if the notes and annotations must be copied too")
+	@WebParam(name = "notes")
+	boolean notes, @WSDoc(description = "if the security settings must be copied too")
+	@WebParam(name = "security")
+	boolean security)
 			throws AuthenticationException, WebserviceException, PersistenceException, PermissionException, IOException;
 
 	/**
@@ -205,6 +224,7 @@ public interface DocumentService {
 	 * @throws AuthenticationException Invalid session
 	 * @throws PermissionException The user does not have the required
 	 *         permission
+	 * @throws UnexistingResourceException the required document does not exist
 	 */
 	@WebMethod(action = "getDocument")
 	@WebResult(name = "document")
@@ -213,7 +233,8 @@ public interface DocumentService {
 	@WebParam(name = "sid")
 	String sid, @WSDoc(description = "Document ID")
 	@WebParam(name = "docId")
-	long docId) throws AuthenticationException, WebserviceException, PersistenceException, PermissionException;
+	long docId) throws AuthenticationException, WebserviceException, PersistenceException, PermissionException,
+			UnexistingResourceException;
 
 	/**
 	 * Gets document metadata of an existing document with the given custom
@@ -254,17 +275,17 @@ public interface DocumentService {
 	@WebMethod(action = "getDocuments")
 	@WebResult(name = "documents")
 	@WSDoc(description = "gets document metadata of a collection of existing documents with the given identifiers; returns an array of WSDocument")
-	public WSDocument[] getDocuments(@WSDoc(description = "identifier of the session", required = true)
+	public List<WSDocument> getDocuments(@WSDoc(description = "identifier of the session", required = true)
 	@WebParam(name = "sid")
 	String sid, @WebParam(name = "docIds")
-	Long[] docIds) throws AuthenticationException, WebserviceException, PersistenceException;
+	List<Long> docIds) throws AuthenticationException, WebserviceException, PersistenceException;
 
 	/**
 	 * Gets the aliases of the given document
 	 * 
 	 * @param sid identifier of the session
 	 * @param docId The master document ID
-	 * @return Arrays of aliases
+	 * @return List of aliases
 	 * 
 	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException Error in the webservice
@@ -273,7 +294,7 @@ public interface DocumentService {
 	@WebMethod(action = "getAliases")
 	@WebResult(name = "aliases")
 	@WSDoc(description = "gets the aliases of the given document; returns an array of WSDocument that are aliases")
-	public WSDocument[] getAliases(@WSDoc(description = "identifier of the session", required = true)
+	public List<WSDocument> getAliases(@WSDoc(description = "identifier of the session", required = true)
 	@WebParam(name = "sid")
 	String sid, @WSDoc(description = "Document ID")
 	@WebParam(name = "docId")
@@ -291,13 +312,15 @@ public interface DocumentService {
 	 * @throws AuthenticationException Invalid session
 	 * @throws PermissionException The user does not have the required
 	 *         permission
+	 * @throws UnexistingResourceException The specified document does not exist
 	 */
 	@WebMethod(action = "update")
 	@WSDoc(description = "updates an existing document with the value object containing the document's metadata")
 	public void update(@WSDoc(description = "identifier of the session", required = true)
 	@WebParam(name = "sid")
 	String sid, @WebParam(name = "document")
-	WSDocument document) throws AuthenticationException, PermissionException, WebserviceException, PersistenceException;
+	WSDocument document) throws AuthenticationException, PermissionException, WebserviceException, PersistenceException,
+			UnexistingResourceException;
 
 	/**
 	 * Gets the content of an existing document with the given identifier
@@ -507,6 +530,7 @@ public interface DocumentService {
 	 * @throws PermissionException The user does not have the required
 	 *         permission
 	 * @throws IOException I/O error
+	 * @throws UnexistingResourceException The specified document does not exist
 	 */
 	@WebMethod(action = "replaceFile")
 	@WSDoc(description = "replaces the file associated to a given version")
@@ -517,8 +541,8 @@ public interface DocumentService {
 	long docId, @WebParam(name = "fileVersion")
 	String fileVersion, @WebParam(name = "comment")
 	String comment, @WebParam(name = "content")
-	DataHandler content)
-			throws AuthenticationException, WebserviceException, PersistenceException, PermissionException, IOException;
+	DataHandler content) throws AuthenticationException, WebserviceException, PersistenceException, PermissionException,
+			IOException, UnexistingResourceException;
 
 	/**
 	 * Promotes an old version to the current default one. If you promote a
@@ -535,6 +559,7 @@ public interface DocumentService {
 	 * @throws PermissionException The user does not have the required
 	 *         permission
 	 * @throws IOException I/O error
+	 * @throws UnexistingResourceException The specified document does not exist
 	 */
 	@WebMethod(action = "promoteVersion")
 	@WSDoc(description = "promotes an old version to the current default one")
@@ -543,8 +568,8 @@ public interface DocumentService {
 	String sid, @WSDoc(description = "the document id")
 	@WebParam(name = "docId")
 	long docId, @WebParam(name = "version")
-	String version)
-			throws AuthenticationException, WebserviceException, PersistenceException, PermissionException, IOException;
+	String version) throws AuthenticationException, WebserviceException, PersistenceException, PermissionException,
+			IOException, UnexistingResourceException;
 
 	/**
 	 * Creates a new document or updates an existing one.
@@ -622,26 +647,6 @@ public interface DocumentService {
 			throws AuthenticationException, WebserviceException, PersistenceException, PermissionException, IOException;
 
 	/**
-	 * Tests if a document is readable
-	 * 
-	 * @param sid identifier of the session
-	 * @param docId The document id
-	 * 
-	 * @return True if the identifier denotes a document, otherwise false
-	 * 
-	 * @throws PersistenceException Error in the database
-	 * @throws WebserviceException Error in the webservice
-	 * @throws AuthenticationException Invalid session
-	 */
-	@WebMethod(action = "isReadable")
-	@WSDoc(description = "tests if a document is readable")
-	public boolean isReadable(@WSDoc(description = "identifier of the session", required = true)
-	@WebParam(name = "sid")
-	String sid, @WSDoc(description = "the document id")
-	@WebParam(name = "docId")
-	long docId) throws AuthenticationException, WebserviceException, PersistenceException;
-
-	/**
 	 * Restores a deleted document
 	 * 
 	 * @param sid identifier of the session
@@ -669,22 +674,24 @@ public interface DocumentService {
 	 * @param sid identifier of the session
 	 * @param docId The document id
 	 * 
-	 * @return Array of versions
+	 * @return Collection of versions
 	 * 
 	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException Error in the webservice
 	 * @throws AuthenticationException Invalid session
 	 * @throws PermissionException The user does not have the required
 	 *         permission
+	 * @throws UnexistingResourceException The specified document does not exist
 	 */
 	@WebMethod(action = "getVersions")
 	@WebResult(name = "version")
 	@WSDoc(description = "gets the versions' history of a document; returns an array of versions")
-	public WSDocument[] getVersions(@WSDoc(description = "identifier of the session", required = true)
+	public List<WSDocument> getVersions(@WSDoc(description = "identifier of the session", required = true)
 	@WebParam(name = "sid")
 	String sid, @WSDoc(description = "the document id")
 	@WebParam(name = "docId")
-	long docId) throws AuthenticationException, WebserviceException, PersistenceException, PermissionException;
+	long docId) throws AuthenticationException, WebserviceException, PersistenceException, PermissionException,
+			UnexistingResourceException;
 
 	/**
 	 * Gets a specific version
@@ -700,6 +707,7 @@ public interface DocumentService {
 	 * @throws AuthenticationException Invalid session
 	 * @throws PermissionException The user does not have the required
 	 *         permission
+	 * @throws UnexistingResourceException The specified document does not exist
 	 */
 	@WebMethod(action = "getVersion")
 	@WebResult(name = "version")
@@ -710,16 +718,17 @@ public interface DocumentService {
 	@WebParam(name = "docId")
 	long docId, @WSDoc(description = "the version number")
 	@WebParam(name = "version")
-	String version) throws AuthenticationException, WebserviceException, PersistenceException, PermissionException;
+	String version) throws AuthenticationException, WebserviceException, PersistenceException, PermissionException,
+			UnexistingResourceException;
 
 	/**
-	 * Gets a document in a specific folder
+	 * Gets the documents in a specific folder
 	 * 
 	 * @param sid identifier of the session
 	 * @param folderId The folder id
 	 * @param fileName Optional file name filter
 	 * 
-	 * @return A value object containing the document's metadata
+	 * @return Collection of documents
 	 * 
 	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException Error in the webservice
@@ -730,7 +739,7 @@ public interface DocumentService {
 	@WebMethod(action = "listDocuments")
 	@WebResult(name = "document")
 	@WSDoc(description = "gets the documents in a specific folder")
-	public WSDocument[] listDocuments(@WSDoc(description = "identifier of the session", required = true)
+	public List<WSDocument> listDocuments(@WSDoc(description = "identifier of the session", required = true)
 	@WebParam(name = "sid")
 	String sid, @WebParam(name = "folderId")
 	long folderId, @WSDoc(description = "file name filter", required = false)
@@ -738,12 +747,43 @@ public interface DocumentService {
 	String fileName) throws AuthenticationException, WebserviceException, PersistenceException, PermissionException;
 
 	/**
-	 * Lists of last modified documents of the current session.
+	 * Gets the documents in a specific folder
+	 * 
+	 * @param sid identifier of the session
+	 * @param folderId The folder id
+	 * @param fileName Optional file name filter
+	 * @param sort Optional sort criteria (eg date asc)
+	 * @param page Optional page number
+	 * @param max Optional maximum number of elements per page
+	 * 
+	 * @return Collection of documents
+	 * 
+	 * @throws PersistenceException Error in the database
+	 * @throws WebserviceException Error in the webservice
+	 * @throws AuthenticationException Invalid session
+	 * @throws PermissionException The user does not have the required
+	 *         permission
+	 */
+	@WebMethod(action = "list")
+	@WebResult(name = "document")
+	@WSDoc(description = "gets the documents in a specific folder")
+	public List<WSDocument> list(@WSDoc(description = "identifier of the session", required = true)
+	@WebParam(name = "sid")
+	String sid, @WebParam(name = "folderId")
+	long folderId, @WSDoc(description = "file name filter", required = false)
+	@WebParam(name = "fileName")
+	String fileName, @WSDoc(description = "Optional sort criteria (eg date asc)")@WebParam(name = "sort")
+	String sort, @WSDoc(description = "Optional page number")@WebParam(name = "page")
+	Integer page, @WSDoc(description = "Optional maximum number of elements per page")@WebParam(name = "max")
+	Integer max) throws AuthenticationException, WebserviceException, PersistenceException, PermissionException;
+
+	/**
+	 * Lists of last modified documents by current user.
 	 * 
 	 * @param sid identifier of the session
 	 * @param maxHits Maximum number of returned records
 	 * 
-	 * @return Array of documents
+	 * @return List of documents
 	 * 
 	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException Error in the webservice
@@ -751,8 +791,8 @@ public interface DocumentService {
 	 */
 	@WebMethod(action = "getRecentDocuments")
 	@WebResult(name = "document")
-	@WSDoc(description = "lists of last modified documents in the current session")
-	public WSDocument[] getRecentDocuments(@WSDoc(description = "identifier of the session", required = true)
+	@WSDoc(description = "lists of last modified documents by current user")
+	public List<WSDocument> getRecentDocuments(@WSDoc(description = "identifier of the session", required = true)
 	@WebParam(name = "sid")
 	String sid, @WSDoc(description = "max number of returned records", required = false)
 	@WebParam(name = "maxHits")
@@ -778,7 +818,7 @@ public interface DocumentService {
 	public void sendEmail(@WSDoc(description = "identifier of the session", required = true)
 	@WebParam(name = "sid")
 	String sid, @WebParam(name = "docIds")
-	Long[] docIds, @WSDoc(description = "comma separated list of email addresses")
+	List<Long> docIds, @WSDoc(description = "comma separated list of email addresses")
 	@WebParam(name = "recipients")
 	String recipients, @WebParam(name = "subject")
 	String subject, @WebParam(name = "message")
@@ -831,6 +871,7 @@ public interface DocumentService {
 	 * @throws AuthenticationException Invalid session
 	 * @throws PermissionException The user does not have the required
 	 *         permission
+	 * @throws UnexistingResourceException The specified document does not exist
 	 */
 	@WebMethod(action = "link")
 	@WebResult(name = "link")
@@ -843,7 +884,8 @@ public interface DocumentService {
 	@WebParam(name = "doc2")
 	long doc2, @WSDoc(description = "type of the link (use 'pdf' to point to the pdf conversion)", required = false)
 	@WebParam(name = "type")
-	String type) throws AuthenticationException, WebserviceException, PersistenceException, PermissionException;
+	String type) throws AuthenticationException, WebserviceException, PersistenceException, PermissionException,
+			UnexistingResourceException;
 
 	/**
 	 * Gets all the links of a specific document
@@ -862,7 +904,7 @@ public interface DocumentService {
 	@WebMethod(action = "getLinks")
 	@WebResult(name = "link")
 	@WSDoc(description = "gets all the links of a specific document; returns an array of links")
-	public WSLink[] getLinks(@WSDoc(description = "identifier of the session", required = true)
+	public List<WSLink> getLinks(@WSDoc(description = "identifier of the session", required = true)
 	@WebParam(name = "sid")
 	String sid, @WSDoc(description = "the document id")
 	@WebParam(name = "docId")
@@ -896,7 +938,7 @@ public interface DocumentService {
 	 * @throws PersistenceException Error at data layer
 	 * @throws WebserviceException Error in the webservice
 	 * @throws AuthenticationException Invalid session
-	 * @throws ParseException Error in adding the entry into fulltext index
+	 * @throws ParsingException Error in adding the entry into fulltext index
 	 */
 	@WebMethod(action = "reindex")
 	@WSDoc(description = "re-indexes(or indexes from scratch) a document")
@@ -906,7 +948,7 @@ public interface DocumentService {
 	@WebParam(name = "docId")
 	long docId, @WSDoc(description = "the content to be used (if null the file is parsed)", required = false)
 	@WebParam(name = "content")
-	String content) throws AuthenticationException, WebserviceException, PersistenceException, ParseException;
+	String content) throws AuthenticationException, WebserviceException, PersistenceException, ParsingException;
 
 	/**
 	 * Creates the PDF conversion of the given document. If the conversion was
@@ -1053,6 +1095,7 @@ public interface DocumentService {
 	 * @throws AuthenticationException Invalid session
 	 * @throws PermissionException The user does not have the required
 	 *         permission
+	 * @throws UnexistingResourceException The specified document does not exist
 	 */
 	@WebMethod(action = "setPassword")
 	@WSDoc(description = "protects with a password the given document")
@@ -1061,7 +1104,8 @@ public interface DocumentService {
 	String sid, @WSDoc(description = "the document id")
 	@WebParam(name = "docId")
 	long docId, @WebParam(name = "password")
-	String password) throws AuthenticationException, WebserviceException, PersistenceException, PermissionException;
+	String password) throws AuthenticationException, WebserviceException, PersistenceException, PermissionException,
+			UnexistingResourceException;
 
 	/**
 	 * Removes the password protection from the document
@@ -1075,6 +1119,7 @@ public interface DocumentService {
 	 * @throws AuthenticationException Invalid session
 	 * @throws PermissionException The user does not have the required
 	 *         permission
+	 * @throws UnexistingResourceException The specified document does not exist
 	 */
 	@WebMethod(action = "unsetPassword")
 	@WSDoc(description = "removes the password protection from the document")
@@ -1083,8 +1128,8 @@ public interface DocumentService {
 	String sid, @WSDoc(description = "the document id")
 	@WebParam(name = "docId")
 	long docId, @WebParam(name = "currentPassword")
-	String currentPassword)
-			throws AuthenticationException, WebserviceException, PersistenceException, PermissionException;
+	String currentPassword) throws AuthenticationException, WebserviceException, PersistenceException,
+			PermissionException, UnexistingResourceException;
 
 	/**
 	 * Unprotects a document that is password protected. If the given password
@@ -1125,6 +1170,7 @@ public interface DocumentService {
 	 * @throws AuthenticationException Invalid session
 	 * @throws PermissionException The user does not have the required
 	 *         permission
+	 * @throws UnexistingResourceException The specified document does not exist
 	 */
 	@WebMethod(action = "addNote")
 	@WebResult(name = "note")
@@ -1134,7 +1180,8 @@ public interface DocumentService {
 	String sid, @WSDoc(description = "the document id", required = true)
 	@WebParam(name = "docId")
 	long docId, @WebParam(name = "note")
-	String note) throws AuthenticationException, WebserviceException, PersistenceException, PermissionException;
+	String note) throws AuthenticationException, WebserviceException, PersistenceException, PermissionException,
+			UnexistingResourceException;
 
 	/**
 	 * Adds a new note for the given document
@@ -1150,6 +1197,7 @@ public interface DocumentService {
 	 * @throws AuthenticationException Invalid session
 	 * @throws PermissionException The user does not have the required
 	 *         permission
+	 * @throws UnexistingResourceException The specified document does not exist
 	 */
 	@WebMethod(action = "saveNote")
 	@WebResult(name = "note")
@@ -1159,7 +1207,8 @@ public interface DocumentService {
 	String sid, @WSDoc(description = "the document id")
 	@WebParam(name = "docId")
 	long docId, @WebParam(name = "note")
-	WSNote note) throws AuthenticationException, WebserviceException, PersistenceException, PermissionException;
+	WSNote note) throws AuthenticationException, WebserviceException, PersistenceException, PermissionException,
+			UnexistingResourceException;
 
 	/**
 	 * Adds a new note for the given document
@@ -1184,22 +1233,24 @@ public interface DocumentService {
 	 * @param sid identifier of the session
 	 * @param docId identifier of the document
 	 * 
-	 * @return array of notes
+	 * @return list of notes
 	 * 
 	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException Error in the webservice
 	 * @throws AuthenticationException Invalid session
 	 * @throws PermissionException The user does not have the required
 	 *         permission
+	 * @throws UnexistingResourceException The specified document does not exist
 	 */
 	@WebMethod(action = "getNotes")
 	@WebResult(name = "note")
 	@WSDoc(description = "gets the notes for the given document")
-	public WSNote[] getNotes(@WSDoc(description = "identifier of the session", required = true)
+	public List<WSNote> getNotes(@WSDoc(description = "identifier of the session", required = true)
 	@WebParam(name = "sid")
 	String sid, @WSDoc(description = "the document id")
 	@WebParam(name = "docId")
-	long docId) throws AuthenticationException, WebserviceException, PersistenceException, PermissionException;
+	long docId) throws AuthenticationException, WebserviceException, PersistenceException, PermissionException,
+			UnexistingResourceException;
 
 	/**
 	 * Deletes a version of a document with the given identifiers. You can not
@@ -1240,6 +1291,7 @@ public interface DocumentService {
 	 * @throws AuthenticationException Invalid session
 	 * @throws PermissionException The user does not have the required
 	 *         permission
+	 * @throws UnexistingResourceException The specified document does not exist
 	 */
 	@WebMethod(action = "rateDocument")
 	@WebResult(name = "rating")
@@ -1249,7 +1301,8 @@ public interface DocumentService {
 	String sid, @WSDoc(description = "the document id")
 	@WebParam(name = "docId")
 	long docId, @WebParam(name = "vote")
-	int vote) throws AuthenticationException, WebserviceException, PersistenceException, PermissionException;
+	int vote) throws AuthenticationException, WebserviceException, PersistenceException, PermissionException,
+			UnexistingResourceException;
 
 	/**
 	 * Gets all the ratings of the given document
@@ -1257,7 +1310,31 @@ public interface DocumentService {
 	 * @param sid identifier of the session
 	 * @param docId identifier of the document
 	 * 
-	 * @return array of ratings
+	 * @return List of ratings
+	 * 
+	 * @throws PersistenceException Error in the database
+	 * @throws WebserviceException Error in the webservice
+	 * @throws AuthenticationException Invalid session
+	 * @throws PermissionException The user does not have the required
+	 *         permission
+	 * @throws UnexistingResourceException The specified document does not exist
+	 */
+	@WebMethod(action = "getRatings")
+	@WebResult(name = "rating")
+	@WSDoc(description = "gets all the ratings of the given document")
+	public List<WSRating> getRatings(@WSDoc(description = "identifier of the session", required = true)
+	@WebParam(name = "sid")
+	String sid, @WSDoc(description = "the document id")
+	@WebParam(name = "docId")
+	long docId) throws AuthenticationException, WebserviceException, PersistenceException, PermissionException,
+			UnexistingResourceException;
+
+	/**
+	 * Sets the Access Control List
+	 * 
+	 * @param sid Session identifier
+	 * @param docId Document id
+	 * @param acl the complete Access Control List
 	 * 
 	 * @throws PersistenceException Error in the database
 	 * @throws WebserviceException Error in the webservice
@@ -1265,12 +1342,113 @@ public interface DocumentService {
 	 * @throws PermissionException The user does not have the required
 	 *         permission
 	 */
-	@WebMethod(action = "getRatings")
-	@WebResult(name = "rating")
-	@WSDoc(description = "gets all the ratings of the given document")
-	public WSRating[] getRatings(@WSDoc(description = "identifier of the session", required = true)
+	@WebMethod(action = "setAccessControlList")
+	@WSDoc(description = "sets the Access Control List")
+	public void setAccessControlList(@WSDoc(description = "identifier of the session", required = true)
 	@WebParam(name = "sid")
-	String sid, @WSDoc(description = "the document id")
-	@WebParam(name = "docId")
-	long docId) throws AuthenticationException, WebserviceException, PersistenceException, PermissionException;
+	String sid, @WebParam(name = "docId")
+	long docId, @WSDoc(description = "the complete Access Control List")
+	@WebParam(name = "acl")
+	List<WSAccessControlEntry> acl)
+			throws PersistenceException, PermissionException, AuthenticationException, WebserviceException;
+
+	/**
+	 * Retrieves the access control list
+	 * 
+	 * @param sid Session identifier
+	 * @param docId Document id
+	 * @return 'error' if error occurred, the right objects collection
+	 * 
+	 * @throws PermissionException The permission has not been granted
+	 * @throws PersistenceException Error in the database
+	 * @throws WebserviceException Error in the webservice
+	 * @throws AuthenticationException Invalid session
+	 */
+	@WebMethod(action = "getAccessControlList")
+	@WSDoc(description = "retrieves the access control list")
+	public List<WSAccessControlEntry> getAccessControlList(
+			@WSDoc(description = "identifier of the session", required = true)
+			@WebParam(name = "sid")
+			String sid, @WebParam(name = "docId")
+			long docId) throws AuthenticationException, WebserviceException, PersistenceException, PermissionException;
+
+	/**
+	 * Tests if a document is readable.
+	 * 
+	 * @param sid Session identifier
+	 * @param docId The document id
+	 * 
+	 * @return True if the identifier denotes a readable document, otherwise
+	 *         false.
+	 * 
+	 * @throws PersistenceException Error in the database
+	 * @throws WebserviceException Error in the webservice
+	 * @throws AuthenticationException Invalid session
+	 */
+	@WebMethod(action = "isRead")
+	@WSDoc(description = "tests if a document is readable")
+	public boolean isRead(@WSDoc(description = "identifier of the session", required = true)
+	@WebParam(name = "sid")
+	String sid, @WebParam(name = "docId")
+	long docId) throws AuthenticationException, WebserviceException, PersistenceException;
+
+	/**
+	 * Tests if a document is writable
+	 * 
+	 * @param sid Session identifier
+	 * @param docId The document id
+	 * @return True if the identifier denotes a writable folder, otherwise false
+	 * 
+	 * @throws PersistenceException Error in the database
+	 * @throws WebserviceException Error in the webservice
+	 * @throws AuthenticationException Invalid session
+	 */
+	@WebMethod(action = "isWrite")
+	@WSDoc(description = "tests if a folder is writable")
+	public boolean isWrite(@WSDoc(description = "identifier of the session", required = true)
+	@WebParam(name = "sid")
+	String sid, @WebParam(name = "docId")
+	long docId) throws AuthenticationException, WebserviceException, PersistenceException;
+
+	/**
+	 * Tests if a document is downloadable
+	 * 
+	 * @param sid Session identifier
+	 * @param docId The document id
+	 * @return True if the identifier denotes a writable folder, otherwise false
+	 * 
+	 * @throws PersistenceException Error in the database
+	 * @throws WebserviceException Error in the webservice
+	 * @throws AuthenticationException Invalid session
+	 */
+	@WebMethod(action = "isDownload")
+	@WSDoc(description = "tests if a folder is writable")
+	public boolean isDownload(@WSDoc(description = "identifier of the session", required = true)
+	@WebParam(name = "sid")
+	String sid, @WebParam(name = "docId")
+	long docId) throws AuthenticationException, WebserviceException, PersistenceException;
+
+	/**
+	 * Tests if the current user has a specific permission on a document
+	 * 
+	 * @param sid Session identifier
+	 * @param docId The document id
+	 * @param permission The permission to check (eg: 'read', 'write', ...)
+	 * 
+	 * @return True if the identifier denotes a granted permission, otherwise
+	 *         false
+	 * 
+	 * @throws PersistenceException Error in the database
+	 * @throws WebserviceException Error in the webservice
+	 * @throws AuthenticationException Invalid session
+	 */
+	@WebMethod(action = "isGranted")
+	@WSDoc(description = "tests if the current user has a specific permission on a document")
+	public boolean isGranted(@WSDoc(description = "identifier of the session", required = true)
+	@WebParam(name = "sid")
+	String sid, @WebParam(name = "docId")
+	long docId, @WSDoc(description = "the permissions' integer representation")
+	@WebParam(name = "permission")
+	String permission) throws AuthenticationException, WebserviceException, PersistenceException;
+
 }

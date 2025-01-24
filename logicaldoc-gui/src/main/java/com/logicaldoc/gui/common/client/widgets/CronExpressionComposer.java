@@ -3,9 +3,8 @@ package com.logicaldoc.gui.common.client.widgets;
 import java.util.Date;
 import java.util.LinkedHashMap;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.services.InfoService;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.smartgwt.client.types.HeaderControls;
@@ -103,7 +102,7 @@ public class CronExpressionComposer extends Window {
 		setHeaderControls(HeaderControls.HEADER_LABEL, HeaderControls.CLOSE_BUTTON);
 		setTitle(I18N.message("cronexpressioncomposer"));
 		setWidth(650);
-		setHeight(340);
+		setHeight(400);
 
 		setCanDragResize(true);
 		setIsModal(true);
@@ -536,12 +535,7 @@ public class CronExpressionComposer extends Window {
 		}
 
 		InfoService.Instance.get().getCronDescription("" + vm.getItem(EXPRESSION).getValue(), I18N.getLocale(),
-				new AsyncCallback<String>() {
-
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
+				new DefaultAsyncCallback<>() {
 
 					@Override
 					public void onSuccess(String description) {
@@ -632,5 +626,30 @@ public class CronExpressionComposer extends Window {
 				h = h.substring(1);
 			vm.getItem(EXPRESSION).setValue("0 " + m + " " + h + DEFAULT_CRON_END_EXPRESSION);
 		}
+	}
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = super.hashCode();
+		result = prime * result + ((sourceItem == null) ? 0 : sourceItem.hashCode());
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (!super.equals(obj))
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		CronExpressionComposer other = (CronExpressionComposer) obj;
+		if (sourceItem == null) {
+			if (other.sourceItem != null)
+				return false;
+		} else if (!sourceItem.equals(other.sourceItem))
+			return false;
+		return true;
 	}
 }

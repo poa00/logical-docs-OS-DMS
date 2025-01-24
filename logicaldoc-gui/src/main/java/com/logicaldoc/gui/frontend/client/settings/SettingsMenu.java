@@ -1,12 +1,11 @@
 package com.logicaldoc.gui.frontend.client.settings;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.logicaldoc.gui.common.client.Feature;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Menu;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIEmailSettings;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.frontend.client.administration.AdminScreen;
 import com.logicaldoc.gui.frontend.client.services.SettingService;
 import com.logicaldoc.gui.frontend.client.settings.automation.AutomationSettingsPanel;
@@ -55,6 +54,8 @@ public class SettingsMenu extends VLayout {
 
 		addComparators();
 
+		addAuditing();
+
 		addParameters();
 	}
 
@@ -62,16 +63,26 @@ public class SettingsMenu extends VLayout {
 		Button parameters = new Button(I18N.message("parameters"));
 		parameters.setWidth100();
 		parameters.setHeight(25);
-		parameters.addClickHandler((ClickEvent event) -> AdminScreen.get().setContent(new ParametersPanel()));
+		parameters.addClickHandler(click -> AdminScreen.get().setContent(new ParametersPanel()));
 		if (Session.get().isDefaultTenant() && Menu.enabled(Menu.PARAMETERS))
 			addMember(parameters);
+	}
+
+	private void addAuditing() {
+		Button auditing = new Button(I18N.message("auditing"));
+		auditing.setWidth100();
+		auditing.setHeight(25);
+		auditing.addClickHandler(click -> AdminScreen.get().setContent(new AuditingPanel()));
+		if (Menu.enabled(Menu.AUDITING)) {
+			addMember(auditing);
+		}
 	}
 
 	private void addComparators() {
 		Button comparators = new Button(I18N.message("comparators"));
 		comparators.setWidth100();
 		comparators.setHeight(25);
-		comparators.addClickHandler((ClickEvent event) -> AdminScreen.get().setContent(new ComparatorsPanel()));
+		comparators.addClickHandler(click -> AdminScreen.get().setContent(new ComparatorsPanel()));
 		if (Feature.visible(Feature.COMPARISON) && Menu.enabled(Menu.COMPARATORS)) {
 			addMember(comparators);
 			if (!Feature.enabled(Feature.COMPARISON))
@@ -88,7 +99,7 @@ public class SettingsMenu extends VLayout {
 		Button automation = new Button(I18N.message("automation"));
 		automation.setWidth100();
 		automation.setHeight(25);
-		automation.addClickHandler((ClickEvent event) -> AdminScreen.get().setContent(new AutomationSettingsPanel()));
+		automation.addClickHandler(click -> AdminScreen.get().setContent(new AutomationSettingsPanel()));
 		if (Feature.visible(Feature.AUTOMATION) && Menu.enabled(Menu.AUTOMATION)) {
 			addMember(automation);
 			if (!Feature.enabled(Feature.AUTOMATION))
@@ -131,20 +142,13 @@ public class SettingsMenu extends VLayout {
 		Button smtp = new Button(I18N.message("outgoingemail"));
 		smtp.setWidth100();
 		smtp.setHeight(25);
-		smtp.addClickHandler(
-				event -> SettingService.Instance.get().loadEmailSettings(new AsyncCallback<GUIEmailSettings>() {
+		smtp.addClickHandler(event -> SettingService.Instance.get().loadEmailSettings(new DefaultAsyncCallback<>() {
+			@Override
+			public void onSuccess(GUIEmailSettings settings) {
+				AdminScreen.get().setContent(new OutgoingEmailPanel(settings));
+			}
 
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
-					@Override
-					public void onSuccess(GUIEmailSettings settings) {
-						AdminScreen.get().setContent(new OutgoingEmailPanel(settings));
-					}
-
-				}));
+		}));
 
 		if (Session.get().isDemo())
 			setFeatureDisabled(smtp);

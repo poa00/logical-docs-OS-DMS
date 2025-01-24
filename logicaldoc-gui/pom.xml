@@ -6,23 +6,28 @@
 	<parent>
 		<groupId>com.logicaldoc</groupId>
 		<artifactId>logicaldoc</artifactId>
-		<version>8.8.6</version>
+		<version>9.1.1</version>
 	</parent>
 	<artifactId>logicaldoc-gui</artifactId>
 	<name>logicaldoc-gui</name>
 	<packaging>jar</packaging>
 	<properties>
 		<gwt.output.directory>./war</gwt.output.directory>
+		<jetty.version>9.4.46.v20220331</jetty.version>
 	</properties>
+
 	<dependencies>
 		<dependency>
-			<groupId>com.google.gwt</groupId>
-			<artifactId>gwt-servlet</artifactId>
-			<scope>provided</scope>
+			<groupId>org.gwtproject</groupId>
+			<artifactId>gwt-dev</artifactId>
 		</dependency>
 		<dependency>
-			<groupId>com.google.gwt</groupId>
+			<groupId>org.gwtproject</groupId>
 			<artifactId>gwt-user</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.gwtproject</groupId>
+			<artifactId>gwt-servlet</artifactId>
 			<scope>provided</scope>
 		</dependency>
 		<dependency>
@@ -71,14 +76,16 @@
 			<version>1.0.3</version>
 			<scope>compile</scope>
 		</dependency>
-		<!-- dependency> <groupId>com.sksamuel.gwt</groupId> <artifactId>gwt-websockets</artifactId> 
-			<version>1.0.4</version> <scope>compile</scope> </dependency -->
 		<dependency>
 			<groupId>org.realityforge.gwt.websockets</groupId>
 			<artifactId>gwt-websockets</artifactId>
 			<version>1.2</version>
 			<scope>compile</scope>
 			<exclusions>
+				<exclusion>
+					<groupId>org.gwtproject</groupId>
+					<artifactId>gwt-dev</artifactId>
+				</exclusion>
 				<exclusion>
 					<groupId>com.google.gwt</groupId>
 					<artifactId>gwt-dev</artifactId>
@@ -108,7 +115,7 @@
 		</dependency>
 		<dependency>
 			<groupId>javax.servlet</groupId>
-			<artifactId>servlet-api</artifactId>
+			<artifactId>javax.servlet-api</artifactId>
 			<scope>provided</scope>
 		</dependency>
 		<dependency>
@@ -127,30 +134,150 @@
 			<groupId>commons-io</groupId>
 			<artifactId>commons-io</artifactId>
 		</dependency>
+		<dependency>
+			<groupId>org.ow2.asm</groupId>
+			<artifactId>asm</artifactId>
+			<version>9.5</version>
+			<scope>compile</scope>
+		</dependency>
+		<dependency>
+			<groupId>junit</groupId>
+			<artifactId>junit</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.logicaldoc</groupId>
+			<artifactId>logicaldoc-util</artifactId>
+			<version>${project.version}</version>
+			<scope>test</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>org.eclipse.jetty.websocket</groupId>
+			<artifactId>websocket-api</artifactId>
+			<version>${jetty.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.eclipse.jetty.websocket</groupId>
+			<artifactId>websocket-server</artifactId>
+			<version>${jetty.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.eclipse.jetty.websocket</groupId>
+			<artifactId>websocket-servlet</artifactId>
+			<version>${jetty.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.eclipse.jetty.websocket</groupId>
+			<artifactId>websocket-common</artifactId>
+			<version>${jetty.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.eclipse.jetty</groupId>
+			<artifactId>jetty-client</artifactId>
+			<version>${jetty.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.eclipse.jetty</groupId>
+			<artifactId>jetty-http</artifactId>
+			<version>${jetty.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.eclipse.jetty</groupId>
+			<artifactId>jetty-io</artifactId>
+			<version>${jetty.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.eclipse.jetty</groupId>
+			<artifactId>jetty-util</artifactId>
+			<version>${jetty.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.eclipse.jetty</groupId>
+			<artifactId>jetty-util-ajax</artifactId>
+			<version>${jetty.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.eclipse.jetty</groupId>
+			<artifactId>jetty-server</artifactId>
+			<version>${jetty.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.eclipse.jetty</groupId>
+			<artifactId>jetty-servlet</artifactId>
+			<version>${jetty.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.eclipse.jetty</groupId>
+			<artifactId>jetty-security</artifactId>
+			<version>${jetty.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.osgi</groupId>
+			<artifactId>org.osgi.service.serviceloader</artifactId>
+			<version>1.0.0</version>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
 	<build>
 		<outputDirectory>${gwt.output.directory}/WEB-INF/classes</outputDirectory>
 		<plugins>
 			<plugin>
-				<groupId>org.codehaus.mojo</groupId>
-				<artifactId>gwt-maven-plugin</artifactId>
-				<version>2.8.2</version>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
 				<configuration>
-					<extraJvmArgs>-XX:-UseGCOverheadLimit -Xmx4000m</extraJvmArgs>
-					<webappDirectory>./war</webappDirectory>
-					<modules>
-						<module>com.logicaldoc.gui.common.Common</module>
-						<module>com.logicaldoc.gui.frontend.Frontend</module>
-						<module>com.logicaldoc.gui.login.Login</module>
-						<module>com.logicaldoc.gui.setup.Setup</module>
-					</modules>
+					<release>17</release>
+					<encoding>iso-8859-1</encoding>
+					<source>17</source>
+					<target>17</target>
 				</configuration>
+			</plugin>
+
+			<plugin>
+				<groupId>net.ltgt.gwt.maven</groupId>
+				<artifactId>gwt-maven-plugin</artifactId>
+				<extensions>true</extensions>
 				<executions>
 					<execution>
-						<phase>process-classes</phase>
+						<id>frontend</id>
+						<phase>compile</phase>
 						<goals>
 							<goal>compile</goal>
 						</goals>
+						<configuration>
+							<moduleName>com.logicaldoc.gui.frontend.Frontend</moduleName>
+						</configuration>
+					</execution>
+					<execution>
+						<id>login</id>
+						<phase>compile</phase>
+						<goals>
+							<goal>compile</goal>
+						</goals>
+						<configuration>
+							<moduleName>com.logicaldoc.gui.login.Login</moduleName>
+						</configuration>
+					</execution>
+					<execution>
+						<id>setup</id>
+						<phase>compile</phase>
+						<goals>
+							<goal>compile</goal>
+						</goals>
+						<configuration>
+							<moduleName>com.logicaldoc.gui.setup.Setup</moduleName>
+						</configuration>
 					</execution>
 				</executions>
 			</plugin>
@@ -211,171 +338,26 @@
 						</goals>
 						<configuration>
 							<target>
-								<delete dir="target/api" quiet="true" />
-								<unzip
-									src="target/${project.artifactId}-${project.version}.jar"
-									dest="target/api" />
-								<copy todir="target/api">
-									<fileset dir="src/main/java">
-										<include name="**/*.java" />
-									</fileset>
-								</copy>
-								<delete>
-									<fileset dir="target/api"
-										includes="*.html,*.properties" />
-								</delete>
-								<zip
-									destfile="target/${project.artifactId}-${project.version}.jar"
-									basedir="target/api" />
-
-								<delete dir="target/work" quiet="true" />
-								<unzip
-									src="target/${project.artifactId}-${project.version}.${project.packaging}"
-									dest="target/work" />
-								<delete dir="target/work/META-INF" />
-								<delete dir="target/work/com/i18n" />
-								<delete file="target/work/context.properties" />
-								<delete file="target/work/dms.log.html" />
-								<delete dir="target/plugin" quiet="true" />
-								<unzip
-									src="target/${project.artifactId}-${project.version}-plugin.zip"
-									dest="target/plugin" />
-								<delete
-									file="target/${project.artifactId}-${project.version}-plugin.zip" />
-								<delete file="target/plugin/pom.xml" />
-								<copy todir="target/plugin">
-									<fileset dir="war">
-										<exclude name="**/WEB-INF/**" />
-										<exclude name="**/common/**" />
-										<exclude name="**/skin/**" />
-										<exclude name="**/skin-Tahoe/**" />
-									</fileset>
-								</copy>
-
-								<!-- Copy static resources in the skins -->
-								<copy todir="target/plugin/frontend/sc/skins/Enterprise"
-									overwrite="true">
-									<fileset dir="war/skin" includes="**" />
-								</copy>
-								<copy todir="target/plugin/frontend/sc/skins/Simplicity"
-									overwrite="true">
-									<fileset dir="war/skin" includes="**" />
-								</copy>
-								<copy todir="target/plugin/frontend/sc/skins/Tahoe"
-									overwrite="true">
-									<fileset dir="war/skin" includes="**" />
-								</copy>
-								<copy todir="target/plugin/frontend/sc/skins/Tahoe"
-									overwrite="true">
-									<fileset dir="war/skin-Tahoe" includes="**" />
-								</copy>
-
-								<copy todir="target/plugin/login/sc/skins/Enterprise"
-									overwrite="true">
-									<fileset dir="war/skin" includes="**" />
-								</copy>
-								<copy todir="target/plugin/login/sc/skins/Simplicity"
-									overwrite="true">
-									<fileset dir="war/skin" includes="**" />
-								</copy>
-								<copy todir="target/plugin/login/sc/skins/Tahoe"
-									overwrite="true">
-									<fileset dir="war/skin" includes="**" />
-								</copy>
-								<copy todir="target/plugin/login/sc/skins/Tahoe"
-									overwrite="true">
-									<fileset dir="war/skin-Tahoe" includes="**" />
-								</copy>
-
-								<copy todir="target/plugin/setup/sc/skins/Enterprise"
-									overwrite="true">
-									<fileset dir="war/skin" includes="**" />
-								</copy>
-								<copy todir="target/plugin/setup/sc/skins/Simplicity"
-									overwrite="true">
-									<fileset dir="war/skin" includes="**" />
-								</copy>
-								<copy todir="target/plugin/setup/sc/skins/Tahoe"
-									overwrite="true">
-									<fileset dir="war/skin" includes="**" />
-								</copy>
-								<copy todir="target/plugin/setup/sc/skins/Tahoe"
-									overwrite="true">
-									<fileset dir="war/skin-Tahoe" includes="**" />
-								</copy>
-
-								<!-- Change some styles of the Tahoe skin -->
-								<replaceregexp
-									file="target/plugin/frontend/sc/skins/Tahoe/skin_styles.css"
-									match=".treeCellOverDark \{\n  background: #b6e3ff;\n  color: white;"
-									replace=".treeCellOverDark {${line.separator}  background: #b6e3ff;${line.separator}  color: black;"
-									flags="gm" byline="false" />
-
-								<!-- Fix the ace distribution -->
-								<replace
-									file="target/plugin/frontend/ace/ext-language_tools.js"
-									token="this.popup = new AcePopup(document.body || document.documentElement);">
-									<replacevalue><![CDATA[// this.popup = new AcePopup(document.body || document.documentElement);
-								  
-										let elements = document.querySelectorAll('div');
-										let parentElement;
-										for (let elem of elements) {
-											if (elem.matches('div[class$="ace_gutter"]')) {
-												parentElement=elem;
-												break;
-											}
-										} 
-										this.popup = new AcePopup(parentElement);
-									]]></replacevalue>
-								</replace>
-
-								<delete dir="target/plugin/frontend/ace/"
-									includes="worker*,mode-*,theme-*"
-									excludes="mode-velocity.js,mode-java.js,theme-eclipse.js" />
-								<delete dir="target/plugin/frontend/ace/snippets"
-									includes="*.js" excludes="velocity.js" />
-
-								<!-- Delete all .txt files -->
-								<delete>
-									<fileset dir="target/plugin" includes="**/*.txt" />
-								</delete>
-
-								<!-- Delete all the sources from the smartgwt jar -->
-								<delete dir="target/plugin/WEB-INF/lib/smartgwt"
-									failonerror="false" />
-								<unzip dest="target/plugin/WEB-INF/lib/smartgwt"
-									src="target/plugin/WEB-INF/lib/smartgwt-${smartgwt.version}.jar" />
-								<delete
-									dir="target/plugin/WEB-INF/lib/smartgwt-${smartgwt.version}.jar" />
-								<delete>
-									<fileset dir="target/plugin/WEB-INF/lib/smartgwt"
-										excludes="**/*.class" />
-								</delete>
-								<zip
-									destfile="target/plugin/WEB-INF/lib/smartgwt-${smartgwt.version}.jar"
-									basedir="target/plugin/WEB-INF/lib/smartgwt" />
-								<delete dir="target/plugin/WEB-INF/lib/smartgwt"
-									failonerror="false" />
-
-								<copy
-									file="target/${project.artifactId}-${project.version}.${project.packaging}"
-									tofile="target/plugin/WEB-INF/lib/${project.artifactId}-${project.version}-plugin.${project.packaging}" />
-								<copy
-									todir="target/plugin/frontend/sc/skins/standard/images/"
-									file="./war/skin/images/blank.gif" />
-								<copy todir="target/plugin/setup/sc/skins/standard/images/"
-									file="./war/skin/images/blank.gif" />
-								<zip
-									destfile="target/${project.artifactId}-${project.version}-plugin2.zip"
-									basedir="target/plugin" />
-								<move
-									file="target/${project.artifactId}-${project.version}-plugin2.zip"
-									tofile="target/${project.artifactId}-${project.version}-plugin.zip" />
+								<!-- maven does not support defining more than one target -->
+                                <!-- https://jira.codehaus.org/browse/MANTRUN-86 -->
+							    <ant antfile="${basedir}/antrun.xml" />
 							</target>
 						</configuration>
 					</execution>
 				</executions>
-
+				<dependencies>
+					<dependency>
+						<groupId>ant-contrib</groupId>
+						<artifactId>ant-contrib</artifactId>
+						<version>1.0b3</version>
+						<exclusions>
+							<exclusion>
+								<artifactId>ant</artifactId>
+								<groupId>ant</groupId>
+							</exclusion>
+						</exclusions>
+					</dependency>
+				</dependencies>
 			</plugin>
 		</plugins>
 	</build>

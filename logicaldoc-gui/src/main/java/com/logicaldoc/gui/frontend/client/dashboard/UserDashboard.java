@@ -1,6 +1,9 @@
 package com.logicaldoc.gui.frontend.client.dashboard;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import java.util.ArrayList;
+import java.util.List;
+
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIDashlet;
 import com.logicaldoc.gui.common.client.i18n.I18N;
@@ -107,9 +110,8 @@ public class UserDashboard extends VLayout {
 	public void save() {
 		Portlet[][][] portlets = portal.getPortletArray();
 
-		GUIDashlet[] dashlets = new GUIDashlet[portal.getPortlets().length];
+		List<GUIDashlet> dashlets = new ArrayList<>();
 
-		int q = 0;
 		for (int column = 0; column < portlets.length; column++)
 			for (int row = 0; row < portlets[column].length; row++)
 				for (int i = 0; i < portlets[column][row].length; i++) {
@@ -118,21 +120,26 @@ public class UserDashboard extends VLayout {
 					guiDashlet.setColumn(column);
 					guiDashlet.setRow(row);
 					guiDashlet.setIndex(i);
-					dashlets[q++] = guiDashlet;
+					dashlets.add(guiDashlet);
 				}
 
 		Session.get().getUser().setDashlets(dashlets);
-		DashletService.Instance.get().saveUserDashlets(dashlets, new AsyncCallback<Void>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
+		DashletService.Instance.get().saveUserDashlets(dashlets, new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(Void ret) {
 				GuiLog.info(I18N.message("settingssaved"), null);
 			}
 		});
+	}
+
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+	
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

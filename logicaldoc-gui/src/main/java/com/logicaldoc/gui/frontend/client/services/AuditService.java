@@ -1,5 +1,7 @@
 package com.logicaldoc.gui.frontend.client.services;
 
+import java.util.List;
+
 import com.google.gwt.core.client.GWT;
 import com.google.gwt.user.client.rpc.RemoteService;
 import com.google.gwt.user.client.rpc.RemoteServiceRelativePath;
@@ -31,7 +33,7 @@ public interface AuditService extends RemoteService {
 	 * 
 	 * @throws ServerException error in the server application
 	 */
-	public void subscribeFolder(long folderId, boolean currentOnly, String[] events, Long userId, Long groupId)
+	public void subscribeFolder(long folderId, boolean currentOnly, List<String> events, Long userId, Long groupId)
 			throws ServerException;
 
 	/**
@@ -46,7 +48,8 @@ public interface AuditService extends RemoteService {
 	 * 
 	 * @throws ServerException error in the server application
 	 */
-	public void subscribeDocuments(Long[] docIds, String[] events, Long userId, Long groupId) throws ServerException;
+	public void subscribeDocuments(List<Long> docIds, List<String> events, Long userId, Long groupId)
+			throws ServerException;
 
 	/**
 	 * Changes a set of subscriptions
@@ -58,7 +61,7 @@ public interface AuditService extends RemoteService {
 	 * 
 	 * @throws ServerException error in the server application
 	 */
-	public void update(Long[] ids, boolean currentOnly, String[] events) throws ServerException;
+	public void update(List<Long> ids, boolean currentOnly, List<String> events) throws ServerException;
 
 	/**
 	 * Deletes a list of Subscriptions
@@ -67,7 +70,7 @@ public interface AuditService extends RemoteService {
 	 * 
 	 * @throws ServerException error in the server application
 	 */
-	public void deleteSubscriptions(long[] ids) throws ServerException;
+	public void deleteSubscriptions(List<Long> ids) throws ServerException;
 
 	public static class Instance {
 		private static AuditServiceAsync inst;

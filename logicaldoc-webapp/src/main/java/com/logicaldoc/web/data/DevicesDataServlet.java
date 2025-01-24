@@ -10,8 +10,8 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import com.logicaldoc.core.security.Device;
+import com.logicaldoc.core.security.DeviceDAO;
 import com.logicaldoc.core.security.Session;
-import com.logicaldoc.core.security.dao.DeviceDAO;
 import com.logicaldoc.util.Context;
 
 /**
@@ -86,7 +86,7 @@ public class DevicesDataServlet extends AbstractDataServlet {
 	}
 
 	private List<Device> getDevices(Session session, boolean trustedOnly) {
-		DeviceDAO dDao = (DeviceDAO) Context.get().getBean(DeviceDAO.class);
+		DeviceDAO dDao = Context.get(DeviceDAO.class);
 		List<Device> devices;
 		if (trustedOnly)
 			devices = dDao.findTrustedDevices(session.getUserId());

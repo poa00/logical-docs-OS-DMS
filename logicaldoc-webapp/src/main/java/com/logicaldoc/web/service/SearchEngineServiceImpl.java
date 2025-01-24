@@ -3,7 +3,6 @@ package com.logicaldoc.web.service;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,7 +15,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.RowMapper;
 
 import com.logicaldoc.core.PersistenceException;
-import com.logicaldoc.core.document.dao.DocumentDAO;
+import com.logicaldoc.core.document.DocumentDAO;
 import com.logicaldoc.core.folder.Folder;
 import com.logicaldoc.core.i18n.LanguageManager;
 import com.logicaldoc.core.metadata.Template;
@@ -54,12 +53,12 @@ public class SearchEngineServiceImpl extends AbstractRemoteService implements Se
 
 	@Override
 	public GUISearchEngine getInfo() throws ServerException {
-		Session session = validateSession(getThreadLocalRequest());
+		Session session = validateSession();
 
 		try {
 			GUISearchEngine searchEngine = new GUISearchEngine();
 
-			SearchEngine indexer = (SearchEngine) Context.get().getBean(SearchEngine.class);
+			SearchEngine indexer = Context.get(SearchEngine.class);
 			searchEngine.setLocked(indexer.isLocked());
 
 			ContextProperties conf = Context.get().getProperties();
@@ -71,6 +70,8 @@ public class SearchEngineServiceImpl extends AbstractRemoteService implements Se
 					.setIncludePatternsMetadata(conf.getProperty(session.getTenantName() + ".index.includes.metadata"));
 			searchEngine.setSkipOnError(conf.getBoolean(session.getTenantName() + ".index.skiponerror", false));
 			searchEngine.setParsingTimeout(conf.getInt(session.getTenantName() + ".parser.timeout", 0));
+			searchEngine
+					.setParsingTimeoutRetain(conf.getBoolean(session.getTenantName() + ".parser.timeout.retain", true));
 			searchEngine.setMaxTextFileSize(conf.getInt(session.getTenantName() + ".parser.txt.maxsize", 0));
 			searchEngine.setDir(conf.getProperty("index.dir"));
 			searchEngine.setSorting(conf.getProperty("index.sorting"));
@@ -91,44 +92,40 @@ public class SearchEngineServiceImpl extends AbstractRemoteService implements Se
 
 			return searchEngine;
 		} catch (Exception t) {
-			return (GUISearchEngine) throwServerException(session, log, t);
+			return throwServerException(session, log, t);
 		}
 	}
 
 	@Override
 	public void rescheduleAll(final boolean dropIndex) throws ServerException {
-		final Session session = validateSession(getThreadLocalRequest());
+		final Session session = validateSession();
 
 		if (dropIndex)
 			try {
-				SearchEngine indexer = (SearchEngine) Context.get().getBean(SearchEngine.class);
-				indexer.dropIndex();
+				Context.get(SearchEngine.class).dropIndex();
 			} catch (Exception e) {
 				throw new ServerException(e.getMessage(), e);
 			}
 
 		Runnable task = () -> {
 			try {
-				DocumentDAO documentDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
-				documentDao.bulkUpdate(
-						"set ld_indexed=0 where ld_indexed=1 "
-								+ (!dropIndex ? " and ld_tenantid=" + session.getTenantId() : ""),
-						(Map<String, Object>) null);
+				Context.get(DocumentDAO.class)
+						.jdbcUpdate("update ld_document set ld_indexed=0 where ld_indexed=1 "
+								+ (!dropIndex ? " and ld_tenantid=" + session.getTenantId() : ""));
 			} catch (Exception t) {
 				log.error(t.getMessage(), t);
 			}
 		};
 
-		Thread recreateThread = new Thread(task);
-		recreateThread.start();
+		new Thread(task).start();
 	}
 
 	@Override
 	public void unlock() throws ServerException {
-		Session session = validateSession(getThreadLocalRequest());
+		Session session = validateSession();
 
 		try {
-			SearchEngine indexer = (SearchEngine) Context.get().getBean(SearchEngine.class);
+			SearchEngine indexer = Context.get(SearchEngine.class);
 			indexer.unlock();
 		} catch (Exception t) {
 			throwServerException(session, log, t);
@@ -137,19 +134,19 @@ public class SearchEngineServiceImpl extends AbstractRemoteService implements Se
 
 	@Override
 	public String check() throws ServerException {
-		Session session = validateSession(getThreadLocalRequest());
+		Session session = validateSession();
 
 		try {
-			SearchEngine indexer = (SearchEngine) Context.get().getBean(SearchEngine.class);
+			SearchEngine indexer = Context.get(SearchEngine.class);
 			return indexer.check();
 		} catch (Exception t) {
-			return (String) throwServerException(session, log, t);
+			return throwServerException(session, log, t);
 		}
 	}
 
 	@Override
 	public void save(GUISearchEngine searchEngine) throws ServerException {
-		Session session = validateSession(getThreadLocalRequest());
+		Session session = validateSession();
 
 		try {
 			ContextProperties conf = Context.get().getProperties();
@@ -165,6 +162,8 @@ public class SearchEngineServiceImpl extends AbstractRemoteService implements Se
 					Boolean.toString(searchEngine.isSkipOnError()));
 			conf.setProperty(session.getTenantName() + ".parser.timeout",
 					searchEngine.getParsingTimeout() != null ? Integer.toString(searchEngine.getParsingTimeout()) : "");
+			conf.setProperty(session.getTenantName() + ".parser.timeout.retain",
+					Boolean.toString(searchEngine.isParsingTimeoutRetain()));
 			conf.setProperty(session.getTenantName() + ".parser.txt.maxsize",
 					searchEngine.getMaxTextFileSize() != null ? Integer.toString(searchEngine.getMaxTextFileSize())
 							: "");
@@ -186,7 +185,7 @@ public class SearchEngineServiceImpl extends AbstractRemoteService implements Se
 
 	@Override
 	public void setLanguageStatus(String language, boolean active) throws ServerException {
-		Session session = validateSession(getThreadLocalRequest());
+		Session session = validateSession();
 
 		try {
 			ContextProperties conf = Context.get().getProperties();
@@ -199,7 +198,7 @@ public class SearchEngineServiceImpl extends AbstractRemoteService implements Se
 
 	@Override
 	public void setAliases(String extension, String aliases) throws ServerException {
-		Session session = validateSession(getThreadLocalRequest());
+		Session session = validateSession();
 
 		try {
 			StringTokenizer st = new StringTokenizer(aliases, ",", false);
@@ -215,18 +214,18 @@ public class SearchEngineServiceImpl extends AbstractRemoteService implements Se
 
 	@Override
 	public long countEntries() throws ServerException {
-		Session session = validateSession(getThreadLocalRequest());
+		Session session = validateSession();
 		try {
-			SearchEngine indexer = (SearchEngine) Context.get().getBean(SearchEngine.class);
+			SearchEngine indexer = Context.get(SearchEngine.class);
 			return indexer.getCount();
 		} catch (Exception t) {
-			return (Long) throwServerException(session, log, t);
+			return throwServerException(session, log, t);
 		}
 	}
 
 	@Override
-	public void reorderTokenFilters(String[] filters) throws ServerException {
-		Session session = validateSession(getThreadLocalRequest());
+	public void reorderTokenFilters(List<String> filters) throws ServerException {
+		Session session = validateSession();
 		try {
 			ContextProperties conf = Context.get().getProperties();
 			int i = 1;
@@ -239,8 +238,8 @@ public class SearchEngineServiceImpl extends AbstractRemoteService implements Se
 	}
 
 	@Override
-	public void saveTokenFilterSettings(String filter, GUIParameter[] settings) throws ServerException {
-		Session session = validateSession(getThreadLocalRequest());
+	public void saveTokenFilterSettings(String filter, List<GUIParameter> settings) throws ServerException {
+		Session session = validateSession();
 		try {
 			String prefix = INDEX_TOKENFILTER + filter + ".";
 			ContextProperties conf = Context.get().getProperties();
@@ -254,7 +253,7 @@ public class SearchEngineServiceImpl extends AbstractRemoteService implements Se
 
 	@Override
 	public void setTokenFilterStatus(String filter, boolean active) throws ServerException {
-		Session session = validateSession(getThreadLocalRequest());
+		Session session = validateSession();
 		try {
 			ContextProperties conf = Context.get().getProperties();
 			conf.setProperty(INDEX_TOKENFILTER + filter, active ? "enabled" : "disabled");
@@ -266,11 +265,11 @@ public class SearchEngineServiceImpl extends AbstractRemoteService implements Se
 
 	@Override
 	public void purge() throws ServerException {
-		Session session = validateSession(getThreadLocalRequest());
+		Session session = validateSession();
 
 		try {
 			Runnable runnable = () -> {
-				SearchEngine indexer = (SearchEngine) Context.get().getBean(SearchEngine.class);
+				SearchEngine indexer = Context.get(SearchEngine.class);
 				indexer.purge();
 			};
 
@@ -281,23 +280,22 @@ public class SearchEngineServiceImpl extends AbstractRemoteService implements Se
 	}
 
 	@Override
-	public void remove(Long[] entryIds) throws ServerException {
-		Session session = validateSession(getThreadLocalRequest());
+	public void remove(List<Long> entryIds) throws ServerException {
+		Session session = validateSession();
 
 		try {
 			Runnable runnable = () -> {
-				SearchEngine indexer = (SearchEngine) Context.get().getBean(SearchEngine.class);
+				SearchEngine indexer = Context.get(SearchEngine.class);
 
-				List<Long> hitsIds = Arrays.asList(entryIds);
-				indexer.deleteHits(hitsIds);
-				log.info("Removed {} entries from the index", hitsIds.size());
+				indexer.deleteHits(entryIds);
+				log.info("Removed {} entries from the index", entryIds.size());
 
-				DocumentDAO dao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+				DocumentDAO dao = Context.get(DocumentDAO.class);
 				StringBuilder updateQuery = new StringBuilder();
 				updateQuery = new StringBuilder("update ld_document set ld_indexed=0 where ld_indexed = 1 ");
 
 				StringBuilder hitsIdsCondition = new StringBuilder();
-				if (!hitsIds.isEmpty()) {
+				if (!entryIds.isEmpty()) {
 					hitsIdsCondition.append(" and (");
 
 					if (dao.isOracle()) {
@@ -309,10 +307,10 @@ public class SearchEngineServiceImpl extends AbstractRemoteService implements Se
 						 */
 						hitsIdsCondition.append(" (ld_id,0) in ( ");
 						hitsIdsCondition.append(
-								hitsIds.stream().map(id -> ("(" + id + ",0)")).collect(Collectors.joining(",")));
+								entryIds.stream().map(id -> ("(" + id + ",0)")).collect(Collectors.joining(",")));
 						hitsIdsCondition.append(" )");
 					} else {
-						hitsIdsCondition.append(" ld_id in " + hitsIds.toString().replace('[', '(').replace(']', ')'));
+						hitsIdsCondition.append(" ld_id in " + entryIds.toString().replace('[', '(').replace(']', ')'));
 					}
 
 					hitsIdsCondition.append(")");
@@ -335,9 +333,9 @@ public class SearchEngineServiceImpl extends AbstractRemoteService implements Se
 
 	@Override
 	public GUIResult query(String query, int page, int size) throws ServerException {
-		Session session = validateSession(getThreadLocalRequest());
+		Session session = validateSession();
 		try {
-			SearchEngine indexer = (SearchEngine) Context.get().getBean(SearchEngine.class);
+			SearchEngine indexer = Context.get(SearchEngine.class);
 			Hits hits = indexer.query(query, page, size);
 
 			GUIResult result = new GUIResult();
@@ -357,14 +355,13 @@ public class SearchEngineServiceImpl extends AbstractRemoteService implements Se
 			// Now sort the hits by score desc
 			List<Hit> sortedHitsList = new ArrayList<>(hitsMap.values());
 			sortedHitsList.sort((h1, h2) -> Long.compare(h1.getId(), h2.getId()));
-			for (Hit hit : sortedHitsList) {
+			for (Hit hit : sortedHitsList)
 				guiResults.add(toDocument(hit));
-			}
-			result.setHits(guiResults.toArray(new GUIDocument[0]));
+			result.setHits(guiResults);
 
 			return result;
 		} catch (Exception t) {
-			return (GUIResult) throwServerException(session, log, t);
+			return throwServerException(session, log, t);
 		}
 	}
 
@@ -410,6 +407,7 @@ public class SearchEngineServiceImpl extends AbstractRemoteService implements Se
 			document.setIcon(FileUtil.getBaseName(hit.getIcon()));
 			document.setPasswordProtected(hit.isPasswordProtected());
 			document.setLinks(hit.getLinks());
+			document.setDocAttrs(hit.getDocAttrs());
 			document.setOcrd(hit.getOcrd());
 			document.setOcrTemplateId(hit.getOcrTemplateId());
 			document.setBarcoded(hit.getBarcoded());
@@ -457,7 +455,7 @@ public class SearchEngineServiceImpl extends AbstractRemoteService implements Se
 		richQuery.append(" left outer join ld_template C on A.ld_templateid=C.ld_id ");
 		richQuery.append(" where A.ld_deleted=0 and A.ld_folderid=FOLD.ld_id  ");
 
-		DocumentDAO dao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO dao = Context.get(DocumentDAO.class);
 
 		Set<Long> hitsIds = hitsMap.keySet();
 		StringBuilder hitsIdsCondition = new StringBuilder();

@@ -7,7 +7,6 @@
 <%! static String LOGIN_PAGE="login.jsp"; %>
 <%@ include file="header.jsp" %>
 <%@ include file="detectmobile.jsp" %>
-<link REL="STYLESHEET" HREF="<%=MODULE%>/sc/skins/<%=SKIN%>/style-login.css" TYPE="text/css" />
 
 <script type="text/javascript">
 	var j_loginurl='${pageContext.request.contextPath}/<%=LOGIN_PAGE%>';
@@ -22,7 +21,9 @@
 <%
   if(request.getSession(false) != null && request.getSession(false).getAttribute("RequestedUrl")!=null 
      && !request.getSession(false).getAttribute("RequestedUrl").toString().contains("/ace/")
-     && !request.getSession(false).getAttribute("RequestedUrl").toString().contains("/sc/")) {
+     && !request.getSession(false).getAttribute("RequestedUrl").toString().contains("/sc/")
+     && !request.getSession(false).getAttribute("RequestedUrl").toString().contains("/info")
+     && !request.getSession(false).getAttribute("RequestedUrl").toString().endsWith("/frontend")) {
 %>
     var j_successurl='<%=request.getSession(false).getAttribute("RequestedUrl")%>';
 <%
@@ -47,6 +48,6 @@
 
 <%@ include file="body.jsp" %>
 
-<link REL="STYLESHEET" HREF="<%=MODULE%>/sc/skins/<%=SKIN%>/style-login.css" TYPE="text/css" />
-
 <%@ include file="footer.jsp" %>
+
+<link REL="STYLESHEET" HREF="<%=MODULE%>/sc/skins/<%=SKIN%>/style-login.css" TYPE="text/css" />

@@ -1,18 +1,20 @@
 package com.logicaldoc.gui.frontend.client.document;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.controllers.FolderController;
 import com.logicaldoc.gui.common.client.data.GarbageDS;
+import com.logicaldoc.gui.common.client.grid.ColoredListGridField;
+import com.logicaldoc.gui.common.client.grid.DateListGridField;
+import com.logicaldoc.gui.common.client.grid.FileNameListGridField;
+import com.logicaldoc.gui.common.client.grid.IdListGridField;
+import com.logicaldoc.gui.common.client.grid.RefreshableListGrid;
 import com.logicaldoc.gui.common.client.i18n.I18N;
 import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.LD;
-import com.logicaldoc.gui.common.client.widgets.grid.ColoredListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.FileNameListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.RefreshableListGrid;
 import com.logicaldoc.gui.frontend.client.folder.FolderNavigator;
 import com.logicaldoc.gui.frontend.client.services.DocumentService;
 import com.logicaldoc.gui.frontend.client.services.FolderService;
@@ -49,8 +51,7 @@ public class TrashPanel extends VLayout {
 
 	@Override
 	public void onDraw() {
-		ListGridField id = new ListGridField("id");
-		id.setHidden(true);
+		ListGridField id = new IdListGridField();
 
 		FileNameListGridField fileName = new FileNameListGridField();
 		fileName.setTitle(I18N.message("name"));
@@ -59,6 +60,11 @@ public class TrashPanel extends VLayout {
 
 		DateListGridField lastModified = new DateListGridField("lastModified", "lastmodified");
 		lastModified.setHidden(true);
+
+		ListGridField idField = new ColoredListGridField("id", I18N.message("id"), 110);
+		idField.setType(ListGridFieldType.TEXT);
+		idField.setCanFilter(true);
+		idField.setHidden(true);
 
 		ListGridField customId = new ColoredListGridField("customId", I18N.message("customid"), 110);
 		customId.setType(ListGridFieldType.TEXT);
@@ -70,7 +76,7 @@ public class TrashPanel extends VLayout {
 		list.setWidth100();
 		list.setHeight100();
 		list.setAutoFetchData(true);
-		list.setFields(fileName, customId, lastModified);
+		list.setFields(id, fileName, idField, customId, lastModified);
 		list.setSelectionType(SelectionStyle.MULTIPLE);
 		list.setDataSource(new GarbageDS());
 		list.setShowFilterEditor(true);
@@ -90,14 +96,8 @@ public class TrashPanel extends VLayout {
 	}
 
 	private void restoreDocument(final long id) {
-		DocumentService.Instance.get().restore(new Long[] { id }, FolderController.get().getCurrentFolder().getId(),
-				new AsyncCallback<Void>() {
-
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+		DocumentService.Instance.get().restore(Arrays.asList(id), FolderController.get().getCurrentFolder().getId(),
+				new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Void ret) {
 						list.removeSelectedData();
@@ -111,14 +111,8 @@ public class TrashPanel extends VLayout {
 	}
 
 	private void restoreFolder(final long id) {
-		FolderService.Instance.get().restore(new Long[] { id }, FolderController.get().getCurrentFolder().getId(),
-				new AsyncCallback<Void>() {
-
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+		FolderService.Instance.get().restore(Arrays.asList(id), FolderController.get().getCurrentFolder().getId(),
+				new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Void ret) {
 						list.removeSelectedData();
@@ -161,13 +155,7 @@ public class TrashPanel extends VLayout {
 		emptyTrash.addClickHandler(
 				event -> LD.ask(I18N.message("question"), I18N.message("confirmemptytrash"), (Boolean response) -> {
 					if (Boolean.TRUE.equals(response)) {
-						DocumentService.Instance.get().emptyTrash(new AsyncCallback<Void>() {
-
-							@Override
-							public void onFailure(Throwable caught) {
-								GuiLog.serverError(caught);
-							}
-
+						DocumentService.Instance.get().emptyTrash(new DefaultAsyncCallback<>() {
 							@Override
 							public void onSuccess(Void arg) {
 								refresh();
@@ -198,34 +186,30 @@ public class TrashPanel extends VLayout {
 		LD.ask(I18N.message("question"), I18N.message("confirmdelete"), (Boolean response) -> {
 			if (Boolean.TRUE.equals(response)) {
 				if (!docIds.isEmpty())
-					DocumentService.Instance.get().deleteFromTrash(docIds.toArray(new Long[0]),
-							new AsyncCallback<Void>() {
-
-								@Override
-								public void onFailure(Throwable caught) {
-									GuiLog.serverError(caught);
-								}
-
-								@Override
-								public void onSuccess(Void arg) {
-									refresh();
-								}
-							});
+					DocumentService.Instance.get().deleteFromTrash(docIds, new DefaultAsyncCallback<>() {
+						@Override
+						public void onSuccess(Void arg) {
+							refresh();
+						}
+					});
 				if (!folderIds.isEmpty())
-					FolderService.Instance.get().deleteFromTrash(folderIds.toArray(new Long[0]),
-							new AsyncCallback<Void>() {
-
-								@Override
-								public void onFailure(Throwable caught) {
-									GuiLog.serverError(caught);
-								}
-
-								@Override
-								public void onSuccess(Void arg) {
-									refresh();
-								}
-							});
+					FolderService.Instance.get().deleteFromTrash(folderIds, new DefaultAsyncCallback<>() {
+						@Override
+						public void onSuccess(Void arg) {
+							refresh();
+						}
+					});
 			}
 		});
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

@@ -1,5 +1,7 @@
 package com.logicaldoc.gui.frontend.client.services;
 
+import java.util.List;
+
 import com.google.gwt.core.client.GWT;
 import com.google.gwt.user.client.rpc.RemoteService;
 import com.google.gwt.user.client.rpc.RemoteServiceRelativePath;
@@ -36,7 +38,7 @@ public interface ZohoService extends RemoteService {
 	 * 
 	 * @throws ServerException an error happened in the server application
 	 */
-	public String[] loadSettings() throws ServerException;
+	public List<String> loadSettings() throws ServerException;
 
 	/**
 	 * Exports documents and folders into Zoho
@@ -50,7 +52,8 @@ public interface ZohoService extends RemoteService {
 	 * 
 	 * @throws ServerException error in the server application
 	 */
-	public boolean exportDocuments(String targetFolderId, long[] folderIds, Long[] docIds) throws ServerException;
+	public boolean exportDocuments(String targetFolderId, List<Long> folderIds, List<Long> docIds)
+			throws ServerException;
 
 	/**
 	 * Exports documents and folders from Zoho into LogicalDOC
@@ -65,7 +68,7 @@ public interface ZohoService extends RemoteService {
 	 * 
 	 * @throws ServerException error in the server application
 	 */
-	public int importDocuments(long targetFolder, String[] folderCompositeIds, String[] documentIds)
+	public int importDocuments(long targetFolder, List<String> folderCompositeIds, List<String> documentIds)
 			throws ServerException;
 
 	/**

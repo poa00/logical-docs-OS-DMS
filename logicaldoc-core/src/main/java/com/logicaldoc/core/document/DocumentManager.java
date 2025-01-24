@@ -4,10 +4,12 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Collection;
+import java.util.Set;
 
 import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.folder.Folder;
-import com.logicaldoc.core.parser.ParseException;
+import com.logicaldoc.core.folder.FolderHistory;
+import com.logicaldoc.core.parser.ParsingException;
 import com.logicaldoc.core.security.authorization.PermissionException;
 import com.logicaldoc.core.ticket.Ticket;
 
@@ -168,10 +170,10 @@ public interface DocumentManager {
 	 * @return the number of milliseconds required to parse the document
 	 * 
 	 * @throws PersistenceException error at data layer
-	 * @throws ParseException error during parsing
+	 * @throws ParsingException error during parsing
 	 */
 	public long index(long docId, String content, DocumentHistory transaction)
-			throws PersistenceException, ParseException;
+			throws PersistenceException, ParsingException;
 
 	/**
 	 * Rename an existing document filename.
@@ -201,6 +203,17 @@ public interface DocumentManager {
 	 * @param doc the document to remove from the index
 	 */
 	public void deleteFromIndex(Document doc);
+	
+	/**
+	 * Permanently deletes a document from the system, the document and all the dependent resources will not be recoverable in the future.
+	 * 
+	 * @param docId the document to destroy
+	 * @param transaction the current session
+	 * 
+	 * @throws PersistenceException error at data layer
+	 * @throws PermissionException The user cannot destroy the document
+	 */
+	public void destroyDocument(long docId, FolderHistory transaction) throws PersistenceException, PermissionException;
 
 	/**
 	 * Utility method used to declare that:
@@ -257,13 +270,17 @@ public interface DocumentManager {
 	 * @param doc The document to move
 	 * @param folder The target folder
 	 * @param transaction entry to log the event (set the user)
+	 * @param links if links must be copied too
+	 * @param notes if notes and annotations must be copied too
+	 * @param notes if security settings must be copied too
+	 * 
 	 * @return The created document
 	 * 
 	 * @throws PersistenceException error at data layer
 	 * @throws IOException I/O error
 	 */
-	public Document copyToFolder(Document doc, Folder folder, DocumentHistory transaction)
-			throws PersistenceException, IOException;
+	public Document copyToFolder(Document doc, Folder folder, DocumentHistory transaction, boolean links, boolean notes,
+			boolean security) throws PersistenceException, IOException;
 
 	/**
 	 * Create an alias(shortcut) associated to the given doc to the specified
@@ -314,9 +331,9 @@ public interface DocumentManager {
 	 * 
 	 * @return The document's content
 	 * 
-	 * @throws ParseException error in the parsing
+	 * @throws ParsingException error in the parsing
 	 */
-	public String parseDocument(Document doc, String fileVersion) throws ParseException;
+	public String parseDocument(Document doc, String fileVersion) throws ParsingException;
 
 	/**
 	 * Archives all the documents in a folder's tree
@@ -340,7 +357,7 @@ public interface DocumentManager {
 	 * @throws PersistenceException raised if at least a document cannot be
 	 *         archived
 	 */
-	public void archiveDocuments(long[] docIds, DocumentHistory transaction) throws PersistenceException;
+	public void archiveDocuments(Set<Long> docIds, DocumentHistory transaction) throws PersistenceException;
 
 	/**
 	 * Creates a new ticket.
@@ -372,7 +389,7 @@ public interface DocumentManager {
 
 	/**
 	 * Moves all the files of the documents in the given tree from it's original
-	 * location to the storage defined in the owning folder
+	 * location to the store defined in the owning folder
 	 * 
 	 * @param rootFolderId identifier of the root of the tree to process
 	 * @param transaction informations about the transaction, optional
@@ -382,7 +399,7 @@ public interface DocumentManager {
 	 * @throws PersistenceException error at data layer
 	 * @throws IOException I/O error
 	 */
-	public int enforceFilesIntoFolderStorage(long rootFolderId, DocumentHistory transaction)
+	public int enforceFilesIntoFolderStore(long rootFolderId, DocumentHistory transaction)
 			throws PersistenceException, IOException;
 
 	/**

@@ -1,10 +1,11 @@
 package com.logicaldoc.gui.frontend.client.document;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.logicaldoc.gui.common.client.Feature;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIEmail;
 import com.logicaldoc.gui.common.client.beans.GUIMessageTemplate;
@@ -30,7 +31,7 @@ public class EmailDialog extends AbstractEmailDialog {
 
 	private static final String SIGNATURE_SEPARATOR = "--";
 
-	private Long[] docIds;
+	private List<Long> docIds = new ArrayList<>();
 
 	private String docTitle;
 
@@ -44,12 +45,12 @@ public class EmailDialog extends AbstractEmailDialog {
 
 	private SelectItem messageTemplate;
 
-	public EmailDialog(Long[] docIds, final String docTitle) {
+	public EmailDialog(List<Long> docIds, final String docTitle) {
 		super();
 		this.docIds = docIds;
 		this.docTitle = docTitle;
 
-		setHeight(570);
+		setHeight(590);
 		setTitle(I18N.message("sendmail"));
 	}
 
@@ -66,13 +67,7 @@ public class EmailDialog extends AbstractEmailDialog {
 		messageTemplate.addChangedHandler(event -> {
 			if (messageTemplate.getValueAsString() != null && !"".equals(messageTemplate.getValueAsString())) {
 				MessageService.Instance.get().getTemplate(Long.parseLong(messageTemplate.getValueAsString()),
-						new AsyncCallback<GUIMessageTemplate>() {
-
-							@Override
-							public void onFailure(Throwable caught) {
-								GuiLog.serverError(caught);
-							}
-
+						new DefaultAsyncCallback<>() {
 							@Override
 							public void onSuccess(GUIMessageTemplate t) {
 								subject.setValue(t.getSubject());
@@ -110,7 +105,7 @@ public class EmailDialog extends AbstractEmailDialog {
 
 		fields.add(1, messageTemplate);
 		fields.add(2, subject);
-		if (docIds.length == 1)
+		if (docIds.size() == 1)
 			fields.add(3, ticket);
 		else
 			fields.add(3, zip);
@@ -136,51 +131,42 @@ public class EmailDialog extends AbstractEmailDialog {
 
 		updateSignature();
 
-		MessageService.Instance.get().loadTemplates(I18N.getLocale(), "user",
-				new AsyncCallback<GUIMessageTemplate[]>() {
-
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
-					@Override
-					public void onSuccess(GUIMessageTemplate[] templates) {
-						LinkedHashMap<String, String> map = new LinkedHashMap<>();
-						map.put("", "");
-						for (GUIMessageTemplate t : templates)
-							map.put("" + t.getId(), t.getName());
-						messageTemplate.setValueMap(map);
-						messageTemplate.setValue("");
-					}
-				});
+		MessageService.Instance.get().loadTemplates(I18N.getLocale(), "user", new DefaultAsyncCallback<>() {
+			@Override
+			public void onSuccess(List<GUIMessageTemplate> templates) {
+				LinkedHashMap<String, String> map = new LinkedHashMap<>();
+				map.put("", "");
+				for (GUIMessageTemplate t : templates)
+					map.put("" + t.getId(), t.getName());
+				messageTemplate.setValueMap(map);
+				messageTemplate.setValue("");
+			}
+		});
 	}
 
 	@Override
-	protected void onSend(GUIEmail mail) {
+	protected void onSubmit(GUIEmail mail) {
 		LD.contactingServer();
-		DocumentService.Instance.get().sendAsEmail(mail, Session.get().getUser().getLanguage(),
-				new AsyncCallback<String>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						LD.clearPrompt();
-						GuiLog.serverError(caught);
-						sendButton.enable();
-						destroy();
-					}
+		DocumentService.Instance.get().sendAsEmail(mail, Session.get().getUser().getLanguage(), new DefaultAsyncCallback<>() {
+			@Override
+			public void onFailure(Throwable caught) {
+				super.onFailure(caught);
+				sendButton.enable();
+				destroy();
+			}
 
-					@Override
-					public void onSuccess(String result) {
-						LD.clearPrompt();
-						sendButton.enable();
-						if ("ok".equals(result)) {
-							GuiLog.info(I18N.message("messagesent") + ". " + I18N.message("documentcopysent"));
-						} else {
-							GuiLog.error(I18N.message("messagenotsent"), null, null);
-						}
-						destroy();
-					}
-				});
+			@Override
+			public void onSuccess(String result) {
+				LD.clearPrompt();
+				sendButton.enable();
+				if ("ok".equals(result)) {
+					GuiLog.info(I18N.message("messagesent") + ". " + I18N.message("documentcopysent"));
+				} else {
+					GuiLog.error(I18N.message("messagenotsent"), null, null);
+				}
+				destroy();
+			}
+		});
 	}
 
 	private String getMessageWithoutSignature() {
@@ -223,5 +209,15 @@ public class EmailDialog extends AbstractEmailDialog {
 			message.setValue(currentMessage + SIGNATURE_SEPARATOR + "<br />" + sgn);
 		else
 			message.setValue(currentMessage);
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+	
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

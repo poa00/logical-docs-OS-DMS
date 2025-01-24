@@ -1,19 +1,19 @@
 package com.logicaldoc.gui.frontend.client.workflow;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIWorkflow;
 import com.logicaldoc.gui.common.client.data.WorkflowHistoriesDS;
+import com.logicaldoc.gui.common.client.grid.DateListGridField;
+import com.logicaldoc.gui.common.client.grid.DateListGridField.DateCellFormatter;
+import com.logicaldoc.gui.common.client.grid.IdListGridField;
+import com.logicaldoc.gui.common.client.grid.RefreshableListGrid;
+import com.logicaldoc.gui.common.client.grid.UserListGridField;
+import com.logicaldoc.gui.common.client.grid.VersionListGridField;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.GridUtil;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.LD;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField.DateCellFormatter;
-import com.logicaldoc.gui.common.client.widgets.grid.RefreshableListGrid;
-import com.logicaldoc.gui.common.client.widgets.grid.UserListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.VersionListGridField;
 import com.logicaldoc.gui.frontend.client.services.WorkflowService;
 import com.smartgwt.client.data.Record;
 import com.smartgwt.client.types.HeaderControls;
@@ -86,12 +86,7 @@ public class WorkflowHistoryDialog extends Window {
 				return;
 
 			WorkflowService.Instance.get().get(selectedRecord.getAttributeAsString("name"), null,
-					new AsyncCallback<GUIWorkflow>() {
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
-						}
-
+					new DefaultAsyncCallback<>() {
 						@Override
 						public void onSuccess(GUIWorkflow result) {
 							selectedWorkflow = result;
@@ -137,7 +132,8 @@ public class WorkflowHistoryDialog extends Window {
 		body.setMembers(toolStrip, instancesContainer, historiesContainer);
 		addItem(body);
 
-		ListGridField id = new ListGridField("id", I18N.message("instance"), 70);
+		ListGridField id = new IdListGridField("instance");
+		id.setHidden(false);
 		ListGridField startDate = new DateListGridField(STARTDATE, STARTDATE, DateCellFormatter.FORMAT_LONG);
 
 		ListGridField endDate = new DateListGridField("enddate", "enddate", DateCellFormatter.FORMAT_LONG);
@@ -163,7 +159,7 @@ public class WorkflowHistoryDialog extends Window {
 				}
 			}
 		};
-		
+
 		instancesGrid.setCanFreezeFields(true);
 		instancesGrid.setAutoFetchData(true);
 		instancesGrid.setShowHeader(true);
@@ -174,7 +170,7 @@ public class WorkflowHistoryDialog extends Window {
 		instancesGrid.setBorder("1px solid #E1E1E1");
 		instancesGrid.sort(STARTDATE, SortDirection.DESCENDING);
 		instancesGrid.setFields(id, version, templateId, tag, startDate, endDate, documents, initiator, documentIds);
-		
+
 		instancesGrid.addCellDoubleClickHandler(event -> onInstanceSelected());
 		instancesGrid.addCellContextClickHandler(event -> {
 			showInstanceContextMenu();
@@ -225,12 +221,7 @@ public class WorkflowHistoryDialog extends Window {
 		delete.addClickHandler(event -> LD.ask(I18N.message("question"), I18N.message("confirmdelete"), value -> {
 			if (Boolean.TRUE.equals(value)) {
 				WorkflowService.Instance.get().deleteInstance(selection.getAttributeAsString("id"),
-						new AsyncCallback<Void>() {
-							@Override
-							public void onFailure(Throwable caught) {
-								GuiLog.serverError(caught);
-							}
-
+						new DefaultAsyncCallback<>() {
 							@Override
 							public void onSuccess(Void result) {
 								instancesGrid.removeSelectedData();
@@ -246,20 +237,24 @@ public class WorkflowHistoryDialog extends Window {
 		completionDiagram.setTitle(I18N.message("completiondiagram"));
 		completionDiagram.addClickHandler(event -> WorkflowService.Instance.get().getCompletionDiagram(
 				selectedWorkflow.getName(), selectedWorkflow.getVersion(), selection.getAttributeAsString("id"),
-				new AsyncCallback<GUIWorkflow>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(GUIWorkflow workflow) {
-						WorkflowPreview diagramWindow = new WorkflowPreview(workflow);
-						diagramWindow.show();
+						new WorkflowPreview(workflow).show();
 					}
 				}));
 
 		contextMenu.setItems(completionDiagram, delete);
 		contextMenu.showContextMenu();
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

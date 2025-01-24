@@ -1,7 +1,9 @@
 package com.logicaldoc.gui.common.client.beans;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 
 import com.logicaldoc.gui.common.client.Constants;
 
@@ -41,10 +43,6 @@ public class GUIWFState implements Serializable {
 
 	private String reminderUnit = Constants.TIME_MINUTE;
 
-	private GUIValue[] participants;
-
-	private GUITransition[] transitions;
-
 	private String owner = "";
 
 	private String pooledActors = "";
@@ -68,6 +66,10 @@ public class GUIWFState implements Serializable {
 	private String onAssignment;
 
 	private String onCompletion;
+
+	private String onOverdue;
+	
+	private String onValidation;
 
 	private String display;
 
@@ -93,6 +95,10 @@ public class GUIWFState implements Serializable {
 	 */
 	private Integer minNoteSize;
 
+	private List<GUIValue> candidates = new ArrayList<>();
+
+	private List<GUITransition> transitions = new ArrayList<>();
+
 	public GUIWFState() {
 	}
 
@@ -100,6 +106,14 @@ public class GUIWFState implements Serializable {
 		this.id = id;
 		this.name = name;
 		this.type = type;
+	}
+
+	public String getOnOverdue() {
+		return onOverdue;
+	}
+
+	public void setOnOverdue(String onOverdue) {
+		this.onOverdue = onOverdue;
 	}
 
 	public int getType() {
@@ -124,22 +138,6 @@ public class GUIWFState implements Serializable {
 
 	public void setDescription(String description) {
 		this.description = description;
-	}
-
-	public GUIValue[] getParticipants() {
-		return participants;
-	}
-
-	public void setParticipants(GUIValue[] participants) {
-		this.participants = participants;
-	}
-
-	public GUITransition[] getTransitions() {
-		return transitions;
-	}
-
-	public void setTransitions(GUITransition[] transitions) {
-		this.transitions = transitions;
 	}
 
 	public String getId() {
@@ -354,5 +352,29 @@ public class GUIWFState implements Serializable {
 
 	public void setMinNoteSize(Integer minNoteSize) {
 		this.minNoteSize = minNoteSize;
+	}
+
+	public List<GUIValue> getCandidates() {
+		return candidates;
+	}
+
+	public void setCandidates(List<GUIValue> candidates) {
+		this.candidates = candidates;
+	}
+
+	public List<GUITransition> getTransitions() {
+		return transitions;
+	}
+
+	public void setTransitions(List<GUITransition> transitions) {
+		this.transitions = transitions;
+	}
+
+	public String getOnValidation() {
+		return onValidation;
+	}
+
+	public void setOnValidation(String onValidation) {
+		this.onValidation = onValidation;
 	}
 }

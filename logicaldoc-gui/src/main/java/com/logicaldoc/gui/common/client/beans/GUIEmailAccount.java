@@ -1,7 +1,9 @@
 package com.logicaldoc.gui.common.client.beans;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 
 /**
  * Model of an email account.
@@ -35,6 +37,21 @@ public class GUIEmailAccount implements Serializable {
 
 	private String password;
 
+	/**
+	 * In case of OAuth authentication, this field stores the client secret
+	 */
+	private String clientSecret;
+
+	/**
+	 * In case of OAuth authentication, this field stores the client id
+	 */
+	private String clientId;
+
+	/**
+	 * In case of OAuth authentication, this field stores the tenant information
+	 */
+	private String clientTenant;
+
 	private String mailFolder;
 
 	// Comma separated list of allowed extensions
@@ -55,7 +72,7 @@ public class GUIEmailAccount implements Serializable {
 	private Date startDate;
 
 	/**
-	 * This attribute defines the EmailAccount storage format.
+	 * This attribute defines the EmailAccount store format.
 	 * 
 	 * @see #FORMAT_MULTIPLE
 	 * @see #FORMAT_EML
@@ -66,11 +83,13 @@ public class GUIEmailAccount implements Serializable {
 
 	private String type = "default";
 
-	private GUIEmailRule[] rules;
+	private List<GUIEmailRule> rules = new ArrayList<>();
 
 	private String automation;
-	
+
 	private String automationAfter;
+
+	private String automationEnd;
 
 	public GUIEmailAccount() {
 		super();
@@ -205,11 +224,11 @@ public class GUIEmailAccount implements Serializable {
 		this.ssl = ssl;
 	}
 
-	public GUIEmailRule[] getRules() {
+	public List<GUIEmailRule> getRules() {
 		return rules;
 	}
 
-	public void setRules(GUIEmailRule[] rules) {
+	public void setRules(List<GUIEmailRule> rules) {
 		this.rules = rules;
 	}
 
@@ -251,5 +270,37 @@ public class GUIEmailAccount implements Serializable {
 
 	public void setAutomationAfter(String automationAfter) {
 		this.automationAfter = automationAfter;
+	}
+
+	public String getClientSecret() {
+		return clientSecret;
+	}
+
+	public String getClientId() {
+		return clientId;
+	}
+
+	public void setClientSecret(String clientSecret) {
+		this.clientSecret = clientSecret;
+	}
+
+	public void setClientId(String clientId) {
+		this.clientId = clientId;
+	}
+
+	public String getClientTenant() {
+		return clientTenant;
+	}
+
+	public void setClientTenant(String clientTenant) {
+		this.clientTenant = clientTenant;
+	}
+
+	public String getAutomationEnd() {
+		return automationEnd;
+	}
+
+	public void setAutomationEnd(String automationEnd) {
+		this.automationEnd = automationEnd;
 	}
 }

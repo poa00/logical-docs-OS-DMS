@@ -13,9 +13,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.logicaldoc.core.document.Document;
+import com.logicaldoc.core.document.DocumentDAO;
 import com.logicaldoc.core.document.Version;
-import com.logicaldoc.core.document.dao.DocumentDAO;
-import com.logicaldoc.core.document.dao.VersionDAO;
+import com.logicaldoc.core.document.VersionDAO;
 import com.logicaldoc.core.security.Session;
 import com.logicaldoc.util.Context;
 import com.logicaldoc.web.util.ServletUtil;
@@ -56,8 +56,8 @@ public class ConvertPdf extends HttpServlet {
 		try {
 			Session session = ServletUtil.validateSession(request);
 
-			DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
-			VersionDAO versionDao = (VersionDAO) Context.get().getBean(VersionDAO.class);
+			DocumentDAO docDao = Context.get(DocumentDAO.class);
+			VersionDAO versionDao = Context.get(VersionDAO.class);
 
 			long docId = Long.parseLong(request.getParameter(DOCUMENT_ID));
 			Document document = docDao.findById(docId);

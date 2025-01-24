@@ -1,16 +1,18 @@
 package com.logicaldoc.gui.frontend.client.document;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIBookmark;
 import com.logicaldoc.gui.common.client.beans.GUIFolder;
 import com.logicaldoc.gui.common.client.data.BookmarksDS;
+import com.logicaldoc.gui.common.client.grid.ColoredListGridField;
+import com.logicaldoc.gui.common.client.grid.FileNameListGridField;
+import com.logicaldoc.gui.common.client.grid.IdListGridField;
+import com.logicaldoc.gui.common.client.grid.RefreshableListGrid;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.DocUtil;
+import com.logicaldoc.gui.common.client.util.GridUtil;
 import com.logicaldoc.gui.common.client.util.LD;
-import com.logicaldoc.gui.common.client.widgets.grid.ColoredListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.FileNameListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.RefreshableListGrid;
+import com.logicaldoc.gui.common.client.validators.MinLengthValidator;
 import com.logicaldoc.gui.frontend.client.services.DocumentService;
 import com.logicaldoc.gui.frontend.client.services.FolderService;
 import com.smartgwt.client.types.ListGridEditEvent;
@@ -47,11 +49,9 @@ public class BookmarksPanel extends VLayout {
 
 	@Override
 	public void onDraw() {
-		ListGridField id = new ListGridField("id");
-		id.setHidden(true);
+		ListGridField id = new IdListGridField();
 
-		LengthRangeValidator validator = new LengthRangeValidator();
-		validator.setMin(1);
+		LengthRangeValidator validator = new MinLengthValidator(1);
 
 		FileNameListGridField name = new FileNameListGridField("name", "icon", I18N.message("name"), 200);
 		name.setWidth("*");
@@ -68,7 +68,7 @@ public class BookmarksPanel extends VLayout {
 		list.setWidth100();
 		list.setHeight100();
 		list.setAutoFetchData(true);
-		list.setFields(name, description);
+		list.setFields(id, name, description);
 		list.setDataSource(new BookmarksDS());
 		list.setShowFilterEditor(true);
 		list.setFilterOnKeypress(true);
@@ -78,16 +78,10 @@ public class BookmarksPanel extends VLayout {
 		list.addCellContextClickHandler(event -> {
 			final ListGridRecord rec = list.getSelectedRecord();
 			FolderService.Instance.get().getFolder(Long.parseLong(rec.getAttributeAsString("folderId")), false, false,
-					false, new AsyncCallback<GUIFolder>() {
-
+					false, new DefaultAsyncCallback<>() {
 						@Override
 						public void onSuccess(GUIFolder folder) {
 							showContextMenu(folder, rec.getAttributeAsString("type").equals("0"));
-						}
-
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
 						}
 					});
 			event.cancel();
@@ -125,24 +119,16 @@ public class BookmarksPanel extends VLayout {
 			final ListGridRecord[] selection = list.getSelectedRecords();
 			if (selection == null || selection.length == 0)
 				return;
-			final long[] ids = new long[selection.length];
-			for (int i = 0; i < selection.length; i++) {
-				ids[i] = Long.parseLong(selection[i].getAttribute("id"));
-			}
 
-			LD.ask(I18N.message("question"), I18N.message("confirmdelete"), (Boolean value) -> {
-				if (Boolean.TRUE.equals(value)) {
-					DocumentService.Instance.get().deleteBookmarks(ids, new AsyncCallback<Void>() {
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
-						}
-
-						@Override
-						public void onSuccess(Void result) {
-							list.removeSelectedData();
-						}
-					});
+			LD.ask(I18N.message("question"), I18N.message("confirmdelete"), answer -> {
+				if (Boolean.TRUE.equals(answer)) {
+					DocumentService.Instance.get().deleteBookmarks(GridUtil.getIds(selection),
+							new DefaultAsyncCallback<>() {
+								@Override
+								public void onSuccess(Void result) {
+									list.removeSelectedData();
+								}
+							});
 				}
 			});
 		});
@@ -182,5 +168,15 @@ public class BookmarksPanel extends VLayout {
 			DocumentsPanel.get().openInFolder(rec.getAttributeAsLong("folderId"), rec.getAttributeAsLong(TARGET_ID));
 		else
 			DocumentsPanel.get().openInFolder(rec.getAttributeAsLong(TARGET_ID), null);
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

@@ -2,6 +2,7 @@ package com.logicaldoc.web;
 
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.security.NoSuchAlgorithmException;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Locale;
@@ -20,12 +21,13 @@ import org.slf4j.LoggerFactory;
 
 import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.automation.Automation;
+import com.logicaldoc.core.automation.AutomationException;
 import com.logicaldoc.core.communication.EMail;
 import com.logicaldoc.core.communication.EMailSender;
 import com.logicaldoc.core.communication.Recipient;
 import com.logicaldoc.core.security.Tenant;
-import com.logicaldoc.core.security.User;
-import com.logicaldoc.core.security.dao.UserDAO;
+import com.logicaldoc.core.security.user.User;
+import com.logicaldoc.core.security.user.UserDAO;
 import com.logicaldoc.core.ticket.Ticket;
 import com.logicaldoc.core.ticket.TicketDAO;
 import com.logicaldoc.util.Context;
@@ -83,7 +85,7 @@ public class PswRecovery extends HttpServlet {
 
 			log.debug("Recover password for ticket with ticketId={}", ticketId);
 
-			TicketDAO ticketDao = (TicketDAO) Context.get().getBean(TicketDAO.class);
+			TicketDAO ticketDao = Context.get(TicketDAO.class);
 			Ticket ticket = ticketDao.findByTicketId(ticketId);
 
 			if ((ticket != null) && ticket.getType() == Ticket.PSW_RECOVERY) {
@@ -93,7 +95,7 @@ public class PswRecovery extends HttpServlet {
 					return;
 				}
 
-				UserDAO userDao = (UserDAO) Context.get().getBean(UserDAO.class);
+				UserDAO userDao = Context.get(UserDAO.class);
 				User user = userDao.findById(Long.parseLong(userId));
 
 				sendEmail(request, response, tenant, ticket, user);
@@ -114,7 +116,8 @@ public class PswRecovery extends HttpServlet {
 	}
 
 	private void sendEmail(HttpServletRequest request, HttpServletResponse response, String tenant, Ticket ticket,
-			User user) throws IOException, PersistenceException, MessagingException {
+			User user) throws IOException, PersistenceException, MessagingException, NoSuchAlgorithmException,
+			AutomationException {
 
 		EMail email = new EMail();
 		email.setHtml(1);
@@ -134,7 +137,7 @@ public class PswRecovery extends HttpServlet {
 		user.setPasswordChanged(new Date());
 		user.setPasswordExpired(1);
 
-		UserDAO userDao = (UserDAO) Context.get().getBean(UserDAO.class);
+		UserDAO userDao = Context.get(UserDAO.class);
 		userDao.store(user);
 
 		Locale locale = user.getLocale();
@@ -162,7 +165,7 @@ public class PswRecovery extends HttpServlet {
 
 		ticket.setCount(ticket.getCount() + 1);
 
-		TicketDAO ticketDao = (TicketDAO) Context.get().getBean(TicketDAO.class);
+		TicketDAO ticketDao = Context.get(TicketDAO.class);
 		ticketDao.store(ticket);
 	}
 

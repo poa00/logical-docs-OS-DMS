@@ -4,7 +4,6 @@ import java.lang.reflect.InvocationTargetException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 
 import org.apache.commons.beanutils.BeanUtils;
@@ -20,6 +19,7 @@ import com.logicaldoc.core.i18n.LanguageManager;
 import com.logicaldoc.core.security.SessionManager;
 import com.logicaldoc.core.security.Tenant;
 import com.logicaldoc.core.security.authentication.AuthenticationException;
+import com.logicaldoc.core.security.user.UserDAO;
 import com.logicaldoc.core.stats.StatsCollector;
 import com.logicaldoc.util.Context;
 import com.logicaldoc.webservice.AbstractService;
@@ -39,96 +39,75 @@ public class SoapSystemService extends AbstractService implements SystemService 
 	protected static Logger log = LoggerFactory.getLogger(SoapSystemService.class);
 
 	@Override
-	public WSParameter[] getStatistics(String sid)
+	public List<WSParameter> getStatistics(String sid)
+			throws AuthenticationException, WebserviceException, PersistenceException {
+		return getTenantStatistics(sid, Tenant.SYSTEM_ID);
+	}
+
+	@Override
+	public List<WSParameter> getTenantStatistics(String sid, long tenantId)
 			throws AuthenticationException, WebserviceException, PersistenceException {
 		validateSession(sid);
 
-		WSParameter[] parameters = new WSParameter[15];
+		List<WSParameter> parameters = new ArrayList<>();
 		try {
 			/*
 			 * Repository statistics
 			 */
-			WSParameter docDirSize = getDocDirSize();
-			parameters[0] = docDirSize;
-
-			WSParameter userDirSize = getUserDirSize();
-			parameters[1] = userDirSize;
-
-			WSParameter indexDirSize = getIndexDirSize();
-			parameters[2] = indexDirSize;
-
-			WSParameter importDirSize = getImportDirSize();
-			parameters[3] = importDirSize;
-
-			WSParameter exportDirSize = getExportDirSize();
-			parameters[4] = exportDirSize;
-
-			WSParameter pluginsDirSize = getPluginsDirSize();
-			parameters[5] = pluginsDirSize;
-
-			WSParameter dbDirSize = getDbDirSize();
-			parameters[6] = dbDirSize;
-
-			WSParameter logsDirSize = getLogsDirSize();
-			parameters[7] = logsDirSize;
+			parameters.add(getStat("docdir", "repo_storage", tenantId));
+			parameters.add(getStat("userdir", "repo_users", Tenant.SYSTEM_ID));
+			parameters.add(getStat("indexdir", "repo_fulltextindex", Tenant.SYSTEM_ID));
+			parameters.add(getStat("importdir", "repo_import", Tenant.SYSTEM_ID));
+			parameters.add(getStat("exportdir", "repo_export", Tenant.SYSTEM_ID));
+			parameters.add(getStat("plugindir", "repo_plugins", Tenant.SYSTEM_ID));
+			parameters.add(getStat("dbdir", "repo_database", Tenant.SYSTEM_ID));
+			parameters.add(getStat("logdir", "repo_logs", Tenant.SYSTEM_ID));
 
 			/*
 			 * Document statistics
 			 */
-			GenericDAO genDao = (GenericDAO) Context.get().getBean(GenericDAO.class);
-			Generic gen = genDao.findByAlternateKey(StatsCollector.STAT, "notindexeddocs", null, Tenant.DEFAULT_ID);
-			WSParameter notIndexed = new WSParameter();
-			notIndexed.setName("docs_notindexed");
-			notIndexed.setValue(gen != null ? Long.toString(gen.getInteger1()) : "0");
-			parameters[8] = notIndexed;
-
-			gen = genDao.findByAlternateKey(StatsCollector.STAT, "indexeddocs", null, Tenant.DEFAULT_ID);
-			WSParameter indexed = new WSParameter();
-			indexed.setName("docs_indexed");
-			indexed.setValue(gen != null ? Long.toString(gen.getInteger1()) : "0");
-			parameters[9] = indexed;
-
-			gen = genDao.findByAlternateKey(StatsCollector.STAT, "deleteddocs", null, Tenant.DEFAULT_ID);
-			WSParameter deletedDocs = new WSParameter();
-			deletedDocs.setName("docs_trash");
-			deletedDocs.setValue(gen != null ? Long.toString(gen.getInteger1()) : "0");
-			parameters[10] = deletedDocs;
+			parameters.add(getStat("notindexeddocs", "docs_notindexed", tenantId));
+			parameters.add(getStat("notindexabledocs", "docs_notindexable", tenantId));
+			parameters.add(getStat("indexeddocs", "docs_indexed", tenantId));
+			parameters.add(getStat("deleteddocs", "docs_trash", tenantId));
+			parameters.add(getStat("archiveddocs", "docs_archived", tenantId));
+			parameters.add(getStat("totaldocs", "docs_total", tenantId));
 
 			/*
 			 * Folders statistics
 			 */
-			gen = genDao.findByAlternateKey(StatsCollector.STAT, "withdocs", null, Tenant.DEFAULT_ID);
-			WSParameter notEmptyFolders = new WSParameter();
-			notEmptyFolders.setName("folder_withdocs");
-			notEmptyFolders.setValue(gen != null ? Long.toString(gen.getInteger1()) : "0");
-			parameters[11] = notEmptyFolders;
+			parameters.add(getStat("withdocs", "folder_withdocs", tenantId));
+			parameters.add(getStat("empty", "folder_empty", tenantId));
+			parameters.add(getStat("deletedfolders", "folder_trash", tenantId));
 
-			gen = genDao.findByAlternateKey(StatsCollector.STAT, "empty", null, Tenant.DEFAULT_ID);
-			WSParameter emptyFolders = new WSParameter();
-			emptyFolders.setName("folder_empty");
-			emptyFolders.setValue(gen != null ? Long.toString(gen.getInteger1()) : "0");
-			parameters[12] = emptyFolders;
-
-			gen = genDao.findByAlternateKey(StatsCollector.STAT, "deletedfolders", null, Tenant.DEFAULT_ID);
-			WSParameter deletedFolders = new WSParameter();
-			deletedFolders.setName("folder_trash");
-			deletedFolders.setValue(gen != null ? Long.toString(gen.getInteger1()) : "0");
-			parameters[13] = deletedFolders;
-
+			/*
+			 * Users statistics
+			 */
+			UserDAO userDao = Context.get(UserDAO.class);
+			WSParameter users = new WSParameter();
+			users.setName("users_regular");
+			users.setValue(Long.toString(userDao.count(tenantId != Tenant.SYSTEM_ID ? tenantId : null)));
+			parameters.add(users);
+			
+			WSParameter readonly = new WSParameter();
+			readonly.setName("users_readonly");
+			readonly.setValue(Long.toString(userDao.countGuests(tenantId != Tenant.SYSTEM_ID ? tenantId : null)));
+			parameters.add(readonly);
+					
 			/*
 			 * Last run
 			 */
-			gen = genDao.findByAlternateKey(StatsCollector.STAT, "lastrun", null, Tenant.DEFAULT_ID);
+			GenericDAO genDao = Context.get(GenericDAO.class);
+			Generic gen = genDao.findByAlternateKey(StatsCollector.STAT, "lastrun", null, Tenant.SYSTEM_ID);
 			DateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-			Date date = gen != null ? df.parse(gen.getString1()) : null;
 			WSParameter lastrun = new WSParameter();
 			lastrun.setName("stats_lastrun");
-			if (date != null) {
-				lastrun.setValue(df.format(date));
+			if (gen.getDate1() != null) {
+				lastrun.setValue(df.format(gen.getDate1()));
 			} else {
 				lastrun.setValue("");
 			}
-			parameters[14] = lastrun;
+			parameters.add(lastrun);
 		} catch (Exception e) {
 			log.error(e.getMessage(), e);
 		}
@@ -136,52 +115,20 @@ public class SoapSystemService extends AbstractService implements SystemService 
 		return parameters;
 	}
 
-	private WSParameter getStat(String statSubtype, String paramName) {
-		GenericDAO genDao = (GenericDAO) Context.get().getBean(GenericDAO.class);
-		Generic gen = genDao.findByAlternateKey(StatsCollector.STAT, statSubtype, null, Tenant.DEFAULT_ID);
-		WSParameter logsDirSize = new WSParameter();
-		logsDirSize.setName(paramName);
+	private WSParameter getStat(String statSubtype, String paramName, long tenantId) throws PersistenceException {
+		GenericDAO genDao = Context.get(GenericDAO.class);
+		Generic gen = genDao.findByAlternateKey(StatsCollector.STAT, statSubtype, null, tenantId);
+		WSParameter parameter = new WSParameter();
+		parameter.setName(paramName);
 		if (gen != null)
-			logsDirSize.setValue(gen.getString1());
+			parameter.setValue(Long.toString(gen.getInteger1()));
 		else
-			logsDirSize.setValue("0");
-		return logsDirSize;
-	}
-
-	private WSParameter getLogsDirSize() {
-		return getStat("logdir", "repo_logs");
-	}
-
-	private WSParameter getDbDirSize() {
-		return getStat("dbdir", "repo_database");
-	}
-
-	private WSParameter getPluginsDirSize() {
-		return getStat("plugindir", "repo_plugins");
-	}
-
-	private WSParameter getExportDirSize() {
-		return getStat("exportdir", "repo_export");
-	}
-
-	private WSParameter getImportDirSize() {
-		return getStat("importdir", "repo_import");
-	}
-
-	private WSParameter getIndexDirSize() {
-		return getStat("indexdir", "repo_fulltextindex");
-	}
-
-	private WSParameter getUserDirSize() {
-		return getStat("userdir", "repo_users");
-	}
-
-	private WSParameter getDocDirSize() {
-		return getStat("docdir", "repo_docs");
+			parameter.setValue("0");
+		return parameter;
 	}
 
 	@Override
-	public String[] getLanguages(String tenantOrSid) {
+	public List<String> getLanguages(String tenantOrSid) {
 		List<String> langs = new ArrayList<>();
 
 		String t = Tenant.DEFAULT_NAME;
@@ -199,20 +146,23 @@ public class SoapSystemService extends AbstractService implements SystemService 
 			log.error(e.getMessage(), e);
 		}
 
-		return langs.toArray(new String[0]);
+		return langs;
 	}
 
 	@Override
 	public WSSystemInfo getInfo() throws WebserviceException {
 		try {
-			SystemInfo inf = SystemInfo.get();
-			WSSystemInfo info = new WSSystemInfo();
-			BeanUtils.copyProperties(info, inf);
+			SystemInfo info = SystemInfo.get();
+
+			WSSystemInfo wsInfo = new WSSystemInfo();
+			BeanUtils.copyProperties(wsInfo, info);
+
+			wsInfo.setFeatures(new ArrayList<>(info.getFeatures()));
 
 			DateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z");
-			info.setDate(df.format(inf.getDate()));
+			wsInfo.setDate(df.format(info.getDate()));
 
-			return info;
+			return wsInfo;
 		} catch (IllegalAccessException | InvocationTargetException e) {
 			throw new WebserviceException(e.getMessage(), e);
 		}

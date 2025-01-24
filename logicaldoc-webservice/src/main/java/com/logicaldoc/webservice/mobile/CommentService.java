@@ -19,14 +19,13 @@ import org.slf4j.LoggerFactory;
 
 import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.document.Document;
+import com.logicaldoc.core.document.DocumentDAO;
 import com.logicaldoc.core.document.DocumentNote;
-import com.logicaldoc.core.document.dao.DocumentDAO;
-import com.logicaldoc.core.document.dao.DocumentNoteDAO;
-import com.logicaldoc.core.folder.FolderDAO;
+import com.logicaldoc.core.document.DocumentNoteDAO;
 import com.logicaldoc.core.security.Permission;
-import com.logicaldoc.core.security.User;
 import com.logicaldoc.core.security.authentication.AuthenticationException;
 import com.logicaldoc.core.security.authorization.PermissionException;
+import com.logicaldoc.core.security.user.User;
 import com.logicaldoc.util.Context;
 import com.logicaldoc.webservice.AbstractService;
 import com.logicaldoc.webservice.WebserviceException;
@@ -49,14 +48,14 @@ public class CommentService extends AbstractService {
 	String docid) throws AuthenticationException, WebserviceException, PersistenceException, PermissionException {
 		User user = validateSession(sid);
 
-		DocumentDAO ddao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO ddao = Context.get(DocumentDAO.class);
 		Long docId = Long.parseLong(docid);
 		Document document = ddao.findById(docId);
 
-		checkReadEnable(user, document.getFolder().getId());
-		boolean writeEnabled = isWriteEnabled(user, document.getFolder().getId());
+		checkDocumentPermission(Permission.READ, user, docId);
+		boolean writeEnabled = isWriteEnabled(user, docId);
 
-		DocumentNoteDAO dndao = (DocumentNoteDAO) Context.get().getBean(DocumentNoteDAO.class);
+		DocumentNoteDAO dndao = Context.get(DocumentNoteDAO.class);
 
 		List<DocumentNote> notes = dndao.findByDocId(docId, document.getFileVersion());
 
@@ -84,10 +83,10 @@ public class CommentService extends AbstractService {
 		return Response.ok(comments).build();
 	}
 
-	private boolean isWriteEnabled(User user, long folderId) {
+	private boolean isWriteEnabled(User user, long docId) {
 		try {
-			FolderDAO dao = (FolderDAO) Context.get().getBean(FolderDAO.class);
-			if (dao.isPermissionEnabled(Permission.WRITE, folderId, user.getId())) {
+			DocumentDAO dao = Context.get(DocumentDAO.class);
+			if (dao.isPermissionAllowed(Permission.WRITE, docId, user.getId())) {
 				return true;
 			}
 		} catch (Exception e) {
@@ -116,7 +115,7 @@ public class CommentService extends AbstractService {
 		note.setDate(new Date());
 		note.setMessage(content);
 
-		DocumentNoteDAO dndao = (DocumentNoteDAO) Context.get().getBean(DocumentNoteDAO.class);
+		DocumentNoteDAO dndao = Context.get(DocumentNoteDAO.class);
 		dndao.store(note);
 
 		return Response.ok(comment).build();
@@ -138,7 +137,7 @@ public class CommentService extends AbstractService {
 		note.setDate(new Date());
 		note.setMessage(comment.getContent());
 
-		DocumentNoteDAO dndao = (DocumentNoteDAO) Context.get().getBean(DocumentNoteDAO.class);
+		DocumentNoteDAO dndao = Context.get(DocumentNoteDAO.class);
 		dndao.store(note);
 
 		return Response.ok(comment).build();

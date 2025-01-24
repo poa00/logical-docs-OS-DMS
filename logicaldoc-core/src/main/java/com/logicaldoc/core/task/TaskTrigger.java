@@ -1,5 +1,7 @@
 package com.logicaldoc.core.task;
 
+import javax.annotation.Resource;
+
 import org.quartz.CronTrigger;
 import org.quartz.JobDetail;
 import org.quartz.SimpleTrigger;
@@ -32,6 +34,7 @@ public class TaskTrigger implements FactoryBean<Trigger>, BeanNameAware, Initial
 
 	public static final String MODE_SIMPLE = "simple";
 
+	@Resource(name = "ContextProperties")
 	private ContextProperties config;
 
 	private Task task;

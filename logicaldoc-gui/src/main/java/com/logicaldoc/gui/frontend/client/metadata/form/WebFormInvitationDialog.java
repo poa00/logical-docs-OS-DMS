@@ -1,6 +1,6 @@
 package com.logicaldoc.gui.frontend.client.metadata.form;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIEmail;
 import com.logicaldoc.gui.common.client.beans.GUIForm;
 import com.logicaldoc.gui.common.client.dialogs.AbstractEmailDialog;
@@ -35,7 +35,7 @@ public class WebFormInvitationDialog extends AbstractEmailDialog {
 	}
 
 	@Override
-	protected void onSend(GUIEmail mail) {
+	protected void onSubmit(GUIEmail mail) {
 		if (Boolean.TRUE.equals(prefillFields.getValueAsBoolean())) {
 			new WebFormPrefilledEmail(mail, formId).show();
 			destroy();
@@ -43,12 +43,11 @@ public class WebFormInvitationDialog extends AbstractEmailDialog {
 			LD.contactingServer();
 			GUIForm gform = new GUIForm();
 			gform.setId(formId);
-			FormService.Instance.get().invite(gform, mail, I18N.getLocale(), new AsyncCallback<Void>() {
+			FormService.Instance.get().invite(gform, mail, I18N.getLocale(), new DefaultAsyncCallback<>() {
 
 				@Override
 				public void onFailure(Throwable caught) {
-					LD.clearPrompt();
-					GuiLog.serverError(caught);
+					super.onFailure(caught);
 					destroy();
 				}
 
@@ -77,5 +76,15 @@ public class WebFormInvitationDialog extends AbstractEmailDialog {
 		buttons.addMember(hintForm);
 
 		return buttons;
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

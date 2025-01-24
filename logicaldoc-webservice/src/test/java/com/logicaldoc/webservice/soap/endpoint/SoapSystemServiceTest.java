@@ -1,11 +1,14 @@
 package com.logicaldoc.webservice.soap.endpoint;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.SQLException;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.junit.Test;
 
+import com.logicaldoc.util.plugin.PluginException;
 import com.logicaldoc.webservice.AbstractWebserviceTestCase;
 import com.logicaldoc.webservice.model.WSParameter;
 import com.logicaldoc.webservice.model.WSSystemInfo;
@@ -23,7 +26,7 @@ public class SoapSystemServiceTest extends AbstractWebserviceTestCase {
 	private SoapSystemService systemServiceImpl;
 
 	@Override
-	public void setUp() throws FileNotFoundException, IOException, SQLException {
+	public void setUp() throws IOException, SQLException, PluginException {
 		super.setUp();
 
 		// Make sure that this is a SoapSystemService instance
@@ -42,13 +45,15 @@ public class SoapSystemServiceTest extends AbstractWebserviceTestCase {
 
 	@Test
 	public void testGetStatistics() throws Exception {
-		WSParameter[] parameters = systemServiceImpl.getStatistics("");
+		List<WSParameter> parameters = systemServiceImpl.getStatistics("");
 
-		Assert.assertEquals("5437281", parameters[0].getValue());
-		Assert.assertEquals("986753", parameters[6].getValue());
-		Assert.assertEquals("181", parameters[9].getValue());
-		Assert.assertEquals("45", parameters[11].getValue());
-		Assert.assertEquals("2011-02-15 10:46:27", parameters[14].getValue());
-		Assert.assertEquals("0", parameters[4].getValue());
+		Map<String, String> map = parameters.stream().collect(Collectors.toMap(p -> p.getName(), p -> p.getValue()));
+		
+		Assert.assertEquals("5437281", map.get("repo_storage"));
+		Assert.assertEquals("986753", map.get("repo_database"));
+		Assert.assertEquals("181", map.get("docs_indexed"));
+		Assert.assertEquals("45", map.get("folder_withdocs"));
+		Assert.assertEquals("2011-02-15 10:46:27", map.get("stats_lastrun"));
+		Assert.assertEquals("0", map.get("repo_import"));
 	}
 }

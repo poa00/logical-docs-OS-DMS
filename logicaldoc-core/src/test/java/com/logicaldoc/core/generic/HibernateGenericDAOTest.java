@@ -1,6 +1,5 @@
 package com.logicaldoc.core.generic;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.List;
@@ -11,6 +10,7 @@ import org.junit.Test;
 import com.logicaldoc.core.AbstractCoreTestCase;
 import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.security.Tenant;
+import com.logicaldoc.util.plugin.PluginException;
 
 import junit.framework.Assert;
 
@@ -26,7 +26,7 @@ public class HibernateGenericDAOTest extends AbstractCoreTestCase {
 	private GenericDAO dao;
 
 	@Before
-	public void setUp() throws FileNotFoundException, IOException, SQLException {
+	public void setUp() throws IOException, SQLException, PluginException {
 		super.setUp();
 		// Retrieve the instance under test from spring context. Make sure that
 		// it is an HibernateGenericDAO
@@ -41,7 +41,7 @@ public class HibernateGenericDAOTest extends AbstractCoreTestCase {
 	}
 
 	@Test
-	public void testFindByAlternateKey() {
+	public void testFindByAlternateKey() throws PersistenceException {
 		Generic generic = dao.findByAlternateKey("a", "a1", null, Tenant.DEFAULT_ID);
 		Assert.assertNotNull(generic);
 		Assert.assertEquals(Long.valueOf(0L), generic.getInteger1());
@@ -57,7 +57,7 @@ public class HibernateGenericDAOTest extends AbstractCoreTestCase {
 	}
 
 	@Test
-	public void testFindByTypeAndSubtype() {
+	public void testFindByTypeAndSubtype() throws PersistenceException {
 		List<Generic> generics = dao.findByTypeAndSubtype("a", "a%", null, null);
 		Assert.assertEquals(2, generics.size());
 		generics = dao.findByTypeAndSubtype("a", "a%", null, Tenant.DEFAULT_ID);

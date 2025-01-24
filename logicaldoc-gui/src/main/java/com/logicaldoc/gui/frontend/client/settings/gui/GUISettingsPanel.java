@@ -2,10 +2,9 @@ package com.logicaldoc.gui.frontend.client.settings.gui;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.logicaldoc.gui.common.client.Feature;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIParameter;
 import com.logicaldoc.gui.common.client.i18n.I18N;
@@ -23,6 +22,7 @@ import com.smartgwt.client.widgets.form.fields.RadioGroupItem;
 import com.smartgwt.client.widgets.form.fields.SelectItem;
 import com.smartgwt.client.widgets.form.fields.SpinnerItem;
 import com.smartgwt.client.widgets.form.fields.TextItem;
+import com.smartgwt.client.widgets.form.fields.ToggleItem;
 import com.smartgwt.client.widgets.form.fields.events.ClickEvent;
 import com.smartgwt.client.widgets.tab.Tab;
 
@@ -51,20 +51,15 @@ public class GUISettingsPanel extends AdminPanel {
 
 	@Override
 	protected void onDraw() {
-		SettingService.Instance.get().loadGUISettings(new AsyncCallback<GUIParameter[]>() {
+		SettingService.Instance.get().loadGUISettings(new DefaultAsyncCallback<>() {
 			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
-			@Override
-			public void onSuccess(GUIParameter[] settings) {
+			public void onSuccess(List<GUIParameter> settings) {
 				initGUI(settings);
 			}
 		});
 	}
 
-	private void initGUI(GUIParameter[] settings) {
+	private void initGUI(List<GUIParameter> settings) {
 		DynamicForm parametersForm = new DynamicForm();
 		parametersForm.setValuesManager(vm);
 		parametersForm.setTitleOrientation(TitleOrientation.LEFT);
@@ -113,10 +108,10 @@ public class GUISettingsPanel extends AdminPanel {
 		SelectItem density = ItemFactory.newDensitySelector();
 		density.setValue(Util.getParameterValue(settings, "gui.density").trim());
 
-		RadioGroupItem saveLogin = ItemFactory.newBooleanSelector("savelogin");
+		ToggleItem saveLogin = ItemFactory.newToggleItem("savelogin",
+				Util.getParameterValueAsBoolean(settings, "gui.savelogin"));
 		saveLogin.setHint(I18N.message("saveloginhint"));
 		saveLogin.setWrapTitle(false);
-		saveLogin.setValue(yesNo(settings, "gui.savelogin"));
 
 		SpinnerItem previewSize = ItemFactory.newSpinnerItem("previewsize", "previewwindow",
 				Integer.parseInt(Util.getParameterValue(settings, "gui.preview.size").trim()));
@@ -135,62 +130,66 @@ public class GUISettingsPanel extends AdminPanel {
 		previewSize.setMin(1);
 		previewSize.setStep(10);
 
-		RadioGroupItem banner = ItemFactory.newBooleanSelector("banner");
+		ToggleItem banner = ItemFactory.newToggleItem("banner",
+				Util.getParameterValueAsBoolean(settings, "gui.banner"));
 		banner.setWrapTitle(false);
-		banner.setValue(yesNo(settings, "gui.banner"));
 
-		RadioGroupItem openPreviewPanel = ItemFactory.newBooleanSelector("openpreviewpanel");
+		ToggleItem openPreviewPanel = ItemFactory.newToggleItem("openpreviewpanel",
+				Util.getParameterValueAsBoolean(settings, "gui.preview.openpanel"));
 		openPreviewPanel.setWrapTitle(false);
-		openPreviewPanel.setValue(yesNo(settings, "gui.preview.openpanel"));
 
-		RadioGroupItem reactToRemoteEvents = ItemFactory.newBooleanSelector("reacttoremoteevents");
+		ToggleItem showDocAttrsAsLinks = ItemFactory.newToggleItem("showdocattrsaslinks",
+				Util.getParameterValueAsBoolean(settings, "gui.showdocattrsaslinks"));
+		showDocAttrsAsLinks.setWrapTitle(false);
+
+		ToggleItem reactToRemoteEvents = ItemFactory.newToggleItem("reacttoremoteevents",
+				Util.getParameterValueAsBoolean(settings, "gui.serverpush"));
 		reactToRemoteEvents.setWrapTitle(false);
-		reactToRemoteEvents.setValue(yesNo(settings, "gui.serverpush"));
-		
-		RadioGroupItem showPushErrors = ItemFactory.newBooleanSelector("reacttoremoteeventsshowerrors");
+
+		ToggleItem showPushErrors = ItemFactory.newToggleItem("reacttoremoteeventsshowerrors",
+				Util.getParameterValueAsBoolean(settings, "gui.serverpush.showerror"));
 		showPushErrors.setWrapTitle(false);
-		showPushErrors.setValue(yesNo(settings, "gui.serverpush.showerror"));
 
-		RadioGroupItem showLicenseAlertsInLogin = ItemFactory.newBooleanSelector("showlicensealertsinlogin");
+		ToggleItem showLicenseAlertsInLogin = ItemFactory.newToggleItem("showlicensealertsinlogin",
+				Util.getParameterValueAsBoolean(settings, "gui.license.showloginalerts"));
 		showLicenseAlertsInLogin.setWrapTitle(false);
-		showLicenseAlertsInLogin.setValue(yesNo(settings, "gui.license.showloginalerts"));
 
-		RadioGroupItem showQuotaAlertsInLogin = ItemFactory.newBooleanSelector("showquotaalertsinlogin");
+		ToggleItem showQuotaAlertsInLogin = ItemFactory.newToggleItem("showquotaalertsinlogin",
+				Util.getParameterValueAsBoolean(settings, "gui.quota.showloginalerts"));
 		showQuotaAlertsInLogin.setWrapTitle(false);
-		showQuotaAlertsInLogin.setValue(yesNo(settings, "gui.quota.showloginalerts"));
 
-		RadioGroupItem showUpdateAlertsInLogin = ItemFactory.newBooleanSelector("showupdatealertsinlogin");
+		ToggleItem showUpdateAlertsInLogin = ItemFactory.newToggleItem("showupdatealertsinlogin",
+				Util.getParameterValueAsBoolean(settings, "gui.update.showloginalerts"));
 		showUpdateAlertsInLogin.setWrapTitle(false);
-		showUpdateAlertsInLogin.setValue(yesNo(settings, "gui.update.showloginalerts"));
 
-		RadioGroupItem showVersionAlertsInLogin = ItemFactory.newBooleanSelector("showversionalertsinlogin");
+		ToggleItem showVersionAlertsInLogin = ItemFactory.newToggleItem("showversionalertsinlogin",
+				Util.getParameterValueAsBoolean(settings, "gui.version.showloginalerts"));
 		showVersionAlertsInLogin.setWrapTitle(false);
-		showVersionAlertsInLogin.setValue(yesNo(settings, "gui.version.showloginalerts"));
 
-		RadioGroupItem showPatchAlertsInLogin = ItemFactory.newBooleanSelector("showpatchalertsinlogin");
+		ToggleItem showPatchAlertsInLogin = ItemFactory.newToggleItem("showpatchalertsinlogin",
+				Util.getParameterValueAsBoolean(settings, "gui.patch.showloginalerts"));
 		showPatchAlertsInLogin.setWrapTitle(false);
-		showPatchAlertsInLogin.setValue(yesNo(settings, "gui.patch.showloginalerts"));
 
-		RadioGroupItem showLanguageInLogin = ItemFactory.newBooleanSelector("showlanguageinlogin");
+		ToggleItem showLanguageInLogin = ItemFactory.newToggleItem("showlanguageinlogin",
+				Util.getParameterValueAsBoolean(settings, "gui.login.lang"));
 		showLicenseAlertsInLogin.setWrapTitle(false);
-		showLanguageInLogin.setValue(yesNo(settings, "gui.login.lang"));
 
-		RadioGroupItem showLostPassword = ItemFactory.newBooleanSelector("showlostpassword",
-				I18N.message("showlostpasswordlink"));
+		ToggleItem showLostPassword = ItemFactory.newToggleItem("showlostpassword",
+				I18N.message("showlostpasswordlink"),
+				Util.getParameterValueAsBoolean(settings, "gui.lostpassword.show"));
 		showLostPassword.setWrapTitle(false);
-		showLostPassword.setValue(yesNo(settings, "gui.lostpassword.show"));
 
-		RadioGroupItem galleryEnabled = ItemFactory.newBooleanSelector("galleryenabled");
+		ToggleItem galleryEnabled = ItemFactory.newToggleItem("galleryenabled",
+				Util.getParameterValueAsBoolean(settings, "gui.galleryenabled"));
 		galleryEnabled.setWrapTitle(false);
-		galleryEnabled.setValue(yesNo(settings, "gui.galleryenabled"));
 
-		RadioGroupItem allowNotesEditing = ItemFactory.newBooleanSelector("allownotesediting");
+		ToggleItem allowNotesEditing = ItemFactory.newToggleItem("allownotesediting",
+				Util.getParameterValueAsBoolean(settings, "gui.notes.allowedit"));
 		allowNotesEditing.setWrapTitle(false);
-		allowNotesEditing.setValue(yesNo(settings, "gui.notes.allowedit"));
 
-		RadioGroupItem saveInputs = ItemFactory.newBooleanSelector("saveinputs");
+		ToggleItem saveInputs = ItemFactory.newToggleItem("saveinputs",
+				Util.getParameterValueAsBoolean(settings, "gui.saveinputs"));
 		galleryEnabled.setWrapTitle(false);
-		saveInputs.setValue(yesNo(settings, "gui.saveinputs"));
 
 		SpinnerItem attrTextAreaW = ItemFactory.newSpinnerItem("textareaw", I18N.message("attrtextareaw"),
 				Integer.parseInt(Util.getParameterValue(settings, "gui.textarea.w").trim()));
@@ -300,7 +299,7 @@ public class GUISettingsPanel extends AdminPanel {
 		previewMaxFileSize.setMin(0);
 		previewMaxFileSize.setStep(1);
 
-		TextItem uploadDisallow = ItemFactory.newTextItem("disallow", "disallowedext",
+		TextItem uploadDisallow = ItemFactory.newTextItem("disallow", "disallowedexts",
 				Util.getParameterValue(settings, "upload.disallow"));
 		uploadDisallow.setHint(I18N.message("separatedcomma"));
 		uploadDisallow.setWidth(350);
@@ -314,53 +313,58 @@ public class GUISettingsPanel extends AdminPanel {
 		textExtensions.setRequired(false);
 		textExtensions.setWrapTitle(false);
 
-		RadioGroupItem ondoubleclick = ItemFactory.newBooleanSelector("ondoubleclick");
+		RadioGroupItem ondoubleclick = ItemFactory.newRadioGroup("ondoubleclick");
 		ondoubleclick.setValueMap(DOWNLOAD, "preview");
 		ondoubleclick.setValue(Util.getParameterValue(settings, "gui.doubleclick"));
 
-		RadioGroupItem docTab = ItemFactory.newBooleanSelector("doctab");
+		RadioGroupItem docTab = ItemFactory.newRadioGroup("doctab");
 		docTab.setValueMap("properties", "preview");
 		docTab.setValue(Util.getParameterValue(settings, "gui.document.tab"));
 
-		RadioGroupItem foldSorting = ItemFactory.newBooleanSelector("foldsorting");
+		RadioGroupItem foldSorting = ItemFactory.newRadioGroup("foldsorting");
 		foldSorting.setValueMap("name", "date");
 		foldSorting.setValue(Util.getParameterValue(settings, "gui.folder.sorting"));
 
-		RadioGroupItem downloadTicketBehavior = ItemFactory.newBooleanSelector("downloadticketbehavior");
+		RadioGroupItem downloadTicketBehavior = ItemFactory.newRadioGroup("downloadticketbehavior");
 		downloadTicketBehavior.setValueMap(DOWNLOAD, "display");
 		downloadTicketBehavior.setValue(Util.getParameterValue(settings, "downloadticket.behavior"));
 
-		RadioGroupItem webstartMode = ItemFactory.newBooleanSelector("webstartmode");
+		RadioGroupItem webstartMode = ItemFactory.newRadioGroup("webstartmode");
 		webstartMode.setValueMap("webstart", DOWNLOAD);
 		webstartMode.setValue(Util.getParameterValue(settings, "gui.webstart.mode"));
 
-		RadioGroupItem foldOpentree = ItemFactory.newBooleanSelector("foldopentree","openfolderstree");
+		ToggleItem foldOpentree = ItemFactory.newToggleItem("foldopentree", "openfolderstree",
+				Util.getParameterValueAsBoolean(settings, "gui.folder.opentree"));
 		foldOpentree.setWrapTitle(false);
-		foldOpentree.setValue(yesNo(settings, "gui.folder.opentree"));
 
-		RadioGroupItem foldOpenSelect = ItemFactory.newBooleanSelector("foldopenselect");
+		ToggleItem foldOpenSelect = ItemFactory.newToggleItem("foldopenselect",
+				Util.getParameterValueAsBoolean(settings, "gui.folder.openonselect"));
 		foldOpenSelect.setWrapTitle(false);
-		foldOpenSelect.setValue(yesNo(settings, "gui.folder.openonselect"));
 
 		SpinnerItem maxHistories = ItemFactory.newSpinnerItem("maxhistories",
 				Integer.parseInt(Util.getParameterValue(settings, "gui.maxhistories").trim()));
 		maxHistories.setStep(10);
 		maxHistories.setWrapTitle(false);
 
-		RadioGroupItem foldPagination = ItemFactory.newBooleanSelector("foldpagination");
+		SpinnerItem maxVersions = ItemFactory.newSpinnerItem("maxversions",
+				Integer.parseInt(Util.getParameterValue(settings, "gui.maxversions").trim()));
+		maxVersions.setStep(10);
+		maxVersions.setWrapTitle(false);
+
+		ToggleItem foldPagination = ItemFactory.newToggleItem("foldpagination",
+				Util.getParameterValueAsBoolean(settings, "gui.folder.pagination"));
 		foldPagination.setWrapTitle(false);
-		foldPagination.setValue(yesNo(settings, "gui.folder.pagination"));
-		
+
 		SpinnerItem foldPageSize = ItemFactory.newSpinnerItem("foldpagesize",
 				Integer.parseInt(Util.getParameterValue(settings, "gui.folder.maxchildren").trim()));
 		foldPageSize.setWrapTitle(false);
 
-		RadioGroupItem autocloseFolderNodes = ItemFactory.newBooleanSelector("autoclosefoldernodes");
-		autocloseFolderNodes.setValue(yesNo(settings, "gui.folder.autoclose"));
+		ToggleItem autocloseFolderNodes = ItemFactory.newToggleItem("autoclosefoldernodes",
+				Util.getParameterValueAsBoolean(settings, "gui.folder.autoclose"));
 
-		RadioGroupItem securityOption = ItemFactory.newBooleanSelector("securityoption");
+		ToggleItem securityOption = ItemFactory.newToggleItem("securityoption",
+				Util.getParameterValueAsBoolean(settings, "gui.security.inheritoption"));
 		securityOption.setWrapTitle(false);
-		securityOption.setValue(yesNo(settings, "gui.security.inheritoption"));
 
 		SelectItem securitySecurityOptionDefault = ItemFactory.newFolderSecurityOption("securityoptiondef");
 		securitySecurityOptionDefault.setWrapTitle(false);
@@ -403,13 +407,13 @@ public class GUISettingsPanel extends AdminPanel {
 		popupTimeout.setMin(1);
 		popupTimeout.setStep(1);
 
-		RadioGroupItem askVersionCommentOnSave = ItemFactory.newBooleanSelector("askversioncommentonsave");
+		ToggleItem askVersionCommentOnSave = ItemFactory.newToggleItem("askversioncommentonsave",
+				Util.getParameterValueAsBoolean(settings, "gui.onsave.askversioncomment"));
 		askVersionCommentOnSave.setWrapTitle(false);
-		askVersionCommentOnSave.setValue(yesNo(settings, "gui.onsave.askversioncomment"));
 
-		RadioGroupItem lockOnEditing = ItemFactory.newBooleanSelector("lockonediting");
+		ToggleItem lockOnEditing = ItemFactory.newToggleItem("lockonediting",
+				Util.getParameterValueAsBoolean(settings, "gui.onedit.lock"));
 		lockOnEditing.setWrapTitle(false);
-		lockOnEditing.setValue(yesNo(settings, "gui.onedit.lock"));
 
 		SpinnerItem avatarSize = ItemFactory.newSpinnerItem("avatarsize",
 				Integer.parseInt(Util.getParameterValue(settings, "gui.avatar.size").trim()));
@@ -426,9 +430,9 @@ public class GUISettingsPanel extends AdminPanel {
 		wfDashletRows.setMin(5);
 		wfDashletRows.setStep(10);
 
-		RadioGroupItem showAvatarsInGrids = ItemFactory.newBooleanSelector("showavatarsingrids");
+		ToggleItem showAvatarsInGrids = ItemFactory.newToggleItem("showavatarsingrids",
+				Util.getParameterValueAsBoolean(settings, "gui.avatar.showingrids"));
 		showAvatarsInGrids.setWrapTitle(false);
-		showAvatarsInGrids.setValue(yesNo(settings, "gui.avatar.showingrids"));
 
 		SelectItem charset = ItemFactory.newCharsetSelector(CHARSET);
 		charset.setValue(Util.getParameterValue(settings, CHARSET));
@@ -446,11 +450,12 @@ public class GUISettingsPanel extends AdminPanel {
 				showAvatarsInGrids, textExtensions, attrTextBoxW, attrTextAreaW, attrTextAreaH, noteMaxSize,
 				emailMaxSize, wfDashletRows, ondoubleclick, docTab, foldSorting, securityOption,
 				securitySecurityOptionDefault, foldOpentree, foldOpenSelect, foldPagination, foldPageSize,
-				openPreviewPanel, maxHistories, autocloseFolderNodes, webstartMode, galleryEnabled, allowNotesEditing,
-				webcontentFolders, downloadTicketBehavior, saveLogin, sessionTimeout, rpcTimeout, sessionHeartbeat,
-				popupTimeout, charset, lockOnEditing, askVersionCommentOnSave, reactToRemoteEvents, showPushErrors, saveInputs,
-				showVersionAlertsInLogin, showLicenseAlertsInLogin, showQuotaAlertsInLogin, showUpdateAlertsInLogin,
-				showPatchAlertsInLogin, showLanguageInLogin, showLostPassword, save);
+				showDocAttrsAsLinks, openPreviewPanel, maxHistories, maxVersions, autocloseFolderNodes, webstartMode,
+				galleryEnabled, allowNotesEditing, webcontentFolders, downloadTicketBehavior, saveLogin, sessionTimeout,
+				rpcTimeout, sessionHeartbeat, popupTimeout, charset, lockOnEditing, askVersionCommentOnSave,
+				reactToRemoteEvents, showPushErrors, saveInputs, showVersionAlertsInLogin, showLicenseAlertsInLogin,
+				showQuotaAlertsInLogin, showUpdateAlertsInLogin, showPatchAlertsInLogin, showLanguageInLogin,
+				showLostPassword, save);
 	}
 
 	private void onSave() {
@@ -460,13 +465,7 @@ public class GUISettingsPanel extends AdminPanel {
 		for (GUIParameter p : params)
 			Session.get().getInfo().setConfig(p.getName(), p.getValue());
 
-		SettingService.Instance.get().saveSettings(params.toArray(new GUIParameter[0]), new AsyncCallback<Void>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
+		SettingService.Instance.get().saveSettings(params, new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(Void ret) {
 				GuiLog.info(I18N.message("settingssaved"), null);
@@ -480,126 +479,131 @@ public class GUISettingsPanel extends AdminPanel {
 
 		collectBooleanSwitches(params);
 
-		@SuppressWarnings("unchecked")
-		Map<String, Object> values = vm.getValues();
-		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.welcome", (String) values.get("welcome")));
-		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.density", (String) values.get("density")));
+		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.welcome", vm.getValueAsString("welcome")));
+		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.density", vm.getValueAsString("density")));
 		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.preview.size",
-				values.get("previewsize").toString()));
+				vm.getValueAsString("previewsize")));
 		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.preview.timeout",
-				values.get("previewtimeout").toString()));
+				vm.getValueAsString("previewtimeout")));
 		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.rpc.timeout",
-				values.get("rpctimeout").toString()));
+				vm.getValueAsString("rpctimeout")));
 		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.popup.timeout",
-				values.get("popuptimeout").toString()));
-		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.textarea.w",
-				values.get("textareaw").toString()));
-		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.textarea.h",
-				values.get("textareah").toString()));
+				vm.getValueAsString("popuptimeout")));
 		params.add(
-				new GUIParameter(Session.get().getTenantName() + ".gui.textbox.w", values.get("textboxw").toString()));
+				new GUIParameter(Session.get().getTenantName() + ".gui.textarea.w", vm.getValueAsString("textareaw")));
+		params.add(
+				new GUIParameter(Session.get().getTenantName() + ".gui.textarea.h", vm.getValueAsString("textareah")));
+		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.textbox.w", vm.getValueAsString("textboxw")));
 		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.thumbnail.size",
-				values.get("thumbsize").toString()));
+				vm.getValueAsString("thumbsize")));
 		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.thumbnail.quality",
-				values.get("thumbquality").toString()));
+				vm.getValueAsString("thumbquality")));
 		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.mobile.size",
-				values.get("mobilesize").toString()));
+				vm.getValueAsString("mobilesize")));
 		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.mobile.quality",
-				values.get("mobilequality").toString()));
-		params.add(
-				new GUIParameter(Session.get().getTenantName() + ".gui.tile.size", values.get("tilesize").toString()));
+				vm.getValueAsString("mobilequality")));
+		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.tile.size", vm.getValueAsString("tilesize")));
 		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.tile.quality",
-				values.get("tilequality").toString()));
+				vm.getValueAsString("tilequality")));
 		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.note.maxlength",
-				values.get("notemaxsize").toString()));
+				vm.getValueAsString("notemaxsize")));
 		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.email.maxlength",
-				values.get("emailmaxsize").toString()));
+				vm.getValueAsString("emailmaxsize")));
 		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.doubleclick",
-				values.get("ondoubleclick").toString()));
+				vm.getValueAsString("ondoubleclick")));
 		params.add(
-				new GUIParameter(Session.get().getTenantName() + ".gui.document.tab", values.get("doctab").toString()));
+				new GUIParameter(Session.get().getTenantName() + ".gui.document.tab", vm.getValueAsString("doctab")));
 		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.folder.sorting",
-				values.get("foldsorting").toString()));
+				vm.getValueAsString("foldsorting")));
 		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.folder.maxchildren",
-				values.get("foldpagesize").toString()));
+				vm.getValueAsString("foldpagesize")));
 		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.maxhistories",
-				values.get("maxhistories").toString()));
-		params.add(new GUIParameter(Session.get().getTenantName() + ".upload.maxsize",
-				values.get("uploadmax").toString()));
-		params.add(new GUIParameter(Session.get().getTenantName() + ".upload.disallow",
-				values.get("disallow").toString()));
+				vm.getValueAsString("maxhistories")));
+		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.maxversions",
+				vm.getValueAsString("maxversions")));
+		params.add(
+				new GUIParameter(Session.get().getTenantName() + ".upload.maxsize", vm.getValueAsString("uploadmax")));
+		params.add(
+				new GUIParameter(Session.get().getTenantName() + ".upload.disallow", vm.getValueAsString("disallow")));
 		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.webcontent.folders",
-				values.get("webcontentfolders").toString()));
+				vm.getValueAsString("webcontentfolders")));
 		params.add(new GUIParameter(Session.get().getTenantName() + ".session.timeout",
-				values.get("sessiontimeout").toString()));
+				vm.getValueAsString("sessiontimeout")));
 		params.add(new GUIParameter(Session.get().getTenantName() + ".session.heartbeat",
-				values.get("sessionheartbeat").toString()));
+				vm.getValueAsString("sessionheartbeat")));
 		params.add(new GUIParameter(Session.get().getTenantName() + ".downloadticket.behavior",
-				values.get("downloadticketbehavior").toString()));
+				vm.getValueAsString("downloadticketbehavior")));
 		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.preview.maxfilesize",
-				values.get("previewmaxfilesize").toString()));
+				vm.getValueAsString("previewmaxfilesize")));
 		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.webstart.mode",
-				values.get("webstartmode").toString()));
+				vm.getValueAsString("webstartmode")));
 		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.avatar.size",
-				values.get("avatarsize").toString()));
+				vm.getValueAsString("avatarsize")));
 		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.wf.dashlet.rows",
-				values.get("wfdashletrows").toString()));
-		params.add(new GUIParameter(Session.get().getTenantName() + ".charset", values.get(CHARSET).toString()));
+				vm.getValueAsString("wfdashletrows")));
+		params.add(new GUIParameter(Session.get().getTenantName() + ".charset", vm.getValueAsString(CHARSET)));
 		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.security.inheritoption.default",
-				values.get("securityoptiondef").toString()));
+				vm.getValueAsString("securityoptiondef")));
 		return params;
 	}
 
 	private void collectBooleanSwitches(List<GUIParameter> params) {
-		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.banner", trueFalse("banner")));
-		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.savelogin", trueFalse("savelogin")));
+		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.banner", vm.getValueAsString("banner")));
+		params.add(
+				new GUIParameter(Session.get().getTenantName() + ".gui.savelogin", vm.getValueAsString("savelogin")));
 		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.preview.openpanel",
-				trueFalse("openpreviewpanel")));
-		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.folder.opentree", trueFalse("foldopentree")));
+				vm.getValueAsString("openpreviewpanel")));
+		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.showdocattrsaslinks",
+				vm.getValueAsString("showdocattrsaslinks")));
+		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.folder.opentree",
+				vm.getValueAsString("foldopentree")));
 		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.folder.openonselect",
-				trueFalse("foldopenselect")));
+				vm.getValueAsString("foldopenselect")));
 		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.folder.pagination",
-				trueFalse("foldpagination")));
+				vm.getValueAsString("foldpagination")));
 		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.folder.autoclose",
-				trueFalse("autoclosefoldernodes")));
-		params.add(
-				new GUIParameter(Session.get().getTenantName() + ".gui.serverpush", trueFalse("reacttoremoteevents")));
-		params.add(
-				new GUIParameter(Session.get().getTenantName() + ".gui.serverpush.showerror", trueFalse("reacttoremoteeventsshowerrors")));
+				vm.getValueAsString("autoclosefoldernodes")));
+		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.serverpush",
+				vm.getValueAsString("reacttoremoteevents")));
+		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.serverpush.showerror",
+				vm.getValueAsString("reacttoremoteeventsshowerrors")));
 		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.license.showloginalerts",
-				trueFalse("showlicensealertsinlogin")));
+				vm.getValueAsString("showlicensealertsinlogin")));
 		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.quota.showloginalerts",
-				trueFalse("showquotaalertsinlogin")));
+				vm.getValueAsString("showquotaalertsinlogin")));
 		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.update.showloginalerts",
-				trueFalse("showupdatealertsinlogin")));
+				vm.getValueAsString("showupdatealertsinlogin")));
 		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.version.showloginalerts",
-				trueFalse("showversionalertsinlogin")));
+				vm.getValueAsString("showversionalertsinlogin")));
 		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.patch.showloginalerts",
-				trueFalse("showpatchalertsinlogin")));
+				vm.getValueAsString("showpatchalertsinlogin")));
 		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.security.inheritoption",
-				trueFalse("securityoption")));
-		params.add(
-				new GUIParameter(Session.get().getTenantName() + ".gui.login.lang", trueFalse("showlanguageinlogin")));
+				vm.getValueAsString("securityoption")));
+		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.login.lang",
+				vm.getValueAsString("showlanguageinlogin")));
 		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.lostpassword.show",
-				trueFalse("showlostpassword")));
+				vm.getValueAsString("showlostpassword")));
 		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.onsave.askversioncomment",
-				trueFalse("askversioncommentonsave")));
-		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.onedit.lock", trueFalse("lockonediting")));
-		params.add(
-				new GUIParameter(Session.get().getTenantName() + ".gui.galleryenabled", trueFalse("galleryenabled")));
+				vm.getValueAsString("askversioncommentonsave")));
+		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.onedit.lock",
+				vm.getValueAsString("lockonediting")));
+		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.galleryenabled",
+				vm.getValueAsString("galleryenabled")));
 		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.notes.allowedit",
-				trueFalse("allownotesediting")));
+				vm.getValueAsString("allownotesediting")));
 		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.avatar.showingrids",
-				trueFalse("showavatarsingrids")));
-		params.add(new GUIParameter(Session.get().getTenantName() + ".gui.saveinputs", trueFalse("saveinputs")));
+				vm.getValueAsString("showavatarsingrids")));
+		params.add(
+				new GUIParameter(Session.get().getTenantName() + ".gui.saveinputs", vm.getValueAsString("saveinputs")));
 	}
 
-	private String yesNo(GUIParameter[] settings, String name) {
-		String parameterValue = Util.getParameterValue(settings, name);
-		return parameterValue != null && parameterValue.equals("true") ? "yes" : "no";
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
 	}
 
-	private String trueFalse(String name) {
-		return "yes".equals(vm.getValues().get(name)) ? "true" : "false";
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

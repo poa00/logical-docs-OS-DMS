@@ -6,16 +6,12 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.SQLException;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 import javax.servlet.http.HttpServletRequest;
-import javax.xml.ws.WebServiceContext;
-import javax.xml.ws.handler.MessageContext;
 
+import org.apache.cxf.message.Message;
 import org.apache.cxf.transport.http.AbstractHTTPDestination;
 import org.junit.Before;
 import org.junit.Test;
@@ -25,16 +21,14 @@ import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
 import com.logicaldoc.util.Context;
+import com.logicaldoc.util.plugin.PluginException;
 import com.logicaldoc.webservice.AbstractWebserviceTestCase;
 
 @RunWith(MockitoJUnitRunner.class)
 public class SoapAuthServiceTest extends AbstractWebserviceTestCase {
 
 	@Mock
-	private WebServiceContext wscontext;
-
-	@Mock
-	private MessageContext messageContext;
+	private Message currentMessage;
 
 	@Mock
 	private HttpServletRequest httpRequest;
@@ -43,18 +37,15 @@ public class SoapAuthServiceTest extends AbstractWebserviceTestCase {
 	private SoapAuthService soapAuthServiceImpl;
 
 	@Before
-	public void setUp() throws FileNotFoundException, IOException, SQLException {
+	public void setUp() throws IOException, SQLException, PluginException {
 		super.setUp();
 
-		wscontext = mock(WebServiceContext.class, Answers.RETURNS_DEEP_STUBS);
-		messageContext = mock(MessageContext.class);
-
-		when(wscontext.getMessageContext()).thenReturn(messageContext);
-		when(messageContext.get(AbstractHTTPDestination.HTTP_REQUEST)).thenReturn(httpRequest);
+		currentMessage = mock(Message.class, Answers.RETURNS_DEEP_STUBS);
+		when(currentMessage.get(AbstractHTTPDestination.HTTP_REQUEST)).thenReturn(httpRequest);
 
 		// Make sure that this is a SoapAuthService instance
 		soapAuthServiceImpl = new SoapAuthService();
-		soapAuthServiceImpl.setContext(wscontext);
+		soapAuthServiceImpl.setCurrentMessage(currentMessage);
 	}
 
 	@Test
@@ -62,17 +53,23 @@ public class SoapAuthServiceTest extends AbstractWebserviceTestCase {
 		String sid = soapAuthServiceImpl.login("author", "admin");
 		assertNotNull(sid);
 	}
+	
+	@Test
+	public void testLoginApiKey() {
+		String sid = soapAuthServiceImpl.loginApiKey(apiKey.getDecodedKey());
+		assertNotNull(sid);
+	}
 
 	@Test
 	public void testLogout() {
-		String sid = soapAuthServiceImpl.login("author", "admin");
+		String sid = soapAuthServiceImpl.loginApiKey(apiKey.getDecodedKey());
 		assertNotNull(sid);
 		soapAuthServiceImpl.logout(sid);
 	}
 
 	@Test
 	public void testValid() {
-		String sid = soapAuthServiceImpl.login("author", "admin");
+		String sid = soapAuthServiceImpl.loginApiKey(apiKey.getDecodedKey());
 		assertNotNull(sid);
 		boolean isValid = soapAuthServiceImpl.valid(sid);
 		assertTrue(isValid);
@@ -91,16 +88,10 @@ public class SoapAuthServiceTest extends AbstractWebserviceTestCase {
 
 	@Test
 	public void testRenew() throws InterruptedException {
-		String sid = soapAuthServiceImpl.login("author", "admin");
+		String sid = soapAuthServiceImpl.loginApiKey(apiKey.getDecodedKey());
 		System.err.println(sid);
 		assertNotNull(sid);
 		waiting();
 		soapAuthServiceImpl.renew(sid);
-	}
-
-	private void waiting() throws InterruptedException {
-		final int secondsToWait = 5;
-		CountDownLatch lock = new CountDownLatch(1);
-		lock.await(secondsToWait, TimeUnit.SECONDS);
 	}
 }

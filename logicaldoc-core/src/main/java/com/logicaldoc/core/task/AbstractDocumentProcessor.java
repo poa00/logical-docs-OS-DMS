@@ -5,16 +5,17 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.stream.Collectors;
+
+import javax.annotation.Resource;
 
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.jdbc.core.RowMapper;
 
 import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.document.Document;
-import com.logicaldoc.core.document.dao.DocumentDAO;
-import com.logicaldoc.core.security.User;
+import com.logicaldoc.core.document.DocumentDAO;
+import com.logicaldoc.core.security.user.User;
 import com.logicaldoc.i18n.I18N;
 
 /**
@@ -29,6 +30,7 @@ public abstract class AbstractDocumentProcessor extends Task {
 
 	protected int errors = 0;
 
+	@Resource(name = "DocumentDAO")
 	protected DocumentDAO documentDao;
 
 	protected AbstractDocumentProcessor(String name) {
@@ -50,8 +52,8 @@ public abstract class AbstractDocumentProcessor extends Task {
 			int max = getBatchSize();
 
 			@SuppressWarnings("unchecked")
-			List<Long> ids = documentDao.queryForList(
-					"select ld_id from ld_document where " + prepareQueueQuery(null, null), null, Long.class, max);
+			List<Long> ids = documentDao.queryForList("select ld_id from ld_document where " + prepareQueueQuery(null),
+					null, Long.class, max);
 			getSize(max, ids);
 
 			if (size > 0)
@@ -64,7 +66,11 @@ public abstract class AbstractDocumentProcessor extends Task {
 			log.info("Errors: {}", errors);
 
 			// To be safer always release the lock
-			lockManager.release(getName(), transactionId);
+			try {
+				lockManager.release(getName(), transactionId);
+			} catch (PersistenceException e) {
+				log.warn(e.getMessage(), e);
+			}
 
 			removeTransactionReference();
 		}
@@ -77,8 +83,8 @@ public abstract class AbstractDocumentProcessor extends Task {
 
 		// Mark all these documents as belonging to the current
 		// transaction
-		documentDao.bulkUpdate("set ld_transactionid='" + transactionId + "' where ld_id in " + idsStr,
-				(Map<String, Object>) null);
+		documentDao
+				.jdbcUpdate("update ld_document set ld_transactionid='" + transactionId + "' where ld_id in " + idsStr);
 
 		// Now we can release the lock
 		lockManager.release(getName(), transactionId);
@@ -102,7 +108,7 @@ public abstract class AbstractDocumentProcessor extends Task {
 
 			try {
 				Document doc = documentDao.findById(id);
-				if (doc == null || doc.getBarcoded() != 0 || doc.getBarcodeTemplateId() == null)
+				if (doc == null)
 					continue;
 				documentDao.initialize(doc);
 
@@ -123,8 +129,8 @@ public abstract class AbstractDocumentProcessor extends Task {
 
 	private void removeTransactionReference() {
 		try {
-			documentDao.bulkUpdate("set ld_transactionid=null where ld_transactionId='" + transactionId + "'",
-					(Map<String, Object>) null);
+			documentDao.jdbcUpdate(
+					"update ld_document set ld_transactionid=null where ld_transactionId='" + transactionId + "'");
 		} catch (PersistenceException e) {
 			log.warn(e.getMessage(), e);
 		}
@@ -171,7 +177,7 @@ public abstract class AbstractDocumentProcessor extends Task {
 	 * @param user the user to process the document in the name of
 	 * 
 	 * @throws IOException I/O error
-	 * @throws PersistenceException Error in the persistrence layer
+	 * @throws PersistenceException Error in the persistence layer
 	 */
 	protected abstract void processDocument(Document document, User user) throws PersistenceException, IOException;
 
@@ -179,7 +185,7 @@ public abstract class AbstractDocumentProcessor extends Task {
 	 * Prepares the query conditions for selecting the documents that have to be
 	 * processed
 	 */
-	protected abstract String prepareQueueQuery(String transaction, Long tenantId);
+	protected abstract String prepareQueueQuery(Long tenantId);
 
 	public void setDocumentDao(DocumentDAO documentDao) {
 		this.documentDao = documentDao;

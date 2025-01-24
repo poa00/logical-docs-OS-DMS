@@ -5,7 +5,7 @@ import com.logicaldoc.gui.common.client.beans.GUIInfo;
 import com.smartgwt.client.util.Offline;
 
 /**
- * Here we handle the storage of informations in the broeserk
+ * Here we handle the store of informations in the broeserk
  * 
  * @author Marco Meschieri - LogicalDOC
  * @since 7.7.2
@@ -48,20 +48,15 @@ public class CookiesManager {
 	 */
 	public static void removeSid() {
 		try {
-			Offline.remove(COOKIE_SID);
-			Cookies.removeCookie(COOKIE_SID);
-			Cookies.removeCookie(COOKIE_JSESSIONID);
+			Cookies.removeCookie(COOKIE_SID, "/");
+			Cookies.removeCookie(COOKIE_JSESSIONID, "/");
 		} catch (Exception t) {
 			// Nothing to do
 		}
-	}
 
-	/**
-	 * Removes the cookies used to handle the login
-	 */
-	public static void removeLogin() {
 		try {
-			removeSid();
+			Offline.remove(COOKIE_SID);
+			Offline.remove(COOKIE_JSESSIONID);
 		} catch (Exception t) {
 			// Nothing to do
 		}
@@ -127,7 +122,7 @@ public class CookiesManager {
 		}
 
 		try {
-			removeLogin();
+			removeSid();
 		} catch (Exception t) {
 			// Nothing to do
 		}

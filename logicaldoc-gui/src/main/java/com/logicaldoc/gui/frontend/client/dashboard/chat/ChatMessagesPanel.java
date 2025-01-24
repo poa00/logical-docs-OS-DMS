@@ -5,10 +5,12 @@ import java.util.Date;
 import java.util.List;
 
 import com.google.gwt.user.client.Timer;
+import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.data.ChatMessagesDS;
+import com.logicaldoc.gui.common.client.grid.DateListGridField;
+import com.logicaldoc.gui.common.client.grid.RefreshableListGrid;
+import com.logicaldoc.gui.common.client.grid.UserListGridField;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.RefreshableListGrid;
 import com.smartgwt.client.data.AdvancedCriteria;
 import com.smartgwt.client.data.Record;
 import com.smartgwt.client.types.OperatorId;
@@ -24,6 +26,8 @@ import com.smartgwt.client.widgets.layout.VLayout;
  * @since 8.0.1
  */
 public class ChatMessagesPanel extends VLayout implements ChatObserver {
+	private static final String USERNAME = "username";
+
 	private static final String MESSAGE = "message";
 
 	private RefreshableListGrid messages = null;
@@ -42,8 +46,14 @@ public class ChatMessagesPanel extends VLayout implements ChatObserver {
 		message.setWidth("*");
 		message.setShowTitle(false);
 
-		ListGridField username = new ListGridField("username", I18N.message("user"), 80);
+		ListGridField user = new UserListGridField("user", "userId", "user",
+				Session.get().getConfigAsBoolean("gui.avatar.showingrids"));
+		user.setShowTitle(false);
+
+		ListGridField username = new ListGridField(USERNAME, I18N.message(USERNAME));
 		username.setShowTitle(false);
+		username.setWidth(80);
+		username.setHidden(true);
 
 		ListGridField date = new DateListGridField("date", "date");
 		date.setHidden(true);
@@ -53,18 +63,16 @@ public class ChatMessagesPanel extends VLayout implements ChatObserver {
 		messages.setEmptyMessage(I18N.message("nomessages"));
 		messages.setAutoFetchData(true);
 		messages.setSelectionType(SelectionStyle.NONE);
-		messages.setFields(date, username, message);
+		messages.setFields(date, user, username, message);
 		messages.setSortField("date");
-
-		messages.addVisibilityChangedHandler(event -> {
+		messages.addVisibilityChangedHandler(visibilityChanged -> {
 			if (timer != null) {
-				if (!event.getIsVisible())
+				if (!visibilityChanged.getIsVisible())
 					stopTimer();
 				else if (!timer.isRunning())
 					startTimer();
 			}
 		});
-
 		messages.addDataArrivedHandler(event -> messages.scrollToRow(messages.getTotalRows() - 1));
 
 		setMembers(messages);
@@ -108,7 +116,7 @@ public class ChatMessagesPanel extends VLayout implements ChatObserver {
 
 			ListGridRecord r = new ListGridRecord();
 			r.setAttribute("id", id);
-			r.setAttribute("username", username);
+			r.setAttribute(USERNAME, username);
 			r.setAttribute("date", date);
 			r.setAttribute(MESSAGE, message);
 			recd.add(r);
@@ -134,5 +142,15 @@ public class ChatMessagesPanel extends VLayout implements ChatObserver {
 	protected void onDestroy() {
 		destroy();
 		super.onDestroy();
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

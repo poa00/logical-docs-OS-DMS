@@ -2,7 +2,7 @@ package com.logicaldoc.gui.frontend.client.security.user;
 
 import java.util.List;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.i18n.I18N;
 import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.services.SecurityService;
@@ -56,15 +56,8 @@ public class ReplicateUserSettings extends Window {
 			if (Boolean.FALSE.equals(vm.hasErrors())) {
 				long masterUserId = Long.parseLong(vm.getValueAsString("user"));
 				LD.contactingServer();
-				SecurityService.Instance.get().replicateUsersSettings(masterUserId, userIds.toArray(new Long[0]),
-						userInterface.getValueAsBoolean(), groups.getValueAsBoolean(), new AsyncCallback<Void>() {
-
-							@Override
-							public void onFailure(Throwable caught) {
-								LD.clearPrompt();
-								GuiLog.serverError(caught);
-							}
-
+				SecurityService.Instance.get().replicateUsersSettings(masterUserId, userIds,
+						userInterface.getValueAsBoolean(), groups.getValueAsBoolean(), new DefaultAsyncCallback<>() {
 							@Override
 							public void onSuccess(Void arg0) {
 								LD.clearPrompt();

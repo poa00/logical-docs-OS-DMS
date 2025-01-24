@@ -5,7 +5,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import org.apache.chemistry.opencmis.commons.PropertyIds;
 import org.apache.chemistry.opencmis.commons.definitions.PropertyDefinition;
@@ -40,6 +39,7 @@ import org.apache.chemistry.opencmis.commons.server.CallContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.metadata.Attribute;
 import com.logicaldoc.core.metadata.AttributeSet;
 import com.logicaldoc.core.metadata.AttributeSetDAO;
@@ -166,7 +166,11 @@ public class TypeManager {
 		documentType.setContentStreamAllowed(ContentStreamAllowed.ALLOWED);
 
 		addBasePropertyDefinitions(documentType);
-		addDocumentPropertyDefinitions(documentType);
+		try {
+			addDocumentPropertyDefinitions(documentType);
+		} catch (PersistenceException e) {
+			log.error(e.getMessage(), e);
+		}
 
 		addTypeInteral(documentType);
 
@@ -260,7 +264,7 @@ public class TypeManager {
 				Updatability.READONLY, false, false));
 	}
 
-	private static void addDocumentPropertyDefinitions(DocumentTypeDefinitionImpl type) {
+	private static void addDocumentPropertyDefinitions(DocumentTypeDefinitionImpl type) throws PersistenceException {
 		type.addPropertyDefinition(createPropDef(PropertyIds.IS_IMMUTABLE, "Is Immutable", "Is Immutable",
 				PropertyType.BOOLEAN, Cardinality.SINGLE, Updatability.READONLY, false, false));
 
@@ -331,7 +335,7 @@ public class TypeManager {
 		/*
 		 * Extended properties
 		 */
-		AttributeSetDAO dao = (AttributeSetDAO) Context.get().getBean(AttributeSetDAO.class);
+		AttributeSetDAO dao = Context.get(AttributeSetDAO.class);
 		List<AttributeSet> sets = dao.findAll();
 		for (AttributeSet set : sets) {
 			dao.initialize(set);
@@ -507,9 +511,9 @@ public class TypeManager {
 		} else if (tc != null) {
 			List<TypeDefinitionContainer> typeContainers = tc.getChildren().stream()
 					.skip(skipCount != null ? skipCount.intValue() : 0)
-					.limit(maxItems == null ? Integer.MAX_VALUE : maxItems.intValue()).collect(Collectors.toList());
-			result = new TypeDefinitionListImpl(typeContainers.stream()
-					.map(c -> copyTypeDefintion(c.getTypeDefinition())).collect(Collectors.toList()));
+					.limit(maxItems == null ? Integer.MAX_VALUE : maxItems.intValue()).toList();
+			result = new TypeDefinitionListImpl(
+					typeContainers.stream().map(c -> copyTypeDefintion(c.getTypeDefinition())).toList());
 		}
 
 		result.setHasMoreItems(tc != null && result.getList().size() < tc.getChildren().size());

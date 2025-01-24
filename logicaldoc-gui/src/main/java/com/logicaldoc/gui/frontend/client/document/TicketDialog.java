@@ -2,12 +2,12 @@ package com.logicaldoc.gui.frontend.client.document;
 
 import java.util.Date;
 import java.util.LinkedHashMap;
+import java.util.List;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.logicaldoc.gui.common.client.Feature;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIDocument;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.frontend.client.services.DocumentService;
 import com.smartgwt.client.data.AdvancedCriteria;
@@ -31,9 +31,11 @@ import com.smartgwt.client.widgets.layout.VLayout;
  */
 public class TicketDialog extends Window {
 
-	private static final String ACTION2 = "action";
+	private static final String MAXVIEWS = "maxviews";
 
-	private static final String MAXDOWNLOADS2 = "maxdownloads";
+	private static final String ACTION = "action";
+
+	private static final String MAXDOWNLOADS = "maxdownloads";
 
 	private static final String CONTENT = "content";
 
@@ -67,19 +69,6 @@ public class TicketDialog extends Window {
 		layout.addMember(form);
 		layout.addMember(save);
 
-		addCloseClickHandler(event -> DocumentService.Instance.get().cleanUploadedFileFolder(new AsyncCallback<Void>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
-			@Override
-			public void onSuccess(Void result) {
-				destroy();
-			}
-		}));
-
 		addItem(layout);
 	}
 
@@ -101,7 +90,7 @@ public class TicketDialog extends Window {
 		date.setColSpan(4);
 		date.setWrapTitle(false);
 
-		SpinnerItem maxDownloads = ItemFactory.newSpinnerItem(MAXDOWNLOADS2, (Integer) null);
+		SpinnerItem maxDownloads = ItemFactory.newSpinnerItem(MAXDOWNLOADS, (Integer) null);
 		maxDownloads.setEndRow(true);
 		maxDownloads.setColSpan(4);
 		maxDownloads.setWrapTitle(false);
@@ -119,7 +108,7 @@ public class TicketDialog extends Window {
 		duedateTime.setValueMap(map);
 		duedateTime.setValue("hour");
 
-		SelectItem action = ItemFactory.newSelectItem(ACTION2);
+		SelectItem action = ItemFactory.newSelectItem(ACTION);
 		action.setEndRow(true);
 		action.setColSpan(4);
 		action.setWrapTitle(false);
@@ -130,13 +119,13 @@ public class TicketDialog extends Window {
 		action.setValue("0");
 		action.setVisible(Feature.enabled(Feature.VIEW_TICKET));
 
-		SpinnerItem maxViews = ItemFactory.newSpinnerItem("maxviews", (Integer) null);
+		SpinnerItem maxViews = ItemFactory.newSpinnerItem(MAXVIEWS, (Integer) null);
 		maxViews.setEndRow(true);
 		maxViews.setColSpan(4);
 		maxViews.setWrapTitle(false);
 		maxViews.setRequired(false);
 		maxViews.setMin(0);
-		maxViews.setVisibleWhen(new AdvancedCriteria(ACTION2, OperatorId.EQUALS, "2"));
+		maxViews.setVisibleWhen(new AdvancedCriteria(ACTION, OperatorId.EQUALS, "2"));
 
 		form.setItems(action, docOrPdfConversion, duedateTimeItem, duedateTime, date, maxDownloads, maxViews);
 	}
@@ -151,37 +140,47 @@ public class TicketDialog extends Window {
 		Integer expireHours = null;
 		if (form.getValue(DUEDATENUMBER) != null)
 			expireHours = Integer.parseInt(form.getValueAsString(DUEDATENUMBER));
-		if ("day".equals(form.getValueAsString("duedatetime")))
+		if (expireHours != null && "day".equals(form.getValueAsString("duedatetime")))
 			expireHours = expireHours * 24;
 
 		if (date == null && (expireHours == null || expireHours.intValue() < 1))
 			SC.warn(I18N.message("providexepinfo"));
 
 		Integer maxDownloads = null;
-		String val = form.getValueAsString(MAXDOWNLOADS2);
+		String val = form.getValueAsString(MAXDOWNLOADS);
 		if (val != null && !val.trim().isEmpty())
 			maxDownloads = Integer.parseInt(val.trim());
 
 		Integer maxViews = null;
-		val = form.getValueAsString(MAXDOWNLOADS2);
+		val = form.getValueAsString(MAXVIEWS);
 		if (val != null && !val.trim().isEmpty())
 			maxViews = Integer.parseInt(val.trim());
 
 		DocumentService.Instance.get().createDownloadTicket(document.getId(),
-				Integer.parseInt(form.getValueAsString(ACTION2)), suffix, expireHours, date, maxDownloads, maxViews,
-				new AsyncCallback<String[]>() {
+				Integer.parseInt(form.getValueAsString(ACTION)), suffix, expireHours, date, maxDownloads, maxViews,
+				new DefaultAsyncCallback<>() {
 
 					@Override
 					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
+						super.onFailure(caught);
 						destroy();
 					}
 
 					@Override
-					public void onSuccess(String[] ret) {
+					public void onSuccess(List<String> ret) {
 						destroy();
-						new TicketDisplay(ret[0], ret[1], ret[2]).show();
+						new TicketDisplay(ret.get(0), ret.get(1), ret.get(2)).show();
 					}
 				});
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+	
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

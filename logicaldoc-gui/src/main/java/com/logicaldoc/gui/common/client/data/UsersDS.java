@@ -26,7 +26,6 @@ public class UsersDS extends DataSource {
 		DataSourceTextField label = new DataSourceTextField("label");
 		DataSourceBooleanField guest = new DataSourceBooleanField("guest");
 		guest.setHidden(true);
-		DataSourceImageField eenabled = new DataSourceImageField("enabledIcon");
 		DataSourceBooleanField enabled = new DataSourceBooleanField("eenabled");
 		DataSourceTextField name = new DataSourceTextField("name");
 		DataSourceTextField firstName = new DataSourceTextField("firstName");
@@ -34,14 +33,22 @@ public class UsersDS extends DataSource {
 		DataSourceTextField timeZone = new DataSourceTextField("timeZone");
 		DataSourceTextField phone = new DataSourceTextField("phone");
 		DataSourceTextField cell = new DataSourceTextField("cell");
+		DataSourceTextField city = new DataSourceTextField("city");
+		DataSourceTextField department = new DataSourceTextField("department");
+		DataSourceTextField building = new DataSourceTextField("building");
+		DataSourceTextField company = new DataSourceTextField("company");
+		DataSourceTextField organizationalUnit = new DataSourceTextField("organizationalUnit");
 		DataSourceTextField usergroup = new DataSourceTextField("usergroup");
 		DataSourceTextField groups = new DataSourceTextField("groups");
 		DataSourceImageField avatar = new DataSourceImageField("avatar", I18N.message("avatar"), 16);
 		DataSourceDateField expire = new DataSourceDateField("expire");
-		DataSourceIntegerField source= new DataSourceIntegerField("source");
+		DataSourceDateField lastlogin = new DataSourceDateField("lastLogin");
+		DataSourceDateField creation = new DataSourceDateField("creation");
+		DataSourceIntegerField source = new DataSourceIntegerField("source");
 
-		setFields(id, username, label, eenabled, enabled, name, firstName, email, phone, cell, groups, usergroup, guest,
-				expire, avatar, timeZone, source);
+		setFields(id, username, label, enabled, name, firstName, email, phone, cell, city, company, department,
+				organizationalUnit, building, groups, usergroup, guest, lastlogin, expire, creation, avatar, timeZone,
+				source);
 		setDataURL("data/users.xml?1=1" + (groupIdOrName != null ? "&groupId=" + groupIdOrName : "") + "&required="
 				+ required + "&skipdisabled=" + skipDisabled);
 		setClientOnly(true);

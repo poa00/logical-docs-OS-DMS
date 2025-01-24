@@ -190,8 +190,8 @@ public class OpenOfficeParser extends AbstractParser {
 			xmlReader.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
 
 			File contentXml = FileUtil.createTempFile("openoffice-content", ".xml");
-			try {
-				if (new ZipUtil().unzip(input, "content.xml", contentXml) > 0) {
+			try (ZipUtil zipUtil = new ZipUtil()) {
+				if (zipUtil.unzip(input, "content.xml", contentXml) > 0) {
 					try (InputStream contentStream = new FileInputStream(contentXml)) {
 						OpenOfficeContentHandler contentHandler = new OpenOfficeContentHandler();
 						xmlReader.setContentHandler(contentHandler);
@@ -200,7 +200,7 @@ public class OpenOfficeParser extends AbstractParser {
 					}
 				}
 			} finally {
-				FileUtil.strongDelete(contentXml);
+				FileUtil.delete(contentXml);
 			}
 		} catch (Exception e) {
 			log.warn("Failed to extract OpenOffice text content", e);
@@ -239,8 +239,8 @@ public class OpenOfficeParser extends AbstractParser {
 		}
 
 		int pages = 1;
-		ZipUtil zipUtil = new ZipUtil();
-		try (InputStream is = zipUtil.getEntryStream(input, "meta.xml")) {
+
+		try (ZipUtil zipUtil = new ZipUtil(); InputStream is = zipUtil.getEntryStream(input, "meta.xml")) {
 			OpenOfficeMetadataHandler metadataHandler = new OpenOfficeMetadataHandler();
 			xmlReader.setContentHandler(metadataHandler);
 			xmlReader.parse(new InputSource(is));
@@ -250,7 +250,7 @@ public class OpenOfficeParser extends AbstractParser {
 			log.warn("Failed to extract OpenOffice meta.xml entry", t);
 		}
 
-		try (InputStream is = zipUtil.getEntryStream(input, "content.xml")) {
+		try (ZipUtil zipUtil = new ZipUtil(); InputStream is = zipUtil.getEntryStream(input, "content.xml")) {
 			OpenOfficePresentationMetadataHandler metadataHandler = new OpenOfficePresentationMetadataHandler();
 			xmlReader.setContentHandler(metadataHandler);
 			xmlReader.parse(new InputSource(is));

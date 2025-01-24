@@ -1,6 +1,9 @@
 package com.logicaldoc.gui.frontend.client.document.stamp;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIDocument;
 import com.logicaldoc.gui.common.client.beans.GUIStamp;
 import com.logicaldoc.gui.common.client.controllers.DocumentController;
@@ -9,7 +12,6 @@ import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.common.client.widgets.StickyWindow;
-import com.logicaldoc.gui.frontend.client.document.grid.DocumentsGrid;
 import com.logicaldoc.gui.frontend.client.services.DocumentService;
 import com.logicaldoc.gui.frontend.client.services.StampService;
 import com.smartgwt.client.types.HeaderControls;
@@ -35,11 +37,11 @@ public class StampDialog extends StickyWindow {
 
 	private SelectItem stampSelector;
 
-	protected DocumentsGrid sourceGrid;
+	protected List<GUIDocument> documents;
 
-	public StampDialog(DocumentsGrid sourceGrid) {
+	public StampDialog(List<GUIDocument> documents) {
 		super("applystamp");
-		this.sourceGrid = sourceGrid;
+		this.documents = documents;
 
 		setHeaderControls(HeaderControls.HEADER_LABEL, HeaderControls.CLOSE_BUTTON);
 		setCanDragResize(true);
@@ -60,7 +62,7 @@ public class StampDialog extends StickyWindow {
 		ButtonItem apply = new ButtonItem();
 		apply.setTitle(I18N.message("apply"));
 		apply.setAutoFit(true);
-		apply.addClickHandler(event -> onApply(sourceGrid));
+		apply.addClickHandler(event -> onApply());
 
 		form.setTitleOrientation(TitleOrientation.TOP);
 		form.setFields(stampSelector, visualPositioning, apply);
@@ -68,7 +70,7 @@ public class StampDialog extends StickyWindow {
 		addItem(form);
 	}
 
-	public void onApply(DocumentsGrid sourceGrid) {
+	public void onApply() {
 		if (!form.validate())
 			return;
 
@@ -76,12 +78,12 @@ public class StampDialog extends StickyWindow {
 		long stampId = selection.getAttributeAsLong("id");
 
 		LD.contactingServer();
-		StampService.Instance.get().getStamp(stampId, new AsyncCallback<GUIStamp>() {
+		StampService.Instance.get().getStamp(stampId, new DefaultAsyncCallback<>() {
 
 			@Override
 			public void onFailure(Throwable caught) {
 				LD.clearPrompt();
-				GuiLog.serverError(caught);
+				super.onFailure(caught);
 			}
 
 			@Override
@@ -90,55 +92,58 @@ public class StampDialog extends StickyWindow {
 
 				Boolean visualPositioningFlag = visualPositioning.getValueAsBoolean();
 				if (stamp.getTemplateId() != null) {
-					// Display the for for filling the form parameters
-					FillStamp fillStamp = new FillStamp(sourceGrid, stamp, visualPositioningFlag);
-					fillStamp.show();
+					// Display the form for filling the form parameters
+					new FillStamp(documents, stamp, visualPositioningFlag).show();
 					destroy();
 				} else {
-					applyStamp(stamp, visualPositioningFlag, StampDialog.this, sourceGrid);
+					applyStamp(stamp, visualPositioningFlag, StampDialog.this, documents);
 				}
 			}
 		});
 	}
 
-	static void applyStamp(GUIStamp stamp, Boolean visualPositioningFlag, Window popup, DocumentsGrid sourceGrid) {
+	static void applyStamp(GUIStamp stamp, Boolean visualPositioningFlag, Window popup, List<GUIDocument> documents) {
 		if (Boolean.TRUE.equals(visualPositioningFlag)) {
-			VisualPositioningStampDialog dialog = new VisualPositioningStampDialog(sourceGrid, stamp);
+			VisualPositioningStampDialog dialog = new VisualPositioningStampDialog(documents, stamp);
 			dialog.show();
 			popup.destroy();
 		} else {
 			LD.contactingServer();
-			StampService.Instance.get().applyStamp(sourceGrid.getSelectedIds(), stamp, new AsyncCallback<Void>() {
 
-				@Override
-				public void onFailure(Throwable caught) {
-					LD.clearPrompt();
-					GuiLog.serverError(caught);
-				}
+			StampService.Instance.get().applyStamp(documents.stream().map(d -> d.getId()).collect(Collectors.toList()),
+					stamp, new DefaultAsyncCallback<>() {
 
-				@Override
-				public void onSuccess(Void result) {
-					LD.clearPrompt();
-					GuiLog.info(I18N.message("event.stamped"), null);
-					GUIDocument[] docs = sourceGrid.getSelectedDocuments();
-					for (GUIDocument doc : docs) {
-						DocumentService.Instance.get().getById(doc.getId(), new AsyncCallback<GUIDocument>() {
+						@Override
+						public void onFailure(Throwable caught) {
+							LD.clearPrompt();
+							super.onFailure(caught);
+						}
 
-							@Override
-							public void onFailure(Throwable caught) {
-								GuiLog.serverError(caught);
+						@Override
+						public void onSuccess(Void result) {
+							LD.clearPrompt();
+							GuiLog.info(I18N.message("event.stamped"), null);
+							for (GUIDocument doc : documents) {
+								DocumentService.Instance.get().getById(doc.getId(), new DefaultAsyncCallback<>() {
+									@Override
+									public void onSuccess(GUIDocument document) {
+										DocumentController.get().modified(document);
+									}
+								});
 							}
-
-							@Override
-							public void onSuccess(GUIDocument document) {
-								sourceGrid.updateDocument(document);
-								DocumentController.get().modified(document);
-							}
-						});
-					}
-					popup.destroy();
-				}
-			});
+							popup.destroy();
+						}
+					});
 		}
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

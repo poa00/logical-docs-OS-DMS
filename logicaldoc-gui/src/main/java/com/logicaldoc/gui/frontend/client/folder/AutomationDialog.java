@@ -1,10 +1,13 @@
 package com.logicaldoc.gui.frontend.client.folder;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import java.util.List;
+
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIAutomationRoutine;
 import com.logicaldoc.gui.common.client.i18n.I18N;
 import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
+import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.common.client.widgets.ExtendedPropertiesPanel;
 import com.logicaldoc.gui.frontend.client.services.AutomationService;
 import com.smartgwt.client.types.HeaderControls;
@@ -41,7 +44,7 @@ public class AutomationDialog extends Window {
 
 	private TabSet tabSet = new TabSet();
 
-	public AutomationDialog(Long folderId, Long[] docIds) {
+	public AutomationDialog(List<Long> folderIds, List<Long> docIds) {
 		HeaderControl closeIcon = new HeaderControl(HeaderControl.CLOSE, (ClickEvent event) -> destroy());
 
 		setHeaderControls(HeaderControls.HEADER_LABEL, closeIcon);
@@ -56,7 +59,7 @@ public class AutomationDialog extends Window {
 
 		ToolStripButton execute = new ToolStripButton();
 		execute.setTitle(I18N.message("execute"));
-		execute.addClickHandler(event -> onExecute(folderId, docIds));
+		execute.addClickHandler(event -> onExecute(folderIds, docIds));
 
 		ToolStripButton close = new ToolStripButton();
 		close.setTitle(I18N.message("close"));
@@ -66,21 +69,16 @@ public class AutomationDialog extends Window {
 		tabSet.addTab(prepareParametersTab());
 		tabSet.disableTab(1);
 
-		ChangedHandler changeHandler = event -> {
-			if (event == null
-					|| (event != null && (event.getValue() == null || event.getValue().toString().isEmpty()))) {
+		ChangedHandler changeHandler = changed -> {
+			if (changed == null
+					|| (changed != null && (changed.getValue() == null || changed.getValue().toString().isEmpty()))) {
 				tabSet.enableTab(0);
 				tabSet.selectTab(0);
 				tabSet.disableTab(1);
 				routine = new GUIAutomationRoutine();
 			} else {
-				AutomationService.Instance.get().getRoutine(Long.parseLong(event.getValue().toString()),
-						new AsyncCallback<GUIAutomationRoutine>() {
-
-							@Override
-							public void onFailure(Throwable caught) {
-								GuiLog.serverError(caught);
-							}
+				AutomationService.Instance.get().getRoutine(Long.parseLong(changed.getValue().toString()),
+						new DefaultAsyncCallback<>() {
 
 							@Override
 							public void onSuccess(GUIAutomationRoutine rt) {
@@ -88,7 +86,7 @@ public class AutomationDialog extends Window {
 								tabSet.enableTab(1);
 								tabSet.selectTab(1);
 								tabSet.disableTab(0);
-								propertiesPanel = new ExtendedPropertiesPanel(routine, null, true, true, false);
+								propertiesPanel = new ExtendedPropertiesPanel(routine, null, true, true, false, true);
 								tabSet.getTab(1).setPane(propertiesPanel);
 							}
 						});
@@ -133,7 +131,7 @@ public class AutomationDialog extends Window {
 		return new Tab(I18N.message("parameters"));
 	}
 
-	private void onExecute(Long folderId, Long[] docIds) {
+	private void onExecute(List<Long> folderIds, List<Long> docIds) {
 		if (routine.getId() == 0L && !scriptForm.validate())
 			return;
 
@@ -143,18 +141,24 @@ public class AutomationDialog extends Window {
 		if (routine.getId() == 0L)
 			routine.setAutomation(scriptForm.getValueAsString("automation"));
 
-		AutomationService.Instance.get().execute(routine, docIds, folderId, new AsyncCallback<Void>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
+		LD.contactingServer();
+		AutomationDialog.this.destroy();
+		GuiLog.info(I18N.message("automationlaunched"));
+		AutomationService.Instance.get().execute(routine, docIds, folderIds, new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(Void arg0) {
-				AutomationDialog.this.destroy();
-				GuiLog.info(I18N.message("automationlaunched"));
+				LD.clearPrompt();
 			}
 		});
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

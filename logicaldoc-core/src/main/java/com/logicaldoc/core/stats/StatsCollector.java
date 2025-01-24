@@ -2,40 +2,41 @@ package com.logicaldoc.core.stats;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
+import javax.annotation.Resource;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.StringUtils;
-import org.apache.http.Consts;
-import org.apache.http.NameValuePair;
-import org.apache.http.client.entity.UrlEncodedFormEntity;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.message.BasicNameValuePair;
+import org.apache.hc.client5.http.classic.methods.HttpPost;
+import org.apache.hc.client5.http.entity.UrlEncodedFormEntity;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.core5.http.NameValuePair;
+import org.apache.hc.core5.http.message.BasicNameValuePair;
 import org.slf4j.LoggerFactory;
 
 import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.communication.EMailSender;
 import com.logicaldoc.core.document.AbstractDocument;
+import com.logicaldoc.core.document.DocumentDAO;
 import com.logicaldoc.core.document.DocumentEvent;
-import com.logicaldoc.core.document.dao.DocumentDAO;
 import com.logicaldoc.core.folder.FolderDAO;
 import com.logicaldoc.core.generic.Generic;
 import com.logicaldoc.core.generic.GenericDAO;
 import com.logicaldoc.core.security.Tenant;
-import com.logicaldoc.core.security.UserEvent;
-import com.logicaldoc.core.security.dao.GroupDAO;
-import com.logicaldoc.core.security.dao.TenantDAO;
+import com.logicaldoc.core.security.TenantDAO;
+import com.logicaldoc.core.security.user.GroupDAO;
+import com.logicaldoc.core.security.user.UserEvent;
 import com.logicaldoc.core.sequence.SequenceDAO;
 import com.logicaldoc.core.task.Task;
 import com.logicaldoc.core.task.TaskException;
 import com.logicaldoc.core.util.UserUtil;
-import com.logicaldoc.util.config.ContextProperties;
 import com.logicaldoc.util.http.HttpUtil;
+import com.logicaldoc.util.http.StringHttpClientResponseHandler;
 import com.logicaldoc.util.plugin.PluginRegistry;
 
 /**
@@ -53,16 +54,22 @@ public class StatsCollector extends Task {
 
 	public static final String NAME = "StatsCollector";
 
+	@Resource(name = "DocumentDAO")
 	private DocumentDAO documentDAO;
 
+	@Resource(name = "FolderDAO")
 	private FolderDAO folderDAO;
 
+	@Resource(name = "GroupDAO")
 	private GroupDAO groupDAO;
 
+	@Resource(name = "GenericDAO")
 	protected GenericDAO genericDAO;
 
+	@Resource(name = "TenantDAO")
 	protected TenantDAO tenantDAO;
 
+	@Resource(name = "SequenceDAO")
 	private SequenceDAO sequenceDAO;
 
 	private static String userno = "community";
@@ -72,6 +79,10 @@ public class StatsCollector extends Task {
 	private static String product = "LogicalDOC";
 
 	private static String productName = "LogicalDOC Community";
+
+	private boolean uploadStatistics = true;
+
+	private List<NameValuePair> statistics = new ArrayList<>();
 
 	public StatsCollector() {
 		super(NAME);
@@ -125,202 +136,192 @@ public class StatsCollector extends Task {
 		if (interruptRequested)
 			return;
 
-		/*
-		 * Collect users data
-		 */
-		int users = userDao.count(null);
-		int guests = userDao.countGuests(null);
-		int groups = groupDAO.count();
-		log.debug("Collected users data");
-
-		long userdir = calculateUserDirSize();
-		saveStatistic("userdir", userdir, Tenant.SYSTEM_ID);
-
-		long indexdir = calculateIndexDirSize();
-		saveStatistic("indexdir", indexdir, Tenant.SYSTEM_ID);
-
-		long importdir = calculateImportDirSize();
-		saveStatistic("importdir", importdir, Tenant.SYSTEM_ID);
-
-		long exportdir = calculateExportDirSize();
-		saveStatistic("exportdir", exportdir, Tenant.SYSTEM_ID);
-
-		long plugindir = calculatePluginDirSize();
-		saveStatistic("plugindir", plugindir, Tenant.SYSTEM_ID);
-
-		next();
-		if (interruptRequested)
-			return;
-
-		long dbdir = calculateDatabaseSize();
-		saveStatistic("dbdir", dbdir, Tenant.SYSTEM_ID);
-
-		long logdir = calculateLogDirSize();
-		saveStatistic("logdir", logdir, Tenant.SYSTEM_ID);
-
-		log.info("Saved repository statistics");
-		next();
-		if (interruptRequested)
-			return;
-
-		/*
-		 * Collect documents statistics
-		 */
-		long totaldocs;
-		long archiveddocs;
-		long docdir;
-		long trash;
 		try {
+			/*
+			 * Collect users statistics
+			 */
+			int users = userDao.count(null);
+			int guests = userDao.countGuests(null);
+			int groups = groupDAO.count();
+			log.debug("Collected users data");
+
+			long userdir = calculateUserDirSize();
+			saveStatistic("userdir", userdir, Tenant.SYSTEM_ID);
+
+			long indexdir = calculateIndexDirSize();
+			saveStatistic("indexdir", indexdir, Tenant.SYSTEM_ID);
+
+			long importdir = calculateImportDirSize();
+			saveStatistic("importdir", importdir, Tenant.SYSTEM_ID);
+
+			long exportdir = calculateExportDirSize();
+			saveStatistic("exportdir", exportdir, Tenant.SYSTEM_ID);
+
+			long plugindir = calculatePluginDirSize();
+			saveStatistic("plugindir", plugindir, Tenant.SYSTEM_ID);
+
+			next();
+			if (interruptRequested)
+				return;
+
+			long dbdir = calculateDatabaseSize();
+			saveStatistic("dbdir", dbdir, Tenant.SYSTEM_ID);
+
+			long logdir = calculateLogDirSize();
+			saveStatistic("logdir", logdir, Tenant.SYSTEM_ID);
+
+			log.info("Saved repository statistics");
+			next();
+			if (interruptRequested)
+				return;
+
+			/*
+			 * Collect documents statistics
+			 */
 			long[] docStats = extractDocStats(Tenant.SYSTEM_ID);
-			totaldocs = docStats[3];
-			archiveddocs = docStats[4];
-			docdir = docStats[5];
-			trash = docStats[7];
+			long totaldocs = docStats[3];
+			long archiveddocs = docStats[4];
+			long docdir = docStats[5];
+			long trash = docStats[7];
 
 			calculateAllTenantsDocsStats();
+
+			log.info("Saved documents statistics");
+			next();
+			if (interruptRequested)
+				return;
+
+			/*
+			 * Collect pages statistics
+			 */
+
+			long[] pageStats = extractPageStats(Tenant.SYSTEM_ID);
+			long totalpages = pageStats[3];
+
+			calculateAllTenantsPageStats();
+
+			log.info("Saved pages statistics");
+			next();
+			if (interruptRequested)
+				return;
+
+			/*
+			 * Collect folders statistics
+			 */
+			long[] fldStats = extractFldStats(Tenant.SYSTEM_ID);
+			long withdocs = fldStats[0];
+			long empty = fldStats[1];
+			long deletedfolders = fldStats[2];
+
+			calculateAllTenantsFolderStats();
+
+			log.info("Saved folder statistics");
+			next();
+			if (interruptRequested)
+				return;
+
+			/*
+			 * Collect sizing statistics
+			 */
+
+			long tags = folderDAO.queryForLong("SELECT COUNT(*) FROM ld_tag");
+			long versions = folderDAO.queryForLong("SELECT COUNT(*) FROM ld_version");
+			long histories = folderDAO.queryForLong("SELECT COUNT(*) FROM ld_history");
+			long userHistories = folderDAO.queryForLong("SELECT COUNT(*) FROM ld_user_history");
+			long votes = folderDAO.queryForLong("SELECT COUNT(*) FROM ld_rating");
+			long wsCalls = sequenceDAO.getCurrentValue("wscall", 0, Tenant.SYSTEM_ID);
+
+			/*
+			 * Save the last update time
+			 */
+			saveStatistic("lastrun", new Date(), Tenant.SYSTEM_ID);
+
+			log.info("Statistics collected");
+			next();
+			if (interruptRequested)
+				return;
+
+			log.debug("Package collected statistics");
+
+			// Prepare the post parameters
+			statistics.clear();
+
+			// Add all statistics as parameters
+			statistics.add(new BasicNameValuePair("id", StringUtils.defaultString(id)));
+			statistics.add(new BasicNameValuePair("userno", StringUtils.defaultString(userno)));
+			statistics.add(new BasicNameValuePair("sid", StringUtils.defaultString(sid)));
+
+			statistics.add(new BasicNameValuePair("product_release", StringUtils.defaultString(release)));
+			statistics.add(new BasicNameValuePair("email", StringUtils.defaultString(email)));
+			statistics.add(new BasicNameValuePair("product", StringUtils.defaultString(StatsCollector.product)));
+			statistics
+					.add(new BasicNameValuePair("product_name", StringUtils.defaultString(StatsCollector.productName)));
+
+			statistics.add(new BasicNameValuePair("java_version", StringUtils.defaultString(javaversion)));
+			statistics.add(new BasicNameValuePair("java_vendor", StringUtils.defaultString(javavendor)));
+			statistics.add(new BasicNameValuePair("java_arch", StringUtils.defaultString(javaarch)));
+			statistics.add(new BasicNameValuePair("dbms", StringUtils.defaultString(dbms)));
+
+			statistics.add(new BasicNameValuePair("os_name", StringUtils.defaultString(osname)));
+			statistics.add(new BasicNameValuePair("os_version", StringUtils.defaultString(osversion)));
+			statistics.add(new BasicNameValuePair("file_encoding", StringUtils.defaultString(fileencoding)));
+
+			statistics.add(new BasicNameValuePair("user_language", StringUtils.defaultString(userlanguage)));
+			statistics.add(new BasicNameValuePair("user_country", StringUtils.defaultString(usercountry)));
+
+			// Sizing
+			statistics.add(new BasicNameValuePair("users", Integer.toString(users)));
+			statistics.add(new BasicNameValuePair("guests", Integer.toString(guests)));
+			statistics.add(new BasicNameValuePair("groups", Integer.toString(groups)));
+			statistics.add(new BasicNameValuePair("docs", Long.toString(totaldocs)));
+			statistics.add(new BasicNameValuePair("pages", Long.toString(totalpages)));
+
+			statistics.add(new BasicNameValuePair("archived_docs", Long.toString(archiveddocs)));
+			statistics.add(new BasicNameValuePair("folders", Long.toString(withdocs + empty + deletedfolders)));
+			statistics.add(new BasicNameValuePair("tags", Long.toString(tags)));
+			statistics.add(new BasicNameValuePair("versions", Long.toString(versions)));
+			statistics.add(new BasicNameValuePair("histories", Long.toString(histories)));
+			statistics.add(new BasicNameValuePair("user_histories", Long.toString(userHistories)));
+			statistics.add(new BasicNameValuePair("votes", Long.toString(votes)));
+			statistics.add(new BasicNameValuePair("wscalls", Long.toString(wsCalls)));
+
+			collectFeatureUsageStats(statistics);
+			next();
+			if (interruptRequested)
+				return;
+
+			/*
+			 * General usage
+			 */
+			Date lastLogin = findLastLogin();
+			statistics.add(new BasicNameValuePair("last_login", formatDate(lastLogin)));
+
+			Date lastCreation = findLastCreation();
+			statistics.add(new BasicNameValuePair("last_creation", formatDate(lastCreation)));
+
+			/*
+			 * Quotas
+			 */
+			statistics.add(new BasicNameValuePair("docdir", Long.toString(docdir)));
+			statistics.add(new BasicNameValuePair("trash", Long.toString(trash)));
+			statistics.add(new BasicNameValuePair("indexdir", Long.toString(indexdir)));
+			statistics.add(new BasicNameValuePair("quota",
+					Long.toString(docdir + indexdir + userdir + importdir + exportdir + plugindir + dbdir + logdir)));
+
+			/*
+			 * Registration
+			 */
+			statistics.add(new BasicNameValuePair("reg_name", regName != null ? regName : ""));
+			statistics.add(new BasicNameValuePair("reg_email", regEmail != null ? regEmail : ""));
+			statistics.add(new BasicNameValuePair("reg_organization", regOrganization != null ? regOrganization : ""));
+			statistics.add(new BasicNameValuePair("reg_website", regWebsite != null ? regWebsite : ""));
+
+			uploadStatistics(statistics);
+
+			next();
 		} catch (PersistenceException e) {
 			throw new TaskException(e.getMessage(), e);
 		}
-
-		log.info("Saved documents statistics");
-		next();
-		if (interruptRequested)
-			return;
-
-		/*
-		 * Collect pages statistics
-		 */
-		long[] pageStats = extractPageStats(Tenant.SYSTEM_ID);
-		long totalpages = pageStats[3];
-
-		calculateAllTenantsPageStats();
-
-		log.info("Saved pages statistics");
-		next();
-		if (interruptRequested)
-			return;
-
-		/*
-		 * Collect folders statistics
-		 */
-		long[] fldStats = extractFldStats(Tenant.SYSTEM_ID);
-		long withdocs = fldStats[0];
-		long empty = fldStats[1];
-		long deletedfolders = fldStats[2];
-
-		calculateAllTenantsFolderStats();
-
-		log.info("Saved folder statistics");
-		next();
-		if (interruptRequested)
-			return;
-
-		/*
-		 * Collect sizing statistics
-		 */
-		long tags;
-		long versions;
-		long histories;
-		long userHistories;
-		long votes;
-		try {
-			tags = folderDAO.queryForLong("SELECT COUNT(*) FROM ld_tag");
-			versions = folderDAO.queryForLong("SELECT COUNT(*) FROM ld_version");
-			histories = folderDAO.queryForLong("SELECT COUNT(*) FROM ld_history");
-			userHistories = folderDAO.queryForLong("SELECT COUNT(*) FROM ld_user_history");
-			votes = folderDAO.queryForLong("SELECT COUNT(*) FROM ld_rating");
-		} catch (PersistenceException e) {
-			throw new TaskException(e.getMessage(), e);
-		}
-		long wsCalls = sequenceDAO.getCurrentValue("wscall", 0, Tenant.SYSTEM_ID);
-
-		/*
-		 * Save the last update time
-		 */
-		saveStatistic("lastrun", new Date(), Tenant.SYSTEM_ID);
-
-		log.info("Statistics collected");
-		next();
-		if (interruptRequested)
-			return;
-
-		log.debug("Package collected statistics");
-
-		// Prepare the post parameters
-		List<NameValuePair> postParams = new ArrayList<>();
-
-		// Add all statistics as parameters
-		postParams.add(new BasicNameValuePair("id", StringUtils.defaultString(id)));
-		postParams.add(new BasicNameValuePair("userno", StringUtils.defaultString(userno)));
-		postParams.add(new BasicNameValuePair("sid", StringUtils.defaultString(sid)));
-
-		postParams.add(new BasicNameValuePair("product_release", StringUtils.defaultString(release)));
-		postParams.add(new BasicNameValuePair("email", StringUtils.defaultString(email)));
-		postParams.add(new BasicNameValuePair("product", StringUtils.defaultString(StatsCollector.product)));
-		postParams.add(new BasicNameValuePair("product_name", StringUtils.defaultString(StatsCollector.productName)));
-
-		postParams.add(new BasicNameValuePair("java_version", StringUtils.defaultString(javaversion)));
-		postParams.add(new BasicNameValuePair("java_vendor", StringUtils.defaultString(javavendor)));
-		postParams.add(new BasicNameValuePair("java_arch", StringUtils.defaultString(javaarch)));
-		postParams.add(new BasicNameValuePair("dbms", StringUtils.defaultString(dbms)));
-
-		postParams.add(new BasicNameValuePair("os_name", StringUtils.defaultString(osname)));
-		postParams.add(new BasicNameValuePair("os_version", StringUtils.defaultString(osversion)));
-		postParams.add(new BasicNameValuePair("file_encoding", StringUtils.defaultString(fileencoding)));
-
-		postParams.add(new BasicNameValuePair("user_language", StringUtils.defaultString(userlanguage)));
-		postParams.add(new BasicNameValuePair("user_country", StringUtils.defaultString(usercountry)));
-
-		// Sizing
-		postParams.add(new BasicNameValuePair("users", Integer.toString(users)));
-		postParams.add(new BasicNameValuePair("guests", Integer.toString(guests)));
-		postParams.add(new BasicNameValuePair("groups", Integer.toString(groups)));
-		postParams.add(new BasicNameValuePair("docs", Long.toString(totaldocs)));
-		postParams.add(new BasicNameValuePair("pages", Long.toString(totalpages)));
-
-		postParams.add(new BasicNameValuePair("archived_docs", Long.toString(archiveddocs)));
-		postParams.add(new BasicNameValuePair("folders", Long.toString(withdocs + empty + deletedfolders)));
-		postParams.add(new BasicNameValuePair("tags", Long.toString(tags)));
-		postParams.add(new BasicNameValuePair("versions", Long.toString(versions)));
-		postParams.add(new BasicNameValuePair("histories", Long.toString(histories)));
-		postParams.add(new BasicNameValuePair("user_histories", Long.toString(userHistories)));
-		postParams.add(new BasicNameValuePair("votes", Long.toString(votes)));
-		postParams.add(new BasicNameValuePair("wscalls", Long.toString(wsCalls)));
-
-		collectFeatureUsageStats(postParams);
-		next();
-		if (interruptRequested)
-			return;
-
-		/*
-		 * General usage
-		 */
-		Date lastLogin = findLastLogin();
-		postParams.add(new BasicNameValuePair("last_login", formatDate(lastLogin)));
-
-		Date lastCreation = findLastCreation();
-		postParams.add(new BasicNameValuePair("last_creation", formatDate(lastCreation)));
-
-		/*
-		 * Quotas
-		 */
-		postParams.add(new BasicNameValuePair("docdir", Long.toString(docdir)));
-		postParams.add(new BasicNameValuePair("trash", Long.toString(trash)));
-		postParams.add(new BasicNameValuePair("indexdir", Long.toString(indexdir)));
-		postParams.add(new BasicNameValuePair("quota",
-				Long.toString(docdir + indexdir + userdir + importdir + exportdir + plugindir + dbdir + logdir)));
-
-		/*
-		 * Registration
-		 */
-		postParams.add(new BasicNameValuePair("reg_name", regName != null ? regName : ""));
-		postParams.add(new BasicNameValuePair("reg_email", regEmail != null ? regEmail : ""));
-		postParams.add(new BasicNameValuePair("reg_organization", regOrganization != null ? regOrganization : ""));
-		postParams.add(new BasicNameValuePair("reg_website", regWebsite != null ? regWebsite : ""));
-
-		postStatistics(postParams);
-
-		next();
 	}
 
 	private String formatDate(Date lastLogin) {
@@ -328,21 +329,16 @@ public class StatsCollector extends Task {
 		return lastLogin != null ? isoDf.format(lastLogin) : "";
 	}
 
-	private void postStatistics(List<NameValuePair> postParams) {
+	private void uploadStatistics(List<NameValuePair> postParams) {
 		try {
-			HttpPost post = new HttpPost("http://stat.logicaldoc.com/stats/collect");
-			UrlEncodedFormEntity entity = new UrlEncodedFormEntity(postParams, Consts.UTF_8);
-			post.setEntity(entity);
-
-			CloseableHttpClient httpclient = HttpUtil.getNotValidatingClient(60);
-
 			// Execute request
-			try (CloseableHttpResponse response = httpclient.execute(post)) {
-				int responseStatusCode = response.getStatusLine().getStatusCode();
-				// log status code
-				log.debug("Response status code: {}", responseStatusCode);
-				if (responseStatusCode != 200)
-					throw new IOException(HttpUtil.getBodyString(response));
+			try (CloseableHttpClient httpClient = HttpUtil.getNotValidatingClient(60)) {
+				HttpPost post = new HttpPost("http://stat.logicaldoc.com/stats/collect");
+				UrlEncodedFormEntity entity = new UrlEncodedFormEntity(postParams, StandardCharsets.UTF_8);
+				post.setEntity(entity);
+
+				if (uploadStatistics)
+					httpClient.execute(post, new StringHttpClientResponseHandler());
 			}
 			log.info("Statistics packaged");
 		} catch (IOException e) {
@@ -355,7 +351,7 @@ public class StatsCollector extends Task {
 	private Date findLastLogin() {
 		Date lastLogin = null;
 		try {
-			lastLogin = (Date) documentDAO
+			lastLogin = documentDAO
 					.queryForObject("select max(ld_date) from ld_user_history where ld_deleted=0 and ld_event='"
 							+ UserEvent.LOGIN.toString() + "'", Date.class);
 		} catch (Exception t) {
@@ -367,7 +363,7 @@ public class StatsCollector extends Task {
 	private Date findLastCreation() {
 		Date lastCreation = null;
 		try {
-			lastCreation = (Date) documentDAO
+			lastCreation = documentDAO
 					.queryForObject("select max(ld_date) from ld_history where ld_deleted=0 and ld_event='"
 							+ DocumentEvent.STORED + "'", Date.class);
 		} catch (Exception t) {
@@ -376,12 +372,12 @@ public class StatsCollector extends Task {
 		return lastCreation;
 	}
 
-	private void calculateAllTenantsFolderStats() {
+	private void calculateAllTenantsFolderStats() throws PersistenceException {
 		for (Tenant tenant : tenantDAO.findAll())
 			extractFldStats(tenant.getId());
 	}
 
-	private void calculateAllTenantsPageStats() {
+	private void calculateAllTenantsPageStats() throws PersistenceException {
 		for (Tenant tenant : tenantDAO.findAll())
 			extractPageStats(tenant.getId());
 	}
@@ -683,8 +679,10 @@ public class StatsCollector extends Task {
 	 *         <li>archivedpages</li>
 	 *         <li>notindexablepages</li>
 	 *         </ol>
+	 * 
+	 * @throws PersistenceException Error in the database
 	 */
-	private long[] extractPageStats(long tenantId) {
+	private long[] extractPageStats(long tenantId) throws PersistenceException {
 		long[] stats = new long[6];
 
 		stats[0] = 0;
@@ -764,8 +762,10 @@ public class StatsCollector extends Task {
 	 *         <li>empty</li>
 	 *         <li>deletedfolders</li>
 	 *         </ol>
+	 * 
+	 * @throws PersistenceException Error in the database
 	 */
-	private long[] extractFldStats(long tenantId) {
+	private long[] extractFldStats(long tenantId) throws PersistenceException {
 		long[] stats = new long[4];
 
 		stats[0] = 0;
@@ -803,8 +803,10 @@ public class StatsCollector extends Task {
 
 	/**
 	 * Convenience method for saving statistical data in the DB as Generics
+	 * 
+	 * @throws PersistenceException Error in the database
 	 */
-	protected void saveStatistic(String parameter, Object val, long tenantId) {
+	protected void saveStatistic(String parameter, Object val, long tenantId) throws PersistenceException {
 		Generic gen = genericDAO.findByAlternateKey(STAT, parameter, null, tenantId);
 		if (gen == null) {
 			gen = new Generic();
@@ -814,14 +816,13 @@ public class StatsCollector extends Task {
 		} else
 			genericDAO.initialize(gen);
 
-		if (val instanceof Date)
-			gen.setDate1((Date) val);
-		else if (val instanceof String)
-			gen.setString1((String) val);
-		else if (val instanceof Long)
-			gen.setInteger1((Long) val);
-		else
-			gen.setInteger1(((Integer) val).longValue());
+		switch (val) {
+		case Date dateVal -> gen.setDate1(dateVal);
+		case String stringVal -> gen.setString1(stringVal);
+		case Integer intVal -> gen.setInteger1(intVal.longValue());
+		case Long longVal -> gen.setInteger1(longVal);
+		default -> gen.setInteger1(null);
+		}
 
 		try {
 			genericDAO.store(gen);
@@ -840,48 +841,6 @@ public class StatsCollector extends Task {
 		return true;
 	}
 
-	public GenericDAO getGenericDAO() {
-		return genericDAO;
-	}
-
-	public void setGenericDAO(GenericDAO genericDAO) {
-		this.genericDAO = genericDAO;
-	}
-
-	@Override
-	public ContextProperties getConfig() {
-		return config;
-	}
-
-	@Override
-	public void setConfig(ContextProperties config) {
-		this.config = config;
-	}
-
-	public DocumentDAO getDocumentDAO() {
-		return documentDAO;
-	}
-
-	public void setDocumentDAO(DocumentDAO documentDAO) {
-		this.documentDAO = documentDAO;
-	}
-
-	public FolderDAO getFolderDAO() {
-		return folderDAO;
-	}
-
-	public void setFolderDAO(FolderDAO folderDAO) {
-		this.folderDAO = folderDAO;
-	}
-
-	public GroupDAO getGroupDAO() {
-		return groupDAO;
-	}
-
-	public void setGroupDAO(GroupDAO groupDAO) {
-		this.groupDAO = groupDAO;
-	}
-
 	public static void setUserno(String userno) {
 		StatsCollector.userno = userno;
 	}
@@ -898,11 +857,11 @@ public class StatsCollector extends Task {
 		StatsCollector.productName = productName;
 	}
 
-	public void setTenantDAO(TenantDAO tenantDAO) {
-		this.tenantDAO = tenantDAO;
+	void setUploadStatistics(boolean uploadStatistics) {
+		this.uploadStatistics = uploadStatistics;
 	}
 
-	public void setSequenceDAO(SequenceDAO sequenceDAO) {
-		this.sequenceDAO = sequenceDAO;
+	List<NameValuePair> getStatistics() {
+		return statistics;
 	}
 }

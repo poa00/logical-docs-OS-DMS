@@ -45,6 +45,9 @@ public class WSAttribute implements Serializable {
 	@WSDoc(documented = false)
 	public static final int TYPE_FOLDER = 6;
 
+	@WSDoc(documented = false)
+	public static final int TYPE_DOCUMENT = 7;
+
 	@WSDoc(required = true, description = "name of the attribute")
 	private String name;
 
@@ -60,7 +63,7 @@ public class WSAttribute implements Serializable {
 	@WSDoc(required = false, description = "the date value; format must be 'yyyy-MM-dd'")
 	private String dateValue;
 
-	@WSDoc(required = true, description = "<b>0</b> = String, <b>1</b> = int, <b>2</b> = double, <b>3</b> = date, <b>4</b> = user (intValue represents the user's id), <b>5</b> = boolean (intValue must be <b>0</b> or <b>1</b>), <b>6</b> = folder (intValue represents the folders's id)")
+	@WSDoc(required = true, description = "<b>0</b> = String, <b>1</b> = int, <b>2</b> = double, <b>3</b> = date, <b>4</b> = user (intValue represents the user's id), <b>5</b> = boolean (intValue must be <b>0</b> or <b>1</b>), <b>6</b> = folder (intValue represents the folders's id, <b>7</b> = document (intValue represents the document's id), <b>8</b> = section")
 	private int type = TYPE_STRING;
 
 	@WSDoc(required = true)
@@ -193,17 +196,11 @@ public class WSAttribute implements Serializable {
 		switch (attribute.type) {
 		case TYPE_STRING:
 			return attribute.getStringValue();
-		case TYPE_INT:
-			return attribute.getIntValue();
-		case TYPE_BOOLEAN:
-			return attribute.getIntValue();
 		case TYPE_DOUBLE:
 			return attribute.getDoubleValue();
 		case TYPE_DATE:
 			return WSUtil.convertStringToDate(attribute.getDateValue());
-		case TYPE_USER:
-			return attribute.getIntValue();
-		case TYPE_FOLDER:
+		case TYPE_INT, TYPE_BOOLEAN, TYPE_USER, TYPE_FOLDER, TYPE_DOCUMENT:
 			return attribute.getIntValue();
 		default:
 			return attribute.getStringValue();
@@ -222,10 +219,10 @@ public class WSAttribute implements Serializable {
 			 * Needed to fix JAXB logic that will invoke getValue(that returns a
 			 * Long) and setValue
 			 */
-			if (value instanceof Long)
-				attribute.intValue = (Long) value;
-			else if (value instanceof String)
-				attribute.stringValue = (String) value;
+			if (value instanceof Long longValue)
+				attribute.intValue = longValue;
+			else if (value instanceof String string)
+				attribute.stringValue = string;
 			return;
 		}
 
@@ -233,48 +230,62 @@ public class WSAttribute implements Serializable {
 	}
 
 	private static void setNonUserValue(WSAttribute attribute, Object value) {
-		if (value instanceof String) {
+		switch (value) {
+		case String string -> {
 			attribute.type = TYPE_STRING;
-			attribute.setStringValue((String) value);
-		} else if (value instanceof Long) {
+			attribute.setStringValue(string);
+		}
+		case Long longValue -> {
 			attribute.type = TYPE_INT;
-			attribute.setIntValue((Long) value);
-		} else if (value instanceof Integer) {
+			attribute.setIntValue(longValue);
+		}
+		case Integer integer -> {
 			attribute.type = TYPE_INT;
-			attribute.setIntValue(((Integer) value).longValue());
-		} else if (value instanceof Boolean) {
-			attribute.setIntValue(((Boolean) value).booleanValue() ? 1L : 0L);
+			attribute.setIntValue(integer.longValue());
+		}
+		case Boolean bool -> {
+			attribute.setIntValue(bool.booleanValue() ? 1L : 0L);
 			attribute.type = TYPE_BOOLEAN;
-		} else if (value instanceof Double) {
+		}
+		case Double doubleVal -> {
 			attribute.type = TYPE_DOUBLE;
-			attribute.setDoubleValue((Double) value);
-		} else if (value instanceof Date) {
+			attribute.setDoubleValue(doubleVal);
+		}
+		case Date date -> {
 			attribute.type = TYPE_DATE;
-			attribute.setDateValue(DateUtil.format((Date) value));
-		} else if (value instanceof WSUser) {
-			attribute.stringValue = ((WSUser) value).getFullName();
-			attribute.intValue = ((WSUser) value).getId();
+			attribute.setDateValue(DateUtil.format(date));
+		}
+		case WSUser user -> {
+			attribute.stringValue = user.getFullName();
+			attribute.intValue = user.getId();
 			attribute.type = TYPE_USER;
-		} else if (value instanceof WSFolder) {
-			attribute.stringValue = ((WSFolder) value).getName();
-			attribute.intValue = ((WSFolder) value).getId();
+		}
+		case WSFolder folder -> {
+			attribute.stringValue = folder.getName();
+			attribute.intValue = folder.getId();
 			attribute.type = TYPE_FOLDER;
-		} else {
-			setDateValue(attribute, value);
+		}
+		case WSDocument document -> {
+			attribute.stringValue = document.getFileName();
+			attribute.intValue = document.getId();
+			attribute.type = TYPE_DOCUMENT;
+		}
+		default -> setDateValue(attribute, value);
 		}
 	}
 
 	private static void setDateValue(WSAttribute attribute, Object value) {
 		attribute.type = TYPE_DATE;
-		if (value instanceof XMLGregorianCalendar) {
-			XMLGregorianCalendar theXGCal = (XMLGregorianCalendar) value;
+
+		switch (value) {
+		case XMLGregorianCalendar theXGCal -> {
 			GregorianCalendar theGCal = theXGCal.toGregorianCalendar();
 			Date theDate = theGCal.getTime();
 			attribute.setDateValue(DateUtil.format(theDate));
-		} else if (value instanceof Date) {
-			attribute.setDateValue(DateUtil.format((Date) value));
-		} else
-			attribute.setDateValue(null);
+		}
+		case Date date -> attribute.setDateValue(DateUtil.format(date));
+		default -> attribute.setDateValue(null);
+		}
 	}
 
 	public int getEditor() {
@@ -348,7 +359,7 @@ public class WSAttribute implements Serializable {
 	public void setInitialization(String initialization) {
 		this.initialization = initialization;
 	}
-	
+
 	public int getReadonly() {
 		return readonly;
 	}

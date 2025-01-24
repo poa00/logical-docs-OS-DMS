@@ -1,10 +1,10 @@
 package com.logicaldoc.gui.frontend.client.folder;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
-import com.logicaldoc.gui.common.client.Constants;
 import com.logicaldoc.gui.common.client.Feature;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Menu;
 import com.logicaldoc.gui.common.client.ServerValidationException;
+import com.logicaldoc.gui.common.client.beans.GUIAccessControlEntry;
 import com.logicaldoc.gui.common.client.beans.GUIFolder;
 import com.logicaldoc.gui.common.client.controllers.FolderController;
 import com.logicaldoc.gui.common.client.controllers.FolderObserver;
@@ -113,7 +113,7 @@ public class FolderDetailsPanel extends VLayout implements FolderObserver {
 		securityTabPanel.setWidth100();
 		securityTabPanel.setHeight100();
 		securityTab.setPane(securityTabPanel);
-		if (folder.hasPermission(Constants.PERMISSION_SECURITY))
+		if (folder.hasPermission(GUIAccessControlEntry.PERMISSION_SECURITY))
 			tabSet.addTab(securityTab);
 
 		Tab historyTab = new Tab(I18N.message("history"));
@@ -139,7 +139,7 @@ public class FolderDetailsPanel extends VLayout implements FolderObserver {
 			tabSet.addTab(aliasesTab);
 
 		automationTab = new Tab(I18N.message("automation"));
-		if (folder.hasPermission(Constants.PERMISSION_AUTOMATION) && Feature.visible(Feature.AUTOMATION)) {
+		if (folder.hasPermission(GUIAccessControlEntry.PERMISSION_AUTOMATION) && Feature.visible(Feature.AUTOMATION)) {
 			if (Feature.enabled(Feature.AUTOMATION)) {
 				automationTabPanel = new HLayout();
 				automationTabPanel.setWidth100();
@@ -176,7 +176,7 @@ public class FolderDetailsPanel extends VLayout implements FolderObserver {
 	private void prepareQuotaTab(GUIFolder folder) {
 		try {
 			quotaTab = new Tab(I18N.message("quota"));
-			if (folder.isWorkspace() && folder.hasPermission(Constants.PERMISSION_WRITE)
+			if (folder.isWorkspace() && folder.hasPermission(GUIAccessControlEntry.PERMISSION_WRITE)
 					&& Feature.visible(Feature.QUOTAS)) {
 				if (Feature.enabled(Feature.QUOTAS)) {
 					quotaTabPanel = new HLayout();
@@ -195,7 +195,7 @@ public class FolderDetailsPanel extends VLayout implements FolderObserver {
 
 	private void prepareSubscriptionsTab(GUIFolder folder) {
 		Tab subscriptionsTab = new Tab(I18N.message("subscriptions"));
-		if (folder.hasPermission(Constants.PERMISSION_SUBSCRIPTION) && Feature.visible(Feature.AUDIT)) {
+		if (folder.hasPermission(GUIAccessControlEntry.PERMISSION_SUBSCRIPTION) && Feature.visible(Feature.AUDIT)) {
 			if (Feature.enabled(Feature.AUDIT)) {
 				subscriptionsTabPanel = new HLayout();
 				subscriptionsTabPanel.setWidth100();
@@ -209,8 +209,8 @@ public class FolderDetailsPanel extends VLayout implements FolderObserver {
 	}
 
 	private void prepareWorkflowTab(GUIFolder folder) {
-		Tab workflowTab  = new Tab(I18N.message("workflow"));
-		if (folder.hasPermission(Constants.PERMISSION_WORKFLOW) && Feature.visible(Feature.WORKFLOW)) {
+		Tab workflowTab = new Tab(I18N.message("workflow"));
+		if (folder.hasPermission(GUIAccessControlEntry.PERMISSION_WORKFLOW) && Feature.visible(Feature.WORKFLOW)) {
 			if (Feature.enabled(Feature.WORKFLOW)) {
 				workflowsTabPanel = new HLayout();
 				workflowsTabPanel.setWidth100();
@@ -225,12 +225,7 @@ public class FolderDetailsPanel extends VLayout implements FolderObserver {
 
 	private void prepareTabSet() {
 		tabSet = new EditingTabSet(saveEvent -> onSave(), cancelEvent -> FolderService.Instance.get()
-				.getFolder(getFolder().getId(), false, false, false, new AsyncCallback<GUIFolder>() {
-
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
+				.getFolder(getFolder().getId(), false, false, false, new DefaultAsyncCallback<>() {
 
 					@Override
 					public void onSuccess(GUIFolder folder) {
@@ -318,7 +313,7 @@ public class FolderDetailsPanel extends VLayout implements FolderObserver {
 	}
 
 	private void addAutomationTab() {
-		if (Feature.enabled(Feature.AUTOMATION) && folder.hasPermission(Constants.PERMISSION_AUTOMATION)) {
+		if (Feature.enabled(Feature.AUTOMATION) && folder.hasPermission(GUIAccessControlEntry.PERMISSION_AUTOMATION)) {
 			/*
 			 * Prepare the subscriptions tab
 			 */
@@ -334,7 +329,7 @@ public class FolderDetailsPanel extends VLayout implements FolderObserver {
 
 	private void addQuotaTab(ChangedHandler changeHandler) {
 		if (Feature.enabled(Feature.QUOTAS) && folder.isWorkspace()
-				&& folder.hasPermission(Constants.PERMISSION_WRITE)) {
+				&& folder.hasPermission(GUIAccessControlEntry.PERMISSION_WRITE)) {
 			/*
 			 * Prepare the subscriptions tab
 			 */
@@ -349,7 +344,7 @@ public class FolderDetailsPanel extends VLayout implements FolderObserver {
 	}
 
 	private void addSubscriptionsTab() {
-		if (Feature.enabled(Feature.AUDIT) && folder.hasPermission(Constants.PERMISSION_SUBSCRIPTION)) {
+		if (Feature.enabled(Feature.AUDIT) && folder.hasPermission(GUIAccessControlEntry.PERMISSION_SUBSCRIPTION)) {
 			/*
 			 * Prepare the subscriptions tab
 			 */
@@ -364,7 +359,7 @@ public class FolderDetailsPanel extends VLayout implements FolderObserver {
 	}
 
 	private void addWorkflowTab() {
-		if (Feature.enabled(Feature.WORKFLOW) && folder.hasPermission(Constants.PERMISSION_WORKFLOW)) {
+		if (Feature.enabled(Feature.WORKFLOW) && folder.hasPermission(GUIAccessControlEntry.PERMISSION_WORKFLOW)) {
 			/*
 			 * Prepare the workflow tab
 			 */
@@ -488,13 +483,13 @@ public class FolderDetailsPanel extends VLayout implements FolderObserver {
 	public void onSave() {
 		if (validate()) {
 			folder.setName(folder.getName().trim());
-			FolderService.Instance.get().save(folder, new AsyncCallback<GUIFolder>() {
+			FolderService.Instance.get().save(folder, new DefaultAsyncCallback<>() {
 				@Override
 				public void onFailure(Throwable caught) {
-					if (caught instanceof ServerValidationException) {
-						handleValidationException((ServerValidationException) caught);
+					if (caught instanceof ServerValidationException validationException) {
+						handleValidationException(validationException);
 					} else {
-						GuiLog.serverError(caught);
+						super.onFailure(caught);
 					}
 				}
 
@@ -588,5 +583,15 @@ public class FolderDetailsPanel extends VLayout implements FolderObserver {
 	private void enableSave() {
 		FolderController.get().beginEditing(folder);
 		tabSet.displaySave();
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

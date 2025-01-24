@@ -8,7 +8,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.stream.Collectors;
+
+import org.apache.commons.collections.CollectionUtils;
 
 import com.logicaldoc.core.PersistentObject;
 
@@ -106,7 +107,7 @@ public abstract class ExtensibleObject extends PersistentObject {
 
 	public List<Object> getValues(String name) {
 		List<Attribute> attrs = getValueAttributes(name);
-		return attrs.stream().map(a -> a.getValue()).collect(Collectors.toList());
+		return attrs.stream().map(a -> a.getValue()).toList();
 	}
 
 	public Object getValue(String name) {
@@ -127,7 +128,7 @@ public abstract class ExtensibleObject extends PersistentObject {
 	public List<String> getAttributeNames() {
 		List<String> names = new ArrayList<>();
 		if (attributes != null)
-			names.addAll(attributes.keySet());
+			names = attributes.keySet().stream().toList();
 		return names;
 	}
 
@@ -168,10 +169,6 @@ public abstract class ExtensibleObject extends PersistentObject {
 	}
 
 	public List<Attribute> setValues(String name, List<Object> values) {
-		return setValues(name, values != null ? values.toArray() : null);
-	}
-
-	public List<Attribute> setValues(String name, Object[] values) {
 		// clean the attributes that store the actual multiple values
 		Set<String> valNames = getValueAttributesName(name);
 		for (String n : valNames) {
@@ -180,18 +177,19 @@ public abstract class ExtensibleObject extends PersistentObject {
 			removeAttribute(n);
 		}
 
-		if (!(values != null && values.length > 0))
-			throw new IllegalArgumentException("no values have been specified");
-
 		List<Attribute> attrs = new ArrayList<>();
-		Attribute master = setValue(name, values[0]);
+		
+		if (CollectionUtils.isEmpty(values))
+			return attrs;
+
+		Attribute master = setValue(name, values.get(0));
 		attrs.add(master);
 
-		if (values.length > 1) {
+		if (values.size() > 1) {
 			master.setMultiple(1);
 			NumberFormat nf = new DecimalFormat("0000");
-			for (int i = 1; i < values.length; i++) {
-				Attribute attribute = setValue(name + "-" + nf.format(i), values[i]);
+			for (int i = 1; i < values.size(); i++) {
+				Attribute attribute = setValue(name + "-" + nf.format(i), values.get(i));
 				attribute.setParent(name);
 				attrs.add(attribute);
 			}
@@ -243,5 +241,30 @@ public abstract class ExtensibleObject extends PersistentObject {
 			}
 
 		return position;
+	}
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = super.hashCode();
+		result = prime * result + ((templateId == null) ? 0 : templateId.hashCode());
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (!super.equals(obj))
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		ExtensibleObject other = (ExtensibleObject) obj;
+		if (templateId == null) {
+			if (other.templateId != null)
+				return false;
+		} else if (!templateId.equals(other.templateId))
+			return false;
+		return true;
 	}
 }

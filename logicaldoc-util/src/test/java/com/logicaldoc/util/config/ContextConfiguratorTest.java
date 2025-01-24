@@ -1,9 +1,7 @@
 package com.logicaldoc.util.config;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.sql.SQLException;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -23,8 +21,8 @@ public class ContextConfiguratorTest {
 	File contextXml = new File("target/context.xml");
 
 	@Before
-	public void setUp() throws FileNotFoundException, IOException, SQLException {
-		FileUtil.copyResource("/context.xml", contextXml);
+	public void setUp() throws IOException {
+		FileUtil.copyResource("/contexttest.xml", contextXml);
 	}
 
 	@Test
@@ -35,7 +33,7 @@ public class ContextConfiguratorTest {
 			config.addTrigger("TestTrigger");
 			notThrownTest = "ok";
 		} catch (Exception t) {
-			// Nothing to do
+			// Ignore
 		}
 		Assert.assertNotNull(notThrownTest);
 	}

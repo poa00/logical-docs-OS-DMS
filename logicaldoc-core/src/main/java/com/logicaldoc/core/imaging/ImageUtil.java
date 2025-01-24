@@ -19,6 +19,7 @@ import java.awt.image.LookupOp;
 import java.awt.image.ShortLookupTable;
 import java.awt.image.WritableRaster;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -86,7 +87,7 @@ public class ImageUtil {
 			saveImage(content, tmpFile);
 			cropImageToFile(tmpFile, zone, file);
 		} finally {
-			FileUtil.strongDelete(tmpFile);
+			FileUtil.delete(tmpFile);
 		}
 	}
 
@@ -279,15 +280,14 @@ public class ImageUtil {
 			File pdfFile = FileUtil.createTempFile("zonalocr", ".pdf");
 			try {
 				if (!"pdf".equals(ext)) {
-					FormatConverterManager manager = (FormatConverterManager) Context.get()
-							.getBean(FormatConverterManager.class);
+					FormatConverterManager manager = Context.get(FormatConverterManager.class);
 					manager.convertFile(originalFile, originalFileName, pdfFile, "jpg", null);
 				} else {
 					pdfFile = originalFile;
 				}
 				GhostUtil.print(pdfFile, out, 1);
 			} finally {
-				FileUtil.strongDelete(pdfFile);
+				FileUtil.delete(pdfFile);
 			}
 		}
 	}
@@ -577,7 +577,7 @@ public class ImageUtil {
 	}
 
 	/**
-	 * Creates an images with the givent text printed inside
+	 * Creates an images with the given text printed inside
 	 * 
 	 * @param text the text to print in the image
 	 * @return The generated image
@@ -605,5 +605,32 @@ public class ImageUtil {
 		graphics2d.dispose();
 
 		return image;
+	}
+
+	/**
+	 * Generates a PNG with a single transparent pixel
+	 * 
+	 * @return the generated image
+	 */
+	public static BufferedImage generateTransparentSinglePixelPng() {
+		BufferedImage transparentPng = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
+		transparentPng.setRGB(0, 0, 1, 1, new int[] { 0 }, 0, 1);
+		return transparentPng;
+	}
+
+	/**
+	 * Write an image into an array of bytes
+	 * 
+	 * @param image the image to read
+	 * @return the image's bytes
+	 * 
+	 * @throws IOException I/O error
+	 */
+	public static byte[] getImageBytes(BufferedImage image) throws IOException {
+		try (ByteArrayOutputStream out = new ByteArrayOutputStream();) {
+			ImageIO.write(image, "png", out);
+			out.flush();
+			return out.toByteArray();
+		}
 	}
 }

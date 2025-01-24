@@ -1,5 +1,7 @@
 package com.logicaldoc.gui.frontend.client.services;
 
+import java.util.List;
+
 import com.google.gwt.core.client.GWT;
 import com.google.gwt.user.client.rpc.RemoteService;
 import com.google.gwt.user.client.rpc.RemoteServiceRelativePath;
@@ -93,34 +95,14 @@ public interface StampService extends RemoteService {
 	 * 
 	 * @throws ServerException an error happened in the server application
 	 */
-	public void applyStamp(Long[] docIds, GUIStamp stamp) throws ServerException;
-
-	/**
-	 * Remove users from stamp
-	 * 
-	 * @param userIds identifiers of the users to remove from the stamp
-	 * @param stampId identifier of the stamp
-	 * 
-	 * @throws ServerException an error happened in the server application
-	 */
-	public void removeUsers(long[] userIds, long stampId) throws ServerException;
-
-	/**
-	 * Assigns users to stamp
-	 * 
-	 * @param userIds identifiers of the users to associate to the stamp
-	 * @param stampId identifier of the stamp
-	 * 
-	 * @throws ServerException an error happened in the server application
-	 */
-	public void addUsers(long[] userIds, long stampId) throws ServerException;
+	public void applyStamp(List<Long> docIds, GUIStamp stamp) throws ServerException;
 
 	public static class Instance {
 		private static StampServiceAsync inst;
 
 		private Instance() {
 		}
-		
+
 		public static StampServiceAsync get() {
 			if (inst == null) {
 				inst = GWT.create(StampService.class);

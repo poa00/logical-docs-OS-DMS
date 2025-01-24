@@ -3,7 +3,7 @@ package com.logicaldoc.web.service;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -16,8 +16,8 @@ import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.contact.Contact;
 import com.logicaldoc.core.contact.ContactDAO;
 import com.logicaldoc.core.security.Session;
-import com.logicaldoc.core.security.User;
-import com.logicaldoc.core.security.dao.UserDAO;
+import com.logicaldoc.core.security.user.User;
+import com.logicaldoc.core.security.user.UserDAO;
 import com.logicaldoc.gui.common.client.ServerException;
 import com.logicaldoc.gui.common.client.beans.GUIContact;
 import com.logicaldoc.gui.common.client.beans.GUIParseContactsParameters;
@@ -39,12 +39,12 @@ public class ContactServiceImpl extends AbstractRemoteService implements Contact
 	private static Logger log = LoggerFactory.getLogger(ContactServiceImpl.class);
 
 	@Override
-	public void delete(long[] ids) throws ServerException {
-		validateSession(getThreadLocalRequest());
+	public void delete(List<Long> ids) throws ServerException {
+		validateSession();
 
 		try {
-			ContactDAO dao = (ContactDAO) Context.get().getBean(ContactDAO.class);
-			for (long id : ids) {
+			ContactDAO dao = Context.get(ContactDAO.class);
+			for (Long id : ids) {
 				dao.delete(id);
 			}
 		} catch (PersistenceException e) {
@@ -54,8 +54,8 @@ public class ContactServiceImpl extends AbstractRemoteService implements Contact
 
 	@Override
 	public void save(GUIContact contact) throws ServerException {
-		validateSession(getThreadLocalRequest());
-		ContactDAO dao = (ContactDAO) Context.get().getBean(ContactDAO.class);
+		validateSession();
+		ContactDAO dao = Context.get(ContactDAO.class);
 		try {
 			Contact cnt = dao.findById(contact.getId());
 			if (cnt == null)
@@ -77,14 +77,14 @@ public class ContactServiceImpl extends AbstractRemoteService implements Contact
 
 	@Override
 	public GUIContact load(long id) throws ServerException {
-		Session session = validateSession(getThreadLocalRequest());
+		Session session = validateSession();
 
 		try {
-			ContactDAO dao = (ContactDAO) Context.get().getBean(ContactDAO.class);
+			ContactDAO dao = Context.get(ContactDAO.class);
 			Contact contact = dao.findById(id);
 			return fromContact(contact);
 		} catch (PersistenceException e) {
-			return (GUIContact) throwServerException(session, log, e);
+			return throwServerException(session, log, e);
 		}
 	}
 
@@ -106,14 +106,13 @@ public class ContactServiceImpl extends AbstractRemoteService implements Contact
 	}
 
 	@Override
-	public GUIContact[] parseContacts(boolean preview, GUIParseContactsParameters parameters)
-			throws ServerException {
-		final Session session = validateSession(getThreadLocalRequest());
+	public List<GUIContact> parseContacts(boolean preview, GUIParseContactsParameters parameters) throws ServerException {
+		final Session session = validateSession();
 
-		Map<String, File> uploadedFilesMap = UploadServlet.getReceivedFiles(session.getSid());
+		Map<String, File> uploadedFilesMap = UploadServlet.getUploads(session.getSid());
 		File file = uploadedFilesMap.values().iterator().next();
 
-		ContactDAO dao = (ContactDAO) Context.get().getBean(ContactDAO.class);
+		ContactDAO dao = Context.get(ContactDAO.class);
 
 		List<GUIContact> contacts = new ArrayList<>();
 
@@ -164,29 +163,21 @@ public class ContactServiceImpl extends AbstractRemoteService implements Contact
 		} catch (IOException | PersistenceException e) {
 			log.error("Unable to parse contacs in CSV file", e);
 		} finally {
-			UploadServlet.cleanReceivedFiles(session.getSid());
+			UploadServlet.cleanUploads(session.getSid());
 		}
 
-		return contacts.toArray(new GUIContact[0]);
+		return contacts;
 	}
 
 	@Override
-	public void shareContacts(long[] contactIds, long[] userIds, long[] groupIds) throws ServerException {
-		validateSession(getThreadLocalRequest());
-		HashSet<Long> users = new HashSet<>();
-		if (userIds != null)
-			for (Long uId : userIds) {
-				if (!users.contains(uId))
-					users.add(uId);
-			}
-
-		appendUserIdsFromGroups(groupIds, users);
-
+	public void shareContacts(List<Long> contactIds, List<Long> userIds, List<Long> groupIds) throws ServerException {
+		validateSession();
 		try {
-			ContactDAO dao = (ContactDAO) Context.get().getBean(ContactDAO.class);
+			appendUserIdsFromGroups(groupIds, userIds);
+			ContactDAO dao = Context.get(ContactDAO.class);
 			for (Long cId : contactIds) {
 				Contact originalContact = dao.findById(cId);
-				for (Long userId : users) {
+				for (Long userId : userIds) {
 					List<Contact> userContacts = dao.findByUser(userId, originalContact.getEmail());
 					if (userContacts.isEmpty()) {
 						Contact cloned = new Contact(originalContact);
@@ -202,7 +193,7 @@ public class ContactServiceImpl extends AbstractRemoteService implements Contact
 	}
 
 	private void storeContact(Contact contact) {
-		ContactDAO dao = (ContactDAO) Context.get().getBean(ContactDAO.class);
+		ContactDAO dao = Context.get(ContactDAO.class);
 		try {
 			dao.store(contact);
 		} catch (PersistenceException e) {
@@ -210,15 +201,13 @@ public class ContactServiceImpl extends AbstractRemoteService implements Contact
 		}
 	}
 
-	private void appendUserIdsFromGroups(long[] groupIds, HashSet<Long> users) {
-		if (groupIds != null) {
-			UserDAO gDao = (UserDAO) Context.get().getBean(UserDAO.class);
-			for (Long gId : groupIds) {
-				Set<User> usrs = gDao.findByGroup(gId);
-				for (User user : usrs) {
-					if (!users.contains(user.getId()))
-						users.add(user.getId());
-				}
+	private void appendUserIdsFromGroups(Collection<Long> groupIds, Collection<Long> users) throws PersistenceException {
+		UserDAO gDao = Context.get(UserDAO.class);
+		for (Long gId : groupIds) {
+			Set<User> usrs = gDao.findByGroup(gId);
+			for (User user : usrs) {
+				if (!users.contains(user.getId()))
+					users.add(user.getId());
 			}
 		}
 	}

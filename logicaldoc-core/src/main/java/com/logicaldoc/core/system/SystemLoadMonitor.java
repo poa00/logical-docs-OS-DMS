@@ -2,18 +2,21 @@ package com.logicaldoc.core.system;
 
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
-import java.lang.management.OperatingSystemMXBean;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Scanner;
+
+import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
+import javax.annotation.Resource;
+import javax.management.MBeanServerConnection;
 
 import org.apache.commons.collections4.queue.CircularFifoQueue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
 
-import com.logicaldoc.util.SystemUtil;
 import com.logicaldoc.util.config.ContextProperties;
-import com.logicaldoc.util.exec.Exec;
+import com.sun.management.OperatingSystemMXBean;
 
 /**
  * This class monitors the system load and notifies the listeners accordingly
@@ -21,10 +24,12 @@ import com.logicaldoc.util.exec.Exec;
  * @author Marco Meschieri - LogicalDOC
  * @since 6.7.1
  */
+@Component("systemLoadMonitor")
 public class SystemLoadMonitor {
 
 	protected static Logger log = LoggerFactory.getLogger(SystemLoadMonitor.class);
 
+	@Resource(name = "ContextProperties")
 	private ContextProperties config;
 
 	private CircularFifoQueue<Integer> samples = null;
@@ -36,6 +41,11 @@ public class SystemLoadMonitor {
 	private List<SystemLoadListener> listeners = new ArrayList<>();
 
 	private boolean lastCheckOverloaded = false;
+	
+	public SystemLoadMonitor(ContextProperties config) {
+		super();
+		this.config = config;
+	}
 
 	public void addListener(SystemLoadListener listener) {
 		if (!listeners.contains(listener))
@@ -44,10 +54,6 @@ public class SystemLoadMonitor {
 
 	public void removeListener(SystemLoadListener listener) {
 		listeners.remove(listener);
-	}
-
-	public void setConfig(ContextProperties config) {
-		this.config = config;
 	}
 
 	private void initSamples() {
@@ -73,98 +79,20 @@ public class SystemLoadMonitor {
 	 * @return current CPU load
 	 */
 	public int getCpuLoad() {
-		// try to get the CPU usage with JMX
-		OperatingSystemMXBean osMXBean = ManagementFactory.getOperatingSystemMXBean();
-		int load = (int) Math.round((osMXBean.getSystemLoadAverage() / osMXBean.getAvailableProcessors()) * 100d);
-		if (load < 0) {
-			// On some systems Java is not able to get the CPU usage so try to
-			// extract the information from the shell
-			load = SystemUtil.isWindows() ? getCpuLoadOnWindows() : getCpuLoadOnLinux();
-		}
-		if (load < 0)
-			load = 0;
-
-		if (log.isTraceEnabled())
-			log.trace("Got CPU load: {}", load);
-
-		return load;
-	}
-
-	private int getCpuLoadOnWindows() {
-		StringBuilder sb = new StringBuilder();
 		try {
-			Exec exec = new Exec();
-			exec.setOutPrefix(null);
-			exec.exec("Powershell \"[string][int](Get-Counter '\\Processor(*)\\% Processor Time').Countersamples[0].CookedValue", null, null, sb, 5);
-		} catch (IOException e1) {
-			log.warn(e1.getMessage(), e1);
+			MBeanServerConnection mbsc = ManagementFactory.getPlatformMBeanServer();
+
+			OperatingSystemMXBean osMBean = ManagementFactory.newPlatformMXBeanProxy(mbsc,
+					ManagementFactory.OPERATING_SYSTEM_MXBEAN_NAME, OperatingSystemMXBean.class);
+
+			int loadPErcentage = (int) Math.ceil(osMBean.getCpuLoad() * 100D);
+			if (log.isTraceEnabled())
+				log.trace("Got CPU load {}%", loadPErcentage);
+
+			return loadPErcentage;
+		} catch (IOException e) {
 			return 0;
 		}
-
-		try {
-			Thread.sleep(500);
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-		}
-
-		/*
-		 * Typical output is: LoadPercentage 6
-		 */
-		String output = sb.toString();
-		int load = 0;
-
-		try (Scanner scanner = new Scanner(output)) {
-			while (scanner.hasNextLine()) {
-				// trim and remove all non printable chars
-				String line = scanner.nextLine().trim().replaceAll("\\p{Zs}+", "");
-				if (line.matches("^\\d+$")) {
-					load = Integer.parseInt(line);
-					break;
-				}
-			}
-		}
-
-		return load;
-	}
-
-	private int getCpuLoadOnLinux() {
-		StringBuilder sb = new StringBuilder();
-		try {
-			Exec exec = new Exec();
-			exec.setOutPrefix(null);
-			exec.exec("top -bn1", null, null, sb, 5);
-		} catch (IOException e1) {
-			log.warn(e1.getMessage(), e1);
-			return 0;
-		}
-
-		try {
-			Thread.sleep(500);
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-		}
-
-		/*
-		 * Typical output is: %Cpu(s): 98.5 us, 1.5 sy, 0.0 ni, 0.0 id, 0.0 wa,
-		 * 0.0 hi, 0.0 si, 0.0 ste
-		 */
-		String output = sb.toString();
-		int load = 0;
-
-		try (Scanner scanner = new Scanner(output)) {
-			while (scanner.hasNextLine()) {
-				// trim and remove all non printable chars
-				String line = scanner.nextLine().trim().toLowerCase().replaceAll("\\p{Zs}+", "");
-				if (line.startsWith("%cpu")) {
-					line = line.substring(line.indexOf(':') + 1).trim().toLowerCase();
-					line = line.substring(0, line.indexOf('u')).trim();
-					load = Math.round(Float.parseFloat(line));
-					break;
-				}
-			}
-		}
-
-		return load;
 	}
 
 	/**
@@ -181,6 +109,15 @@ public class SystemLoadMonitor {
 			return averageCpuLoad > cpumax;
 	}
 
+	@PostConstruct
+	public void start() {
+		initSamples();
+		tracker.setPriority(Thread.MIN_PRIORITY);
+		tracker.start();
+		log.info("System load monitor started");
+	}
+
+	@PreDestroy
 	public void stop() {
 		if (tracker != null)
 			try {
@@ -188,13 +125,6 @@ public class SystemLoadMonitor {
 			} catch (Exception e) {
 				// Nothing to do
 			}
-	}
-
-	public void start() {
-		initSamples();
-		tracker.setPriority(Thread.MIN_PRIORITY);
-		tracker.start();
-		log.info("System load monitor started");
 	}
 
 	/*

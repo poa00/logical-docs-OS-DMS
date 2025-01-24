@@ -1,14 +1,13 @@
 package com.logicaldoc.gui.frontend.client.security;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIMenu;
 import com.logicaldoc.gui.common.client.beans.GUIUser;
 import com.logicaldoc.gui.common.client.data.MenusDS;
-import com.logicaldoc.gui.common.client.formatters.I18NCellFormatter;
+import com.logicaldoc.gui.common.client.grid.IdListGridField;
+import com.logicaldoc.gui.common.client.grid.formatters.I18NCellFormatter;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.services.SecurityService;
-import com.logicaldoc.gui.common.client.util.Util;
 import com.logicaldoc.gui.common.client.widgets.HTMLPanel;
 import com.smartgwt.client.data.Record;
 import com.smartgwt.client.types.Alignment;
@@ -45,8 +44,7 @@ public class MenusPanel extends VLayout {
 		listing.setHeight("55%");
 		listing.setShowResizeBar(true);
 
-		ListGridField id = new ListGridField("id", 40);
-		id.setHidden(true);
+		ListGridField id = new IdListGridField();
 
 		ListGridField name = new ListGridField("name", I18N.message("name"), 350);
 		name.setCanFilter(true);
@@ -62,11 +60,11 @@ public class MenusPanel extends VLayout {
 		menus.setLoadDataOnDemand(true);
 		menus.setCanSelectAll(false);
 		menus.setShowConnectors(true);
+		menus.setShowOpenIcons(false);
+		menus.setShowFolderIcons(false);
 		menus.setShowRoot(false);
 		menus.setCanAcceptDrop(false);
 		menus.setCanAcceptDroppedRecords(false);
-		menus.setNodeIcon(Util.imageUrl("cube_yellow16.png"));
-		menus.setFolderIcon(Util.imageUrl("cube_yellow16.png"));
 		menus.setDataSource(new MenusDS());
 		menus.setFields(id, name);
 
@@ -81,13 +79,7 @@ public class MenusPanel extends VLayout {
 			Record rec = menus.getSelectedRecord();
 			if (rec != null)
 				SecurityService.Instance.get().getMenu(Long.parseLong(rec.getAttributeAsString("id")), I18N.getLocale(),
-						new AsyncCallback<GUIMenu>() {
-
-							@Override
-							public void onFailure(Throwable caught) {
-								GuiLog.serverError(caught);
-							}
-
+						new DefaultAsyncCallback<>() {
 							@Override
 							public void onSuccess(GUIMenu menu) {
 								showRights(menu);
@@ -130,7 +122,17 @@ public class MenusPanel extends VLayout {
 
 	public void showRights(GUIMenu menu) {
 		rightsContainer.removeMember(rights);
-		rights = new MenuRightsPanel(menu, true);
+		rights = new MenuSecurityPanel(menu, true);
 		rightsContainer.addMember(rights);
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

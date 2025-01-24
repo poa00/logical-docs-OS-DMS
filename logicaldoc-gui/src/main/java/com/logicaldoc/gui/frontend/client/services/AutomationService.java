@@ -1,5 +1,7 @@
 package com.logicaldoc.gui.frontend.client.services;
 
+import java.util.List;
+
 import com.google.gwt.core.client.GWT;
 import com.google.gwt.user.client.rpc.RemoteService;
 import com.google.gwt.user.client.rpc.RemoteServiceRelativePath;
@@ -39,9 +41,9 @@ public interface AutomationService extends RemoteService {
 	 */
 	public GUIAutomationRoutine getRoutine(long id) throws ServerException;
 
-	public void deleteRoutines(long[] ids) throws ServerException;
+	public void deleteRoutines(List<Long> ids) throws ServerException;
 
-	public void deleteTriggers(long[] ids) throws ServerException;
+	public void deleteTriggers(List<Long> ids) throws ServerException;
 
 	/**
 	 * Creates or updates a trigger
@@ -83,17 +85,18 @@ public interface AutomationService extends RemoteService {
 	 *        database and the extended attributes of <code>routine</code> are
 	 *        used as input parameters.
 	 * @param docIds selected documents (optional)
-	 * @param folderId selected folders (optional)
+	 * @param folderIds selected folders
 	 * 
 	 * @throws ServerException an error happened in the server application
 	 */
-	public void execute(GUIAutomationRoutine routine, Long[] docIds, Long folderId) throws ServerException;
+	public void execute(GUIAutomationRoutine routine, List<Long> docIds, List<Long> folderIds) throws ServerException;
 
 	public static class Instance {
 		private static AutomationServiceAsync inst;
 
-		private Instance() {}
-		
+		private Instance() {
+		}
+
 		public static AutomationServiceAsync get() {
 			if (inst == null) {
 				inst = GWT.create(AutomationService.class);

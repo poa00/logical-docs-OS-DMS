@@ -2,6 +2,10 @@ package com.logicaldoc.core.searchengine;
 
 import java.io.InputStream;
 import java.util.Collection;
+import java.util.Set;
+
+import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
 
 import com.logicaldoc.core.document.Document;
 
@@ -21,8 +25,8 @@ public interface SearchEngine {
 	 * @param document The document to add into the index
 	 * @param content The extracted body text
 	 * 
-	 * @throws IndexException is an error happens and the document cannot be added to
-	 *         the index
+	 * @throws IndexException is an error happens and the document cannot be
+	 *         added to the index
 	 */
 	public void addHit(Document document, String content) throws IndexException;
 
@@ -32,8 +36,8 @@ public interface SearchEngine {
 	 * @param content Stream of the document's file
 	 * @param document The document that we want to add
 	 * 
-	 * @throws IndexException is an error happens and the document cannot be added to
-	 *         the index
+	 * @throws IndexException is an error happens and the document cannot be
+	 *         added to the index
 	 */
 	public void addHit(Document document, InputStream content) throws IndexException;
 
@@ -79,7 +83,7 @@ public interface SearchEngine {
 	 * 
 	 * @return the hits ordered by descending score
 	 */
-	public Hits search(String expression, String[] filters, String expressionLanguage, Integer rows);
+	public Hits search(String expression, Set<String> filters, String expressionLanguage, Integer rows);
 
 	/**
 	 * Executes a low-level query in the fulltext index<br>
@@ -93,12 +97,6 @@ public interface SearchEngine {
 	 * @return the search result, ordered by ascending id
 	 */
 	public Hits query(String expression, int page, int size);
-
-	
-	/**
-	 * Closes all indexing operations, shuts down the engine.
-	 */
-	public void close();
 
 	/**
 	 * This method can unlock a locked index.
@@ -137,7 +135,14 @@ public interface SearchEngine {
 	 * To be called on the context startup, this method creates all indexes and
 	 * unlock the existing ones
 	 */
+	@PostConstruct
 	public void init();
+
+	/**
+	 * Closes all indexing operations, shuts down the engine.
+	 */
+	@PreDestroy
+	public void close();
 
 	/**
 	 * Service method to get access from the internal core

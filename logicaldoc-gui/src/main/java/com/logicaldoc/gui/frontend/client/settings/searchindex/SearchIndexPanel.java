@@ -3,9 +3,8 @@ package com.logicaldoc.gui.frontend.client.settings.searchindex;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Feature;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIParameter;
@@ -14,19 +13,23 @@ import com.logicaldoc.gui.common.client.data.IndexingQueueDS;
 import com.logicaldoc.gui.common.client.data.LanguagesDS;
 import com.logicaldoc.gui.common.client.data.ParsersDS;
 import com.logicaldoc.gui.common.client.data.TokenFiltersDS;
+import com.logicaldoc.gui.common.client.grid.ColoredListGridField;
+import com.logicaldoc.gui.common.client.grid.DateListGridField;
+import com.logicaldoc.gui.common.client.grid.EnabledListGridField;
+import com.logicaldoc.gui.common.client.grid.FileNameListGridField;
+import com.logicaldoc.gui.common.client.grid.FileSizeListGridField;
+import com.logicaldoc.gui.common.client.grid.IdListGridField;
+import com.logicaldoc.gui.common.client.grid.IndexedListGridField;
+import com.logicaldoc.gui.common.client.grid.RefreshableListGrid;
+import com.logicaldoc.gui.common.client.grid.TypeIconGridField;
+import com.logicaldoc.gui.common.client.grid.VersionListGridField;
 import com.logicaldoc.gui.common.client.i18n.I18N;
 import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.common.client.util.Util;
+import com.logicaldoc.gui.common.client.validators.MinLengthValidator;
 import com.logicaldoc.gui.common.client.widgets.InfoPanel;
-import com.logicaldoc.gui.common.client.widgets.grid.ColoredListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.FileNameListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.FileSizeListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.IndexedListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.RefreshableListGrid;
-import com.logicaldoc.gui.common.client.widgets.grid.VersionListGridField;
 import com.logicaldoc.gui.frontend.client.administration.AdminPanel;
 import com.logicaldoc.gui.frontend.client.administration.AdminScreen;
 import com.logicaldoc.gui.frontend.client.document.DocumentsPanel;
@@ -34,7 +37,6 @@ import com.logicaldoc.gui.frontend.client.services.DocumentService;
 import com.logicaldoc.gui.frontend.client.services.SearchEngineService;
 import com.smartgwt.client.types.Alignment;
 import com.smartgwt.client.types.ListGridFieldType;
-import com.smartgwt.client.types.PickerIconName;
 import com.smartgwt.client.types.SelectionStyle;
 import com.smartgwt.client.types.TitleOrientation;
 import com.smartgwt.client.util.SC;
@@ -43,13 +45,12 @@ import com.smartgwt.client.widgets.IButton;
 import com.smartgwt.client.widgets.events.ClickEvent;
 import com.smartgwt.client.widgets.form.DynamicForm;
 import com.smartgwt.client.widgets.form.ValuesManager;
-import com.smartgwt.client.widgets.form.fields.PickerIcon;
-import com.smartgwt.client.widgets.form.fields.RadioGroupItem;
+import com.smartgwt.client.widgets.form.fields.FormItemIcon;
 import com.smartgwt.client.widgets.form.fields.SelectItem;
 import com.smartgwt.client.widgets.form.fields.SpinnerItem;
 import com.smartgwt.client.widgets.form.fields.StaticTextItem;
 import com.smartgwt.client.widgets.form.fields.TextItem;
-import com.smartgwt.client.widgets.form.validator.LengthRangeValidator;
+import com.smartgwt.client.widgets.form.fields.ToggleItem;
 import com.smartgwt.client.widgets.grid.ListGrid;
 import com.smartgwt.client.widgets.grid.ListGridField;
 import com.smartgwt.client.widgets.grid.ListGridRecord;
@@ -74,7 +75,7 @@ public class SearchIndexPanel extends AdminPanel {
 
 	private static final String VALUE = "value";
 
-	private static final String EENABLED = "eenabled";
+	private static final String ENABLED = "eenabled";
 
 	private static final String ALIASES = "aliases";
 
@@ -101,13 +102,7 @@ public class SearchIndexPanel extends AdminPanel {
 	@Override
 	public void onDraw() {
 		if (searchEngine == null)
-			SearchEngineService.Instance.get().getInfo(new AsyncCallback<GUISearchEngine>() {
-
-				@Override
-				public void onFailure(Throwable caught) {
-					GuiLog.serverError(caught);
-				}
-
+			SearchEngineService.Instance.get().getInfo(new DefaultAsyncCallback<>() {
 				@Override
 				public void onSuccess(GUISearchEngine searchEngine) {
 					SearchIndexPanel.this.searchEngine = searchEngine;
@@ -116,12 +111,12 @@ public class SearchIndexPanel extends AdminPanel {
 					tabs.addTab(fillFiltersTab());
 					tabs.addTab(fillLanguagesTab());
 					tabs.addTab(fillParsersTab());
-					tabs.addTab(fillHistoryTab());
-
 					if (Session.get().isDefaultTenant()) {
 						tabs.addTab(fillIndexingQueueTab(100));
 						tabs.addTab(fillEntiesTab());
 					}
+					tabs.addTab(fillIndexingHistoryTab());
+					tabs.addTab(fillSearchHistoryTab());
 				}
 			});
 	}
@@ -140,10 +135,16 @@ public class SearchIndexPanel extends AdminPanel {
 		return indexingQueueTab;
 	}
 
-	private Tab fillHistoryTab() {
-		Tab historyTab = new Tab(I18N.message("history"));
-		historyTab.setPane(new SearchIndexHistoryPanel());
-		return historyTab;
+	private Tab fillIndexingHistoryTab() {
+		Tab indexingHistoryTab = new Tab(I18N.message("indexinghistory"));
+		indexingHistoryTab.setPane(new IndexingHistoryPanel());
+		return indexingHistoryTab;
+	}
+
+	private Tab fillSearchHistoryTab() {
+		Tab searchHistoryTab = new Tab(I18N.message("searchhistory"));
+		searchHistoryTab.setPane(new SearchHistoryPanel());
+		return searchHistoryTab;
 	}
 
 	private Tab fillParsersTab() {
@@ -154,29 +155,18 @@ public class SearchIndexPanel extends AdminPanel {
 
 		setMembersMargin(3);
 
-		ListGridField id = new ListGridField("id");
-		id.setHidden(true);
+		ListGridField id = new IdListGridField();
 
-		LengthRangeValidator validator = new LengthRangeValidator();
-		validator.setMin(1);
-
-		ListGridField icon = new ListGridField("icon", " ", 24);
-		icon.setType(ListGridFieldType.IMAGE);
-		icon.setCanSort(false);
-		icon.setAlign(Alignment.CENTER);
-		icon.setShowDefaultContextMenu(false);
-		icon.setImageURLPrefix(Util.imagePrefix());
-		icon.setImageURLSuffix(".png");
-		icon.setCanEdit(false);
-		icon.setCanFilter(false);
+		ListGridField icon = new TypeIconGridField();
+		icon.setHidden(false);
 
 		ListGridField extension = new ListGridField(EXTENSION, I18N.message(EXTENSION), 80);
 		extension.setCanEdit(false);
-		extension.setValidators(validator);
+		extension.setValidators(new MinLengthValidator(1));
 
 		ListGridField name = new ListGridField("name", I18N.message("name"), 180);
 		name.setCanEdit(false);
-		name.setValidators(validator);
+		name.setValidators(new MinLengthValidator(1));
 
 		ListGridField aliases = new ListGridField(ALIASES, I18N.message(ALIASES));
 		aliases.setCanEdit(true);
@@ -190,7 +180,7 @@ public class SearchIndexPanel extends AdminPanel {
 		parsersList.setWidth100();
 		parsersList.setHeight100();
 		parsersList.setAutoFetchData(true);
-		parsersList.setFields(icon, extension, name, aliases);
+		parsersList.setFields(id, icon, extension, name, aliases);
 		parsersList.setDataSource(ParsersDS.get());
 		parsersList.setShowFilterEditor(true);
 		parsersList.setFilterOnKeypress(true);
@@ -200,12 +190,7 @@ public class SearchIndexPanel extends AdminPanel {
 			ListGridRecord rec = parsersList.getRecord(event.getRowNum());
 
 			SearchEngineService.Instance.get().setAliases(rec.getAttributeAsString(EXTENSION),
-					(String) event.getNewValues().get(ALIASES), new AsyncCallback<Void>() {
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
-						}
-
+					(String) event.getNewValues().get(ALIASES), new DefaultAsyncCallback<>() {
 						@Override
 						public void onSuccess(Void ret) {
 							parsersList.invalidateCache();
@@ -226,14 +211,7 @@ public class SearchIndexPanel extends AdminPanel {
 		languagesTabPanel.setWidth100();
 		languagesTabPanel.setHeight100();
 
-		ListGridField enabled = new ListGridField(EENABLED, " ", 24);
-		enabled.setType(ListGridFieldType.IMAGE);
-		enabled.setCanSort(false);
-		enabled.setAlign(Alignment.CENTER);
-		enabled.setShowDefaultContextMenu(false);
-		enabled.setImageURLPrefix(Util.imagePrefix());
-		enabled.setImageURLSuffix(".gif");
-		enabled.setCanFilter(false);
+		ListGridField enabled = new EnabledListGridField();
 
 		ListGridField code = new ListGridField("code", I18N.message("code"), 80);
 		code.setCanEdit(false);
@@ -265,14 +243,7 @@ public class SearchIndexPanel extends AdminPanel {
 	}
 
 	private Tab fillFiltersTab() {
-		ListGridField enabled = new ListGridField(EENABLED, " ", 24);
-		enabled.setType(ListGridFieldType.IMAGE);
-		enabled.setCanSort(false);
-		enabled.setAlign(Alignment.CENTER);
-		enabled.setShowDefaultContextMenu(false);
-		enabled.setImageURLPrefix(Util.imagePrefix());
-		enabled.setImageURLSuffix(".gif");
-		enabled.setCanFilter(false);
+		ListGridField enabled = new EnabledListGridField();
 
 		ListGridField name = new ListGridField("name", I18N.message("filter"));
 		name.setWidth("*");
@@ -307,27 +278,20 @@ public class SearchIndexPanel extends AdminPanel {
 		filtersGrid.addDropCompleteHandler(event -> {
 			List<String> filters = new ArrayList<>();
 			ListGridRecord[] records = filtersGrid.getRecords();
-			for (ListGridRecord rec : records) {
+			for (ListGridRecord rec : records)
 				filters.add(rec.getAttributeAsString("name"));
-			}
-			SearchEngineService.Instance.get().reorderTokenFilters(filters.toArray(new String[0]),
-					new AsyncCallback<Void>() {
 
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
-						}
-
-						@Override
-						public void onSuccess(Void arg) {
-							// Nothing to do
-						}
-					});
+			SearchEngineService.Instance.get().reorderTokenFilters(filters, new DefaultAsyncCallback<>() {
+				@Override
+				public void onSuccess(Void arg) {
+					// Nothing to do
+				}
+			});
 		});
 
-		filtersGrid.addCellContextClickHandler(event -> {
+		filtersGrid.addCellContextClickHandler(click -> {
 			showFilterMenu(filtersGrid);
-			event.cancel();
+			click.cancel();
 		});
 		return filtersTab;
 	}
@@ -367,19 +331,12 @@ public class SearchIndexPanel extends AdminPanel {
 				params.add(new GUIParameter(recd.getAttributeAsString("name"), recd.getAttributeAsString(VALUE)));
 			}
 
-			SearchEngineService.Instance.get().saveTokenFilterSettings(filter, params.toArray(new GUIParameter[0]),
-					new AsyncCallback<Void>() {
-
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
-						}
-
-						@Override
-						public void onSuccess(Void arg) {
-							// Nothing to do
-						}
-					});
+			SearchEngineService.Instance.get().saveTokenFilterSettings(filter, params, new DefaultAsyncCallback<>() {
+				@Override
+				public void onSuccess(Void arg) {
+					// Nothing to do
+				}
+			});
 		});
 		hLayout.addMember(saveButton);
 
@@ -404,31 +361,23 @@ public class SearchIndexPanel extends AdminPanel {
 		searchEngineForm.setColWidths(1, "*");
 		searchEngineForm.setValuesManager(vm);
 
-		PickerIcon computeStat = new PickerIcon(PickerIconName.REFRESH, iconClick -> {
-			iconClick.getItem().setValue(I18N.message("computing") + "...");
-			SearchEngineService.Instance.get().countEntries(new AsyncCallback<Long>() {
-
-				@Override
-				public void onFailure(Throwable caught) {
-					GuiLog.serverError(caught);
-				}
-
+		FormItemIcon computeStats = new FormItemIcon();
+		computeStats.setPrompt(I18N.message("calculatestats"));
+		computeStats.setSrc("[SKIN]/arrows-rotate.svg");
+		computeStats.addFormItemClickHandler(click -> {
+			click.getItem().setValue(I18N.message("computing") + "...");
+			SearchEngineService.Instance.get().countEntries(new DefaultAsyncCallback<>() {
 				@Override
 				public void onSuccess(Long count) {
-					iconClick.getItem().setValue(Util.formatLong(count));
+					click.getItem().setValue(Util.formatLong(count));
 				}
 			});
 		});
 
-		computeStat.setPrompt(I18N.message("calculatestats"));
-		computeStat.setWidth(16);
-
 		// Entries count
 		StaticTextItem entries = ItemFactory.newStaticTextItem("entries", "entriescount", "-");
 		entries.setIconHSpace(2);
-		entries.setIconWidth(16);
-		entries.setIconHeight(16);
-		entries.setIcons(computeStat);
+		entries.setIcons(computeStats);
 		entries.setWidth("1%");
 
 		// Locked
@@ -480,8 +429,8 @@ public class SearchIndexPanel extends AdminPanel {
 
 		TextItem customSorting = ItemFactory.newTextItem("customsorting", this.searchEngine.getCustomSorting());
 		customSorting.setWidth(300);
-		customSorting.addChangeHandler(changeEvent -> 
-			sorting.setDisabled(changeEvent.getValue() != null && !changeEvent.getValue().toString().isEmpty()));
+		customSorting.addChangeHandler(changeEvent -> sorting
+				.setDisabled(changeEvent.getValue() != null && !changeEvent.getValue().toString().isEmpty()));
 
 		// The optional batch
 		SpinnerItem batch = ItemFactory.newSpinnerItem("batch", this.searchEngine.getBatch());
@@ -504,6 +453,12 @@ public class SearchIndexPanel extends AdminPanel {
 		timeout.setWidth(100);
 		timeout.setMin(0);
 		timeout.setStep(10);
+
+		// Retain extracted text on timeout
+		ToggleItem timeoutRetain = ItemFactory.newToggleItem("timeoutRetain", "ontimeoutretaintext",
+				this.searchEngine.isParsingTimeoutRetain());
+		timeoutRetain.setHint(I18N.message("ontimeoutretaintexthint"));
+		timeoutRetain.setRequired(true);
 
 		// The optional max text that will be put in the index
 		SpinnerItem maxText = ItemFactory.newSpinnerItem("maxtext", this.searchEngine.getMaxText());
@@ -528,15 +483,16 @@ public class SearchIndexPanel extends AdminPanel {
 		repository.setVisible(Session.get().isDefaultTenant());
 
 		// Mark unindexable on error
-		RadioGroupItem skipOnError = ItemFactory.newBooleanSelector("skipOnError", "onerrormarkunindexable");
+		ToggleItem skipOnError = ItemFactory.newToggleItem("skipOnError", "onerrormarkunindexable",
+				this.searchEngine.isSkipOnError());
 		skipOnError.setHint(I18N.message("onerrormarkunindexablehint"));
-		skipOnError.setValue(this.searchEngine.isSkipOnError() ? "yes" : "no");
+		skipOnError.setRequired(true);
 
 		HLayout buttons = prepareButtons();
 
 		searchEngineForm.setItems(entries, status, repository, includePatterns, excludePatterns,
 				includePatternsMetadata, excludePatternsMetadata, skipOnError, sorting, customSorting, threads, batch,
-				timeout, maxText, maxTextFileSize);
+				timeout, timeoutRetain, maxText, maxTextFileSize);
 
 		buttons.setMembersMargin(5);
 		searchEngineTabPanel.setMembers(searchEngineForm, buttons);
@@ -572,24 +528,17 @@ public class SearchIndexPanel extends AdminPanel {
 	private IButton preparePurgeButton() {
 		IButton purge = new IButton(I18N.message("purge"));
 		purge.setAutoFit(true);
-		purge.addClickHandler(purgeClick -> 
-			SC.ask(I18N.message("purgeconfirmation"), answer -> {
-				if (Boolean.TRUE.equals(answer)) {
-					LD.contactingServer();
-					SearchEngineService.Instance.get().purge(new AsyncCallback<Void>() {
-						@Override
-						public void onFailure(Throwable caught) {
-							LD.clearPrompt();
-							GuiLog.serverError(caught);
-						}
-
-						@Override
-						public void onSuccess(Void ret) {
-							LD.clearPrompt();
-						}
-					});
-				}
-			}));
+		purge.addClickHandler(purgeClick -> SC.ask(I18N.message("purgeconfirmation"), answer -> {
+			if (Boolean.TRUE.equals(answer)) {
+				LD.contactingServer();
+				SearchEngineService.Instance.get().purge(new DefaultAsyncCallback<>() {
+					@Override
+					public void onSuccess(Void ret) {
+						LD.clearPrompt();
+					}
+				});
+			}
+		}));
 		return purge;
 	}
 
@@ -598,13 +547,7 @@ public class SearchIndexPanel extends AdminPanel {
 		check.setAutoFit(true);
 		check.addClickHandler(checkClick -> {
 			LD.contactingServer();
-			SearchEngineService.Instance.get().check(new AsyncCallback<String>() {
-				@Override
-				public void onFailure(Throwable caught) {
-					GuiLog.serverError(caught);
-					LD.clearPrompt();
-				}
-
+			SearchEngineService.Instance.get().check(new DefaultAsyncCallback<>() {
 				@Override
 				public void onSuccess(String ret) {
 					LD.clearPrompt();
@@ -624,13 +567,12 @@ public class SearchIndexPanel extends AdminPanel {
 					if (Boolean.TRUE.equals(yes)) {
 						LD.contactingServer();
 						rescheduleAll.setDisabled(true);
-						SearchEngineService.Instance.get().rescheduleAll(true, new AsyncCallback<Void>() {
+						SearchEngineService.Instance.get().rescheduleAll(true, new DefaultAsyncCallback<>() {
 
 							@Override
 							public void onFailure(Throwable caught) {
-								LD.clearPrompt();
+								super.onFailure(caught);
 								dropIndex.setDisabled(false);
-								GuiLog.serverError(caught);
 							}
 
 							@Override
@@ -654,13 +596,12 @@ public class SearchIndexPanel extends AdminPanel {
 					if (Boolean.TRUE.equals(value)) {
 						LD.contactingServer();
 						rescheduleAll.setDisabled(true);
-						SearchEngineService.Instance.get().rescheduleAll(false, new AsyncCallback<Void>() {
+						SearchEngineService.Instance.get().rescheduleAll(false, new DefaultAsyncCallback<>() {
 
 							@Override
 							public void onFailure(Throwable caught) {
-								LD.clearPrompt();
+								super.onFailure(caught);
 								rescheduleAll.setDisabled(false);
-								GuiLog.serverError(caught);
 							}
 
 							@Override
@@ -679,13 +620,7 @@ public class SearchIndexPanel extends AdminPanel {
 	private IButton prepareUnlockButton() {
 		IButton unlock = new IButton(I18N.message("unlock"));
 		unlock.setAutoFit(true);
-		unlock.addClickHandler(unlockClick -> SearchEngineService.Instance.get().unlock(new AsyncCallback<Void>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
+		unlock.addClickHandler(unlockClick -> SearchEngineService.Instance.get().unlock(new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(Void ret) {
 				GuiLog.info(I18N.message("indexunlocked"), null);
@@ -704,13 +639,7 @@ public class SearchIndexPanel extends AdminPanel {
 
 			collectValues();
 
-			SearchEngineService.Instance.get().save(SearchIndexPanel.this.searchEngine, new AsyncCallback<Void>() {
-
-				@Override
-				public void onFailure(Throwable caught) {
-					GuiLog.serverError(caught);
-				}
-
+			SearchEngineService.Instance.get().save(SearchIndexPanel.this.searchEngine, new DefaultAsyncCallback<>() {
 				@Override
 				public void onSuccess(Void ret) {
 					AdminScreen.get().setContent(new SearchIndexPanel());
@@ -721,17 +650,16 @@ public class SearchIndexPanel extends AdminPanel {
 	}
 
 	private void collectValues() {
-		@SuppressWarnings("unchecked")
-		final Map<String, Object> values = vm.getValues();
-
-		SearchIndexPanel.this.searchEngine.setIncludePatterns((String) values.get("includepatterns"));
-		SearchIndexPanel.this.searchEngine.setExcludePatterns((String) values.get("excludepatterns"));
-		SearchIndexPanel.this.searchEngine.setIncludePatternsMetadata((String) values.get("includepatternsmetadata"));
-		SearchIndexPanel.this.searchEngine.setExcludePatternsMetadata((String) values.get("excludepatternsmetadata"));
-		SearchIndexPanel.this.searchEngine.setDir((String) values.get("repository"));
-		SearchIndexPanel.this.searchEngine.setSorting((String) values.get("sorting"));
-		SearchIndexPanel.this.searchEngine.setCustomSorting((String) values.get("customsorting"));
-		SearchIndexPanel.this.searchEngine.setSkipOnError("yes".equals(values.get("skipOnError")));
+		SearchIndexPanel.this.searchEngine.setIncludePatterns(vm.getValueAsString("includepatterns"));
+		SearchIndexPanel.this.searchEngine.setExcludePatterns(vm.getValueAsString("excludepatterns"));
+		SearchIndexPanel.this.searchEngine.setIncludePatternsMetadata(vm.getValueAsString("includepatternsmetadata"));
+		SearchIndexPanel.this.searchEngine.setExcludePatternsMetadata(vm.getValueAsString("excludepatternsmetadata"));
+		SearchIndexPanel.this.searchEngine.setDir(vm.getValueAsString("repository"));
+		SearchIndexPanel.this.searchEngine.setSorting(vm.getValueAsString("sorting"));
+		SearchIndexPanel.this.searchEngine.setCustomSorting(vm.getValueAsString("customsorting"));
+		SearchIndexPanel.this.searchEngine.setSkipOnError(Boolean.valueOf(vm.getValueAsString("skipOnError")));
+		SearchIndexPanel.this.searchEngine
+				.setParsingTimeoutRetain(Boolean.valueOf(vm.getValueAsString("timeoutRetain")));
 
 		String btch = vm.getValueAsString("batch");
 		if (btch == null || "".equals(btch.trim()))
@@ -865,7 +793,6 @@ public class SearchIndexPanel extends AdminPanel {
 		final ListGridRecord[] selection = docsList.getSelectedRecords();
 
 		Menu contextMenu = new Menu();
-
 		MenuItem openInFolder = new MenuItem();
 		openInFolder.setTitle(I18N.message("openinfolder"));
 		openInFolder.addClickHandler(event -> {
@@ -881,17 +808,11 @@ public class SearchIndexPanel extends AdminPanel {
 		markUnindexable.addClickHandler(event -> {
 			if (selection == null)
 				return;
-			Long[] ids = new Long[selection.length];
-			for (int j = 0; j < selection.length; j++) {
-				ids[j] = Long.parseLong(selection[j].getAttribute("id"));
-			}
+			List<Long> ids = new ArrayList<>();
+			for (int j = 0; j < selection.length; j++)
+				ids.add(selection[j].getAttributeAsLong("id"));
 
-			DocumentService.Instance.get().markUnindexable(ids, new AsyncCallback<Void>() {
-				@Override
-				public void onFailure(Throwable caught) {
-					GuiLog.serverError(caught);
-				}
-
+			DocumentService.Instance.get().markUnindexable(ids, new DefaultAsyncCallback<>() {
 				@Override
 				public void onSuccess(Void result) {
 					for (ListGridRecord rec : selection) {
@@ -910,18 +831,13 @@ public class SearchIndexPanel extends AdminPanel {
 
 		Menu contextMenu = new Menu();
 		MenuItem enable = new MenuItem();
+		enable.setEnabled(Boolean.FALSE.equals(rec.getAttributeAsBoolean(ENABLED)));
 		enable.setTitle(I18N.message("enable"));
 		enable.addClickHandler(event -> SearchEngineService.Instance.get()
-				.setLanguageStatus(rec.getAttributeAsString("code"), true, new AsyncCallback<Void>() {
-
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				.setLanguageStatus(rec.getAttributeAsString("code"), true, new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Void result) {
-						rec.setAttribute(EENABLED, "0");
+						rec.setAttribute(ENABLED, true);
 						langsList.refreshRow(langsList.getRecordIndex(rec));
 						GuiLog.info(I18N.message("settingsaffectnewsessions"), null);
 					}
@@ -929,26 +845,18 @@ public class SearchIndexPanel extends AdminPanel {
 
 		MenuItem disable = new MenuItem();
 		disable.setTitle(I18N.message("disable"));
+		disable.setEnabled(Boolean.TRUE.equals(rec.getAttributeAsBoolean(ENABLED)));
 		disable.addClickHandler(event -> SearchEngineService.Instance.get()
-				.setLanguageStatus(rec.getAttributeAsString("code"), false, new AsyncCallback<Void>() {
-
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				.setLanguageStatus(rec.getAttributeAsString("code"), false, new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Void result) {
-						rec.setAttribute(EENABLED, "2");
+						rec.setAttribute(ENABLED, false);
 						langsList.refreshRow(langsList.getRecordIndex(rec));
 						GuiLog.info(I18N.message("settingsaffectnewsessions"), null);
 					}
 				}));
 
-		if ("0".equals(rec.getAttributeAsString(EENABLED)))
-			contextMenu.setItems(disable);
-		else
-			contextMenu.setItems(enable);
+		contextMenu.setItems(enable, disable);
 		contextMenu.showContextMenu();
 	}
 
@@ -958,42 +866,39 @@ public class SearchIndexPanel extends AdminPanel {
 		Menu contextMenu = new Menu();
 		MenuItem enable = new MenuItem();
 		enable.setTitle(I18N.message("enable"));
+		enable.setEnabled(Boolean.FALSE.equals(rec.getAttributeAsBoolean(ENABLED)));
 		enable.addClickHandler(event -> SearchEngineService.Instance.get()
-				.setTokenFilterStatus(rec.getAttributeAsString("name"), true, new AsyncCallback<Void>() {
-
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				.setTokenFilterStatus(rec.getAttributeAsString("name"), true, new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Void result) {
-						rec.setAttribute(EENABLED, "0");
+						rec.setAttribute(ENABLED, true);
 						grid.refreshRow(grid.getRecordIndex(rec));
 					}
 				}));
 
 		MenuItem disable = new MenuItem();
 		disable.setTitle(I18N.message("disable"));
+		disable.setEnabled(Boolean.TRUE.equals(rec.getAttributeAsBoolean(ENABLED)));
 		disable.addClickHandler(event -> SearchEngineService.Instance.get()
-				.setTokenFilterStatus(rec.getAttributeAsString("name"), false, new AsyncCallback<Void>() {
-
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				.setTokenFilterStatus(rec.getAttributeAsString("name"), false, new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Void result) {
-						rec.setAttribute(EENABLED, "2");
+						rec.setAttribute(ENABLED, false);
 						grid.refreshRow(grid.getRecordIndex(rec));
 					}
 				}));
 
-		if ("0".equals(rec.getAttributeAsString(EENABLED)))
-			contextMenu.setItems(disable);
-		else
-			contextMenu.setItems(enable);
+		contextMenu.setItems(enable, disable);
 		contextMenu.showContextMenu();
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

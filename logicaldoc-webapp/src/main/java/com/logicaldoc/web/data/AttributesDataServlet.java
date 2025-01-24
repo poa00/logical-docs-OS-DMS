@@ -41,6 +41,8 @@ public class AttributesDataServlet extends AbstractDataServlet {
 
 		boolean docevent = "docevent".equals(request.getParameter("context"));
 
+		boolean sections = "true".equals(request.getParameter("sections"));
+
 		PrintWriter writer = response.getWriter();
 		writer.write("<list>");
 
@@ -56,6 +58,7 @@ public class AttributesDataServlet extends AbstractDataServlet {
 				printAttibute("user", I18N.message("user", locale), Attribute.TYPE_USER, writer);
 			}
 
+			printAttibute("customId", I18N.message("customid", locale), writer);
 			printAttibute("filename", I18N.message("filename", locale), writer);
 			printAttibute("lastModified", I18N.message("lastmodified", locale), writer);
 			printAttibute("user", I18N.message("user", locale), Attribute.TYPE_DATE, writer);
@@ -69,6 +72,7 @@ public class AttributesDataServlet extends AbstractDataServlet {
 			printAttibute("creator", I18N.message("creator", locale), writer);
 			printAttibute("publisher", I18N.message("publisher", locale), writer);
 			printAttibute("comment", I18N.message("comment", locale), writer);
+			printAttibute("lastNote", I18N.message("lastnote", locale), writer);
 			printAttibute("template", I18N.message("template", locale), writer);
 			printAttibute("tags", I18N.message("tags", locale), writer);
 			printAttibute("workflowStatus", I18N.message("workflowstatus", locale), writer);
@@ -87,10 +91,10 @@ public class AttributesDataServlet extends AbstractDataServlet {
 		 */
 		Map<String, Attribute> attributes = new HashMap<>();
 		if (templateId == null) {
-			AttributeSetDAO dao = (AttributeSetDAO) Context.get().getBean(AttributeSetDAO.class);
+			AttributeSetDAO dao = Context.get(AttributeSetDAO.class);
 			attributes = dao.findAttributes(session.getTenantId(), null);
 		} else {
-			TemplateDAO dao = (TemplateDAO) Context.get().getBean(TemplateDAO.class);
+			TemplateDAO dao = Context.get(TemplateDAO.class);
 			Template template = dao.findById(templateId);
 			dao.initialize(template);
 			List<String> names = template.getAttributeNames();
@@ -100,11 +104,12 @@ public class AttributesDataServlet extends AbstractDataServlet {
 
 		for (Map.Entry<String, Attribute> entry : attributes.entrySet()) {
 			Attribute attribute = entry.getValue();
-			if (attribute.getHidden() == 1)
+			if (attribute.getHidden() == 1 || (!sections && attribute.isSection()))
 				continue;
 
-			printAttibute("ext_" + entry.getKey(), (StringUtils.isNotEmpty(attribute.getLabel()) ? attribute.getLabel() : ""),
-					attribute.getType(), writer);
+			printAttibute("ext_" + entry.getKey(),
+					(StringUtils.isNotEmpty(attribute.getLabel()) ? attribute.getLabel() : ""), attribute.getType(),
+					writer);
 		}
 
 		writer.write("</list>");

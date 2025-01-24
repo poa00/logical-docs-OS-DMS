@@ -30,6 +30,9 @@ public class Login implements EntryPoint {
 		if (RootPanel.get("loadingwrapper-login") == null)
 			return;
 
+		// Reset any reference to past sessions
+		CookiesManager.removeSid();
+		
 		GWT.setUncaughtExceptionHandler(caught -> SC.warn("Error", caught.getMessage()));
 
 		declareShowLostDialog(this);
@@ -46,7 +49,7 @@ public class Login implements EntryPoint {
 		Window.enableScrolling(false);
 		Window.setMargin("0px");
 
-		InfoService.Instance.get().getInfo(I18N.getLocale(), tenant, true, new AsyncCallback<GUIInfo>() {
+		InfoService.Instance.get().getInfo(I18N.getLocale(), tenant, true, new AsyncCallback<>() {
 			@Override
 			public void onFailure(Throwable error) {
 				SC.warn(error.getMessage());

@@ -28,6 +28,7 @@ import com.logicaldoc.core.security.authentication.AccountInactiveException;
 import com.logicaldoc.core.security.authentication.AccountNotFoundException;
 import com.logicaldoc.core.security.authentication.OutsideWorkingTimeException;
 import com.logicaldoc.core.security.authentication.PasswordExpiredException;
+import com.logicaldoc.core.security.user.Group;
 
 /**
  * This Authentication provider users the <code>AuthenticationChain</code> to
@@ -52,8 +53,8 @@ public class LDAuthenticationProvider implements AuthenticationProvider {
 
 		String key = httpReq.getParameter("key");
 
-		if (authentication.getDetails() instanceof LDAuthenticationDetails) {
-			key = ((LDAuthenticationDetails) authentication.getDetails()).getSecretKey();
+		if (authentication.getDetails() instanceof LDAuthenticationDetails ldAuthenticationDetails) {
+			key = ldAuthenticationDetails.getSecretKey();
 		}
 
 		log.debug("Authenticate user {} with key {}", username, key != null ? key : "-");
@@ -69,9 +70,8 @@ public class LDAuthenticationProvider implements AuthenticationProvider {
 			// in authentication object
 			session.getUser().clearPassword();
 
-			String[] groups = session.getUser().getGroupNames();
 			Collection<GrantedAuthority> authorities = new ArrayList<>();
-			for (String role : groups) {
+			for (String role : session.getUser().getGroups().stream().map(Group::getName).toList()) {
 				authorities.add(new SimpleGrantedAuthority(role));
 			}
 
@@ -88,9 +88,6 @@ public class LDAuthenticationProvider implements AuthenticationProvider {
 			String message = String.format("Username %s not found", username);
 			log.warn(message);
 
-			// Register a new login failure
-			LoginThrottle.recordFailure(username, client, nf);
-
 			// Hide the real exception reason to not disclose that the username
 			// doesn't exist
 			throw new CredentialsExpiredException("Bad credentials");
@@ -98,24 +95,15 @@ public class LDAuthenticationProvider implements AuthenticationProvider {
 			String message = String.format("User %s is disabled", username);
 			log.warn(message);
 
-			// Register a new login failure
-			LoginThrottle.recordFailure(username, client, ad);
-
 			throw new DisabledException(ad.getMessage());
 		} catch (PasswordExpiredException pe) {
 			String message = String.format("Credentials expired for user %s", username);
 			log.warn(message);
 
-			// Register a new login failure
-			LoginThrottle.recordFailure(username, client, pe);
-
 			throw new CredentialsExpiredException(pe.getMessage());
 		} catch (AccountExpiredException aee) {
 			String message = String.format("User %s expired on %s", username, aee.getDate());
 			log.warn(message);
-
-			// Register a new login failure
-			LoginThrottle.recordFailure(username, client, aee);
 
 			throw new CredentialsExpiredException(aee.getMessage());
 		} catch (AccountInactiveException aie) {
@@ -123,20 +111,13 @@ public class LDAuthenticationProvider implements AuthenticationProvider {
 					"User %s was considered inactive because there were no interactions for too many days", username);
 			log.warn(message);
 
-			// Register a new login failure
-			LoginThrottle.recordFailure(username, client, aie);
-
 			throw new CredentialsExpiredException(aie.getMessage());
 		} catch (OutsideWorkingTimeException owte) {
 			String message = String.format("User %s tried to enter outside his working hours", username);
 			log.warn(message);
 
-			// Register a new login failure
-			LoginThrottle.recordFailure(username, client, owte);
-
 			throw new CredentialsExpiredException(owte.getMessage());
 		} catch (com.logicaldoc.core.security.authentication.AuthenticationException ae) {
-			LoginThrottle.recordFailure(username, client, ae);
 			throw new CredentialsExpiredException(ae.getMessage() != null
 					? String.format("Security checks failed for user %s - %s", username, ae.getMessage())
 					: "badcredentials");

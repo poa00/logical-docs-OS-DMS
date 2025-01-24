@@ -17,12 +17,12 @@ import org.slf4j.LoggerFactory;
 import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.conversion.FormatConverterManager;
 import com.logicaldoc.core.document.Document;
+import com.logicaldoc.core.document.DocumentDAO;
 import com.logicaldoc.core.document.DocumentEvent;
 import com.logicaldoc.core.document.DocumentHistory;
-import com.logicaldoc.core.document.dao.DocumentDAO;
 import com.logicaldoc.core.folder.FolderDAO;
-import com.logicaldoc.core.security.dao.TenantDAO;
-import com.logicaldoc.core.store.Storer;
+import com.logicaldoc.core.security.TenantDAO;
+import com.logicaldoc.core.store.Store;
 import com.logicaldoc.core.ticket.Ticket;
 import com.logicaldoc.core.ticket.TicketDAO;
 import com.logicaldoc.util.Context;
@@ -68,7 +68,7 @@ public class TicketDownload extends HttpServlet {
 
 			String suffix = getSuffix(ticket, document, request);
 
-			TenantDAO tenantDao = (TenantDAO) Context.get().getBean(TenantDAO.class);
+			TenantDAO tenantDao = Context.get(TenantDAO.class);
 			String tenantName = tenantDao.getTenantName(ticket.getTenantId());
 
 			String behavior = request.getParameter("behavior");
@@ -81,14 +81,24 @@ public class TicketDownload extends HttpServlet {
 
 			if (isPreviewDownload(ticketId, request, document)) {
 				request.getSession().removeAttribute(getPreviewAttributeName(ticketId));
-				ticket.setViews(ticket.getViews() + 1);
+
+				/**
+				 * The user may resize the view panel that will trigger a reload
+				 * so we must mark the read in the session and count it just the
+				 * first time
+				 */
+				String viewMarker = "ticketviewed-" + ticketId;
+				if (request.getSession().getAttribute(viewMarker) == null) {
+					ticket.setViews(ticket.getViews() + 1);
+					request.getSession().setAttribute(viewMarker, true);
+				}
 				if (isHtml(document))
 					suffix = "safe.html";
 			} else {
 				increaseDownloadCount(request, ticket, document);
 			}
 
-			TicketDAO ticketDao = (TicketDAO) Context.get().getBean(TicketDAO.class);
+			TicketDAO ticketDao = Context.get(TicketDAO.class);
 			ticketDao.store(ticket);
 		} catch (Exception e) {
 			log.error(e.getMessage(), e);
@@ -134,8 +144,7 @@ public class TicketDownload extends HttpServlet {
 		if ("pdf".equals(suffix))
 			suffix = "conversion.pdf";
 		if ("conversion.pdf".equals(suffix)) {
-			FormatConverterManager converter = (FormatConverterManager) Context.get()
-					.getBean(FormatConverterManager.class);
+			FormatConverterManager converter = Context.get(FormatConverterManager.class);
 			converter.convertToPdf(document, null);
 			if ("pdf".equalsIgnoreCase(FileUtil.getExtension(document.getFileName())))
 				suffix = null;
@@ -144,7 +153,7 @@ public class TicketDownload extends HttpServlet {
 	}
 
 	private Document getDocument(Ticket ticket) throws PersistenceException, IOException {
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
 		Document doc = docDao.findById(ticket.getDocId());
 		if (doc.getDocRef() != null)
 			doc = docDao.findById(doc.getDocRef());
@@ -154,7 +163,7 @@ public class TicketDownload extends HttpServlet {
 	}
 
 	private Ticket getTicket(String ticketId) throws IOException {
-		TicketDAO tktDao = (TicketDAO) Context.get().getBean(TicketDAO.class);
+		TicketDAO tktDao = Context.get(TicketDAO.class);
 		Ticket ticket = tktDao.findByTicketId(ticketId);
 		if (ticket == null || ticket.getDocId() == 0)
 			throw new IOException("Unexisting ticket");
@@ -214,15 +223,15 @@ public class TicketDownload extends HttpServlet {
 		 */
 		DownloadServlet.processSafeHtml(suffix, null, document);
 
-		Storer storer = (Storer) Context.get().getBean(Storer.class);
-		String resource = storer.getResourceName(document, fileVersion, suffix);
+		Store store = Context.get(Store.class);
+		String resource = store.getResourceName(document, fileVersion, suffix);
 		OutputStream os = null;
-		try (InputStream is = storer.getStream(document.getId(), resource)) {
+		try (InputStream is = store.getStream(document.getId(), resource)) {
 			String filename = document.getFileName();
 			if (suffix != null && suffix.contains("pdf"))
 				filename = document.getFileName() + ".pdf";
 
-			long size = storer.size(document.getId(), resource);
+			long size = store.size(document.getId(), resource);
 
 			// get the mimetype
 			String mimetype = MimeType.getByFilename(filename);
@@ -261,7 +270,7 @@ public class TicketDownload extends HttpServlet {
 		DocumentHistory history = new DocumentHistory();
 		history.setDocument(document);
 
-		FolderDAO fdao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+		FolderDAO fdao = Context.get(FolderDAO.class);
 		history.setPath(fdao.computePathExtended(document.getFolder().getId()));
 		history.setEvent(isPreviewDownload(ticket, request, document) ? DocumentEvent.VIEWED.toString()
 				: DocumentEvent.DOWNLOADED.toString());
@@ -269,7 +278,7 @@ public class TicketDownload extends HttpServlet {
 		history.setFolderId(document.getFolder().getId());
 		history.setComment("Ticket " + ticket);
 
-		DocumentDAO ddao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO ddao = Context.get(DocumentDAO.class);
 		try {
 			ddao.saveDocumentHistory(document, history);
 		} catch (PersistenceException e) {

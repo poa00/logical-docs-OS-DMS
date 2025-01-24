@@ -1,5 +1,7 @@
 package com.logicaldoc.gui.frontend.client.services;
 
+import java.util.List;
+
 import com.google.gwt.core.client.GWT;
 import com.google.gwt.user.client.rpc.RemoteService;
 import com.google.gwt.user.client.rpc.RemoteServiceRelativePath;
@@ -37,9 +39,9 @@ public interface MessageService extends RemoteService {
 	 * 
 	 * @throws ServerException an error happened in the server application
 	 */
-	public void delete(long[] ids) throws ServerException;
+	public void delete(List<Long> ids) throws ServerException;
 
-	void save(GUIMessage message, long[] recipientIds) throws ServerException;
+	void save(GUIMessage message, List<Long> recipientIds) throws ServerException;
 
 	/**
 	 * Loads the templates configured for a given language and type
@@ -51,7 +53,7 @@ public interface MessageService extends RemoteService {
 	 * 
 	 * @throws ServerException an error happened in the server application
 	 */
-	public GUIMessageTemplate[] loadTemplates(String language, String type) throws ServerException;
+	public List<GUIMessageTemplate> loadTemplates(String language, String type) throws ServerException;
 
 	/**
 	 * Gets the template
@@ -71,7 +73,7 @@ public interface MessageService extends RemoteService {
 	 * 
 	 * @throws ServerException an error happened in the server application
 	 */
-	public void saveTemplates(GUIMessageTemplate[] templates) throws ServerException;
+	public void saveTemplates(List<GUIMessageTemplate> templates) throws ServerException;
 
 	/**
 	 * Deletes a selection of templates
@@ -80,7 +82,7 @@ public interface MessageService extends RemoteService {
 	 * 
 	 * @throws ServerException an error happened in the server application
 	 */
-	public void deleteTemplates(long[] ids) throws ServerException;
+	public void deleteTemplates(List<Long> ids) throws ServerException;
 
 	/**
 	 * Deletes the templates with the given name
@@ -90,13 +92,13 @@ public interface MessageService extends RemoteService {
 	 * @throws ServerException an error happened in the server application
 	 */
 	public void deleteTemplates(String name) throws ServerException;
-	
+
 	public static class Instance {
 		private static MessageServiceAsync inst;
 
 		private Instance() {
 		}
-		
+
 		public static MessageServiceAsync get() {
 			if (inst == null) {
 				inst = GWT.create(MessageService.class);
@@ -105,4 +107,4 @@ public interface MessageService extends RemoteService {
 			return inst;
 		}
 	}
-} 
+}

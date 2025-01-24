@@ -1,5 +1,7 @@
 package com.logicaldoc.gui.frontend.client.services;
 
+import java.util.List;
+
 import com.google.gwt.core.client.GWT;
 import com.google.gwt.user.client.rpc.RemoteService;
 import com.google.gwt.user.client.rpc.RemoteServiceRelativePath;
@@ -49,7 +51,7 @@ public interface SearchService extends RemoteService {
 	 * 
 	 * @throws ServerException share the search to
 	 */
-	void shareSearch(String name, long[] userIds, long[] groupIds) throws ServerException;
+	void shareSearch(String name, List<Long> userIds, List<Long> groupIds) throws ServerException;
 
 	/**
 	 * Deletes a previously saved search
@@ -58,7 +60,7 @@ public interface SearchService extends RemoteService {
 	 * 
 	 * @throws ServerException error in the server application
 	 */
-	public void delete(String[] names) throws ServerException;
+	public void delete(List<String> names) throws ServerException;
 
 	/**
 	 * Loads a saved search
@@ -76,7 +78,7 @@ public interface SearchService extends RemoteService {
 
 		private Instance() {
 		}
-		
+
 		public static SearchServiceAsync get() {
 			if (inst == null) {
 				inst = GWT.create(SearchService.class);

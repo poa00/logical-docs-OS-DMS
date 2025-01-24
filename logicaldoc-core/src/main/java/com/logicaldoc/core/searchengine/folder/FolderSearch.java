@@ -20,10 +20,10 @@ import com.logicaldoc.core.metadata.Template;
 import com.logicaldoc.core.searchengine.Hit;
 import com.logicaldoc.core.searchengine.Search;
 import com.logicaldoc.core.searchengine.SearchException;
-import com.logicaldoc.core.security.Group;
 import com.logicaldoc.core.security.Tenant;
-import com.logicaldoc.core.security.User;
-import com.logicaldoc.core.security.dao.UserDAO;
+import com.logicaldoc.core.security.user.Group;
+import com.logicaldoc.core.security.user.User;
+import com.logicaldoc.core.security.user.UserDAO;
 import com.logicaldoc.util.Context;
 import com.logicaldoc.util.sql.SqlUtil;
 
@@ -49,10 +49,11 @@ public class FolderSearch extends Search {
 
 	private static final String AND = " and ";
 
-	@SuppressWarnings("unchecked")
+	private String query;
+
 	@Override
 	public void internalSearch() throws SearchException {
-		UserDAO userDAO = (UserDAO) Context.get().getBean(UserDAO.class);
+		UserDAO userDAO = Context.get(UserDAO.class);
 		User user;
 		try {
 			user = userDAO.findById(options.getUserId());
@@ -63,18 +64,18 @@ public class FolderSearch extends Search {
 
 		Map<String, Object> params = null;
 		try {
-			params = prepareExpression();
+			params = prepareQuery();
 		} catch (PersistenceException e1) {
 			throw new SearchException(e1);
 		}
 
 		options.setParameters(params);
 
-		FolderDAO dao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+		FolderDAO dao = Context.get(FolderDAO.class);
 		// Execute the search
 		List<Hit> folders;
 		try {
-			folders = dao.query(options.getExpression(), params, new HitMapper(), null);
+			folders = dao.query(query, params, new HitMapper(), null);
 		} catch (PersistenceException e) {
 			throw new SearchException(e);
 		}
@@ -104,39 +105,36 @@ public class FolderSearch extends Search {
 	 * 
 	 * PersistenceException error at data layer
 	 */
-	private Map<String, Object> prepareExpression() throws PersistenceException {
-		if (StringUtils.isNotEmpty(options.getExpression()))
+	private Map<String, Object> prepareQuery() throws PersistenceException {
+		if (StringUtils.isNotEmpty(query))
 			return options.getParameters();
 
 		Map<String, Object> params = new HashMap<>();
-		StringBuilder query = new StringBuilder();
+		StringBuilder sb = new StringBuilder();
 
 		if (options.isRetrieveAliases())
-			query.append("(");
+			sb.append("(");
 
 		// Find all real folders
-		query.append(
+		sb.append(
 				"select A.ld_id, A.ld_parentid, A.ld_name, A.ld_description, A.ld_creation, A.ld_lastmodified, A.ld_type, A.ld_foldref, C.ld_name, A.ld_templateid, A.ld_tgs, A.ld_color ");
-		query.append(" from ld_folder A ");
-		query.append(" left outer join ld_template C on A.ld_templateid=C.ld_id ");
-		appendWhereClause(false, params, query);
+		sb.append(" from ld_folder A ");
+		sb.append(" left outer join ld_template C on A.ld_templateid=C.ld_id ");
+		appendWhereClause(false, params, sb);
 
 		if (options.isRetrieveAliases()) {
 			// Append all aliases
-			query.append(
+			sb.append(
 					") UNION (select A.ld_id, A.ld_parentid, A.ld_name, A.ld_description, A.ld_creation, A.ld_lastmodified, A.ld_type, A.ld_foldref, C.ld_name, REF.ld_templateid, REF.ld_tgs, A.ld_color ");
-			query.append(" from ld_folder A ");
-			query.append(" join ld_folder REF on A.ld_foldref=REF.ld_id ");
-			query.append(" left outer join ld_template C on REF.ld_templateid=C.ld_id ");
-			appendWhereClause(true, params, query);
-			query.append(")");
+			sb.append(" from ld_folder A ");
+			sb.append(" join ld_folder REF on A.ld_foldref=REF.ld_id ");
+			sb.append(" left outer join ld_template C on REF.ld_templateid=C.ld_id ");
+			appendWhereClause(true, params, sb);
+			sb.append(")");
 		}
 
-		options.setExpression(query.toString());
-
-		log.info("executing query {}", query);
-		log.info("with parameters {}", params);
-
+		log.info("executing query {} with parameters {}", sb, params);
+		query = sb.toString();
 		return params;
 	}
 
@@ -216,10 +214,7 @@ public class FolderSearch extends Search {
 				criteriaQueryPart.append("-%') and ");
 				columnName = "C" + joinsCounter + ".";
 				switch (criterion.getType()) {
-				case Attribute.TYPE_INT:
-				case Attribute.TYPE_USER:
-				case Attribute.TYPE_FOLDER:
-				case Attribute.TYPE_BOOLEAN:
+				case Attribute.TYPE_INT, Attribute.TYPE_USER, Attribute.TYPE_FOLDER, Attribute.TYPE_DOCUMENT, Attribute.TYPE_BOOLEAN:
 					columnName += "ld_intvalue";
 					break;
 				case Attribute.TYPE_DOUBLE:
@@ -290,7 +285,7 @@ public class FolderSearch extends Search {
 
 	private void appendMainFolderCondition(StringBuilder query, String tableAlias, FolderSearchOptions fOptions)
 			throws PersistenceException {
-		FolderDAO dao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+		FolderDAO dao = Context.get(FolderDAO.class);
 		if (fOptions.getFolderId() != null) {
 			query.append(AND);
 			if (fOptions.isSearchInSubPath()) {
@@ -307,10 +302,8 @@ public class FolderSearch extends Search {
 		case Attribute.TYPE_INT:
 			appendIntegerCriterion(query, columnName, criterion, params);
 			break;
-		case Attribute.TYPE_FOLDER:
-		case Attribute.TYPE_USER:
-		case FolderCriterion.TYPE_TEMPLATE:
-			appendFolderOrUserOrTemplateCriterion(query, columnName, criterion, params);
+		case Attribute.TYPE_FOLDER, Attribute.TYPE_DOCUMENT, Attribute.TYPE_USER, FolderCriterion.TYPE_TEMPLATE:
+			appendFolderOrDocumentOrUserOrTemplateCriterion(query, columnName, criterion, params);
 			break;
 		case Attribute.TYPE_BOOLEAN:
 			appendBooleanCriterion(query, columnName, criterion, params);
@@ -381,7 +374,7 @@ public class FolderSearch extends Search {
 	private void appendFolderCriterion(StringBuilder query, String tableAlias, String columnName,
 			FolderCriterion criterion) throws PersistenceException {
 		if (FolderCriterion.OPERATOR_INORSUBFOLDERS.equals(criterion.getOperator())) {
-			FolderDAO dao = (FolderDAO) Context.get().getBean(FolderDAO.class);
+			FolderDAO dao = Context.get(FolderDAO.class);
 			String path = dao.computePath(criterion.getLongValue());
 			query.append(tableAlias + ".ld_path like '" + path + "/%'");
 		} else
@@ -454,7 +447,7 @@ public class FolderSearch extends Search {
 		}
 	}
 
-	private void appendFolderOrUserOrTemplateCriterion(StringBuilder query, String columnName,
+	private void appendFolderOrDocumentOrUserOrTemplateCriterion(StringBuilder query, String columnName,
 			FolderCriterion criterion, Map<String, Object> params) {
 		if (FolderCriterion.OPERATOR_NULL.equals(criterion.getOperator())) {
 			query.append(columnName + IS_NULL);
@@ -547,7 +540,7 @@ public class FolderSearch extends Search {
 		 * collect all accessible folders.
 		 */
 		if (ids.isEmpty() && !user.isMemberOf(Group.GROUP_ADMIN)) {
-			FolderDAO folderDAO = (FolderDAO) Context.get().getBean(FolderDAO.class);
+			FolderDAO folderDAO = Context.get(FolderDAO.class);
 			ids = folderDAO.findFolderIdByUserId(options.getUserId(), null, true);
 		}
 
@@ -555,13 +548,13 @@ public class FolderSearch extends Search {
 	}
 
 	private Collection<Long> retrieveAccessibleFolderIdsFromFolderCriterions(User user) throws PersistenceException {
-		FolderDAO folderDAO = (FolderDAO) Context.get().getBean(FolderDAO.class);
+		FolderDAO folderDAO = Context.get(FolderDAO.class);
 		Collection<Long> ids = new HashSet<>();
 		for (FolderCriterion criterion : ((FolderSearchOptions) options).getCriteria()) {
 			if (criterion.getType() == FolderCriterion.TYPE_FOLDER && !criterion.isEmpty()) {
 				if (FolderCriterion.OPERATOR_INORSUBFOLDERS.equals(criterion.getOperator())) {
 					ids.addAll(folderDAO.findFolderIdByUserIdInPath(user.getId(), criterion.getLongValue()));
-				} else if (folderDAO.isReadEnabled(criterion.getLongValue(), user.getId())) {
+				} else if (folderDAO.isReadAllowed(criterion.getLongValue(), user.getId())) {
 					ids.add(criterion.getLongValue());
 				}
 			}

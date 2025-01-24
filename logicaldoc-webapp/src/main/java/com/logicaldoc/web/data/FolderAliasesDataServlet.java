@@ -13,11 +13,11 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.lang.StringUtils;
 
 import com.logicaldoc.core.PersistenceException;
-import com.logicaldoc.core.document.dao.DocumentDAO;
+import com.logicaldoc.core.document.DocumentDAO;
 import com.logicaldoc.core.folder.FolderDAO;
-import com.logicaldoc.core.security.Group;
 import com.logicaldoc.core.security.Session;
-import com.logicaldoc.core.security.User;
+import com.logicaldoc.core.security.user.Group;
+import com.logicaldoc.core.security.user.User;
 import com.logicaldoc.util.Context;
 
 public class FolderAliasesDataServlet extends AbstractDataServlet {
@@ -36,8 +36,8 @@ public class FolderAliasesDataServlet extends AbstractDataServlet {
 		writer.write("<list>");
 
 		Context context = Context.get();
-		DocumentDAO dao = (DocumentDAO) context.getBean(DocumentDAO.class);
-		FolderDAO folderDAO = (FolderDAO) context.getBean(FolderDAO.class);
+		DocumentDAO dao = context.getBean(DocumentDAO.class);
+		FolderDAO folderDAO = context.getBean(FolderDAO.class);
 		Collection<Long> accessibleFolderIds = folderDAO.findFolderIdByUserId(session.getUserId(), null, true);
 
 		StringBuilder query = new StringBuilder(
@@ -69,7 +69,7 @@ public class FolderAliasesDataServlet extends AbstractDataServlet {
 			}
 		}
 
-		List<Object> records = dao.findByQuery(query.toString(), (Map<String, Object>) null, null);
+		List<?> records = dao.findByQuery(query.toString(), (Map<String, Object>) null, null);
 
 		/*
 		 * Iterate over records composing the response XML document

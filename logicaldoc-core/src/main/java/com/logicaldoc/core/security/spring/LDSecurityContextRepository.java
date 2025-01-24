@@ -38,9 +38,6 @@ public class LDSecurityContextRepository implements SecurityContextRepository {
 	public SecurityContext loadContext(HttpRequestResponseHolder request) {
 		String sid = SessionManager.get().getSessionId(request.getRequest());
 		if (sid == null || !SessionManager.get().isOpen(sid))
-			sid = null;
-
-		if (sid == null)
 			return SecurityContextHolder.createEmptyContext();
 
 		Session session = SessionManager.get().get(sid);
@@ -69,8 +66,7 @@ public class LDSecurityContextRepository implements SecurityContextRepository {
 
 		Object principal = context.getAuthentication().getPrincipal();
 
-		if (principal instanceof LDAuthenticationToken) {
-			LDAuthenticationToken token = (LDAuthenticationToken) principal;
+		if (principal instanceof LDAuthenticationToken token) {
 			SessionManager.get().saveSid(request, response, token.getSid());
 
 			HttpSession servletSession = request.getSession(false);
@@ -83,7 +79,7 @@ public class LDSecurityContextRepository implements SecurityContextRepository {
 	public static void bindServletSession(String sid, HttpServletRequest request) {
 		bindServletSession(sid, request.getSession());
 	}
-	
+
 	public static void bindServletSession(String sid, HttpSession servletSession) {
 		servletSession.setAttribute(SessionManager.PARAM_SID, sid);
 		servletSessionMapping.put(sid, servletSession);

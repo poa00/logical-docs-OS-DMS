@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans default-lazy-init="false"
+    xmlns="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:util="http://www.springframework.org/schema/util" xmlns:context="http://www.springframework.org/schema/context"
+    xmlns:aop="http://www.springframework.org/schema/aop" xmlns:tx="http://www.springframework.org/schema/tx"
+    xmlns:p="http://www.springframework.org/schema/p" xmlns:security="http://www.springframework.org/schema/security"
+    xsi:schemaLocation="
+            http://www.springframework.org/schema/beans 
+            http://www.springframework.org/schema/beans/spring-beans.xsd
+            http://www.springframework.org/schema/util 
+            http://www.springframework.org/schema/util/spring-util.xsd
+            http://www.springframework.org/schema/context
+            http://www.springframework.org/schema/context/spring-context.xsd
+            http://www.springframework.org/schema/tx
+            http://www.springframework.org/schema/tx/spring-tx.xsd
+            http://www.springframework.org/schema/aop
+            http://www.springframework.org/schema/aop/spring-aop.xsd
+            http://www.springframework.org/schema/security
+            http://www.springframework.org/schema/security/spring-security.xsd">
+
+    <context:annotation-config />
+
+    <import resource="classpath*:context/context-*.xml" />    
+
+    <!-- This post processor ensures placeholders substitutions -->
+	<bean id="PropertyPlaceholderConfigurer"
+		class="com.logicaldoc.util.spring.PropertiesPlaceHolder">
+		<property name="locations">
+			<list>
+				<value>classpath*:context.properties</value>
+			</list>
+		</property>
+	</bean>
+
+    <bean id="ContextProperties" class="com.logicaldoc.util.config.ContextProperties" />
+
+	<bean id="Context" class="com.logicaldoc.util.Context" factory-method="get" lazy-init="false" />
+
+    <!-- DataSource -->
+    <bean id="HikariConfig" class="com.zaxxer.hikari.HikariConfig">
+        <property name="driverClassName" value="org.hsqldb.jdbc.JDBCDriver" />
+        <property name="jdbcUrl" value="jdbc:hsqldb:mem:logicaldoc" />
+        <property name="username" value="sa" />
+        <property name="password" value="" />
+    </bean>    
+    <bean id="DataSource" class="com.zaxxer.hikari.HikariDataSource" destroy-method="close">
+    	<constructor-arg ref="HikariConfig" />
+  	</bean>
+  	
+	<!-- Scheduler -->
+    <bean id="Scheduler" class="org.springframework.scheduling.quartz.SchedulerFactoryBean">
+        <property name="waitForJobsToCompleteOnShutdown" value="true" />
+        <property name="triggers">
+            <list>
+            </list>
+        </property>
+    </bean>  	
+</beans>

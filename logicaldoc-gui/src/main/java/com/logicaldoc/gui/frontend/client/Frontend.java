@@ -9,6 +9,7 @@ import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.google.gwt.user.client.ui.RootPanel;
 import com.logicaldoc.gui.common.client.CookiesManager;
 import com.logicaldoc.gui.common.client.Feature;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIInfo;
 import com.logicaldoc.gui.common.client.beans.GUISession;
@@ -73,7 +74,7 @@ public class Frontend implements EntryPoint {
 		I18N.setLocale(locale);
 
 		// Tries to capture tenant parameter
-		final String tenant = Util.detectTenant();
+		final String tenantInRequest = Util.getTenantInRequest();
 
 		// Get grid of scrollbars, and clear out the window's built-in margin,
 		// because we want to take advantage of the entire client area.
@@ -85,42 +86,56 @@ public class Frontend implements EntryPoint {
 		declareGetCurrentFolderId(this);
 		declareCheckPermission(this);
 		declareDownload();
+		declareDownloadDocumentResource();
 
-		InfoService.Instance.get().getInfo(locale, tenant, false, new AsyncCallback<GUIInfo>() {
+		InfoService.Instance.get().getInfo(locale, tenantInRequest, false, new AsyncCallback<>() {
 			@Override
 			public void onFailure(Throwable error) {
 				SC.warn(error.getMessage());
 			}
 
 			@Override
-			public void onSuccess(final GUIInfo info) {
+			public void onSuccess(GUIInfo info) {
 				CookiesManager.saveRelease(info);
 
 				init(info);
 
-				SecurityService.Instance.get().getSession(Util.getLocaleInRequest(), null,
-						new AsyncCallback<GUISession>() {
+				retrieveSession(tenantInRequest);
+			}
+		});
+	}
 
-							@Override
-							public void onFailure(Throwable caught) {
-								SC.warn(I18N.message("accessdenied") + " - " + caught.getMessage());
-							}
+	private void retrieveSession(final String tenant) {
+		SecurityService.Instance.get().getSession(Util.getLocaleInRequest(), null, new AsyncCallback<>() {
 
-							@Override
-							public void onSuccess(GUISession session) {
-								if (session == null || !session.isLoggedIn()) {
-									SC.warn(I18N.message("accessdenied"));
-								} else {
-									session.getInfo().setUserNo(info.getUserNo());
-									init(session.getInfo());
+			@Override
+			public void onFailure(Throwable caught) {
+				SC.warn(I18N.message("accessdenied") + " - " + caught.getMessage());
+			}
+
+			@Override
+			public void onSuccess(GUISession session) {
+				if (session == null || !session.isLoggedIn()) {
+					SC.warn(I18N.message("accessdenied"));
+				} else {
+					String loc = Util.getLocaleInRequest() == null ? session.getUser().getLanguage()
+							: Util.getLocaleInRequest();
+					InfoService.Instance.get().getInfo(loc,
+							tenant != null ? tenant : session.getUser().getTenant().getName(), false,
+							new DefaultAsyncCallback<>() {
+								@Override
+								public void onSuccess(GUIInfo info) {
+									session.setInfo(info);
+									init(info);
+
 									Session.get().init(session);
 
 									connectWebsockets();
 									declareReloadTrigger(Frontend.this);
 									showMain();
 								}
-							}
-						});
+							});
+				}
 			}
 		});
 	}
@@ -228,6 +243,15 @@ public class Frontend implements EntryPoint {
 	public static native void declareDownload() /*-{
 		$wnd.download = function(url) {
 			@com.logicaldoc.gui.common.client.util.Util::download(Ljava/lang/String;)(url);
+		};
+	}-*/;
+
+	/**
+	 * Declares the javascript function used to download a document's resource
+	 */
+	public static native void declareDownloadDocumentResource() /*-{
+		$wnd.downloadDocumentResource = function(docId, url) {
+			@com.logicaldoc.gui.frontend.client.document.DocumentUtil::downloadDocumentResource(Ljava/lang/String;Ljava/lang/String;)(docId, url);
 		};
 	}-*/;
 }

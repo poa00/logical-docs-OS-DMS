@@ -6,13 +6,17 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
+import javax.annotation.PostConstruct;
+import javax.annotation.Resource;
+
 import org.java.plugin.registry.Extension;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
 
 import com.logicaldoc.core.document.Document;
-import com.logicaldoc.core.security.dao.TenantDAO;
-import com.logicaldoc.core.store.Storer;
+import com.logicaldoc.core.security.TenantDAO;
+import com.logicaldoc.core.store.Store;
 import com.logicaldoc.core.util.DocUtil;
 import com.logicaldoc.util.Context;
 import com.logicaldoc.util.MimeType;
@@ -26,6 +30,7 @@ import com.logicaldoc.util.plugin.PluginRegistry;
  * @author Marco Meschieri - LogicalDOC
  * @since 4.5
  */
+@Component("thumbnailManager")
 public class ThumbnailManager {
 
 	public static final String SUFFIX_PREVIEW = "conversion.pdf";
@@ -40,7 +45,8 @@ public class ThumbnailManager {
 
 	protected static Logger log = LoggerFactory.getLogger(ThumbnailManager.class);
 
-	private Storer storer;
+	@Resource(name = "Store")
+	private Store store;
 
 	// Key is the extension, value is the associated builder
 	private Map<String, ThumbnailBuilder> builders = new HashMap<>();
@@ -120,7 +126,7 @@ public class ThumbnailManager {
 
 	protected void createImage(Document document, String fileVersion, int size, Integer quality, String suffix,
 			String sid) throws IOException {
-		TenantDAO tDao = (TenantDAO) Context.get().getBean(TenantDAO.class);
+		TenantDAO tDao = Context.get(TenantDAO.class);
 
 		ThumbnailBuilder builder = getBuilder(document);
 		if (builder == null) {
@@ -139,14 +145,14 @@ public class ThumbnailManager {
 					quality != null ? quality : getQuality("thumbnail", tDao.getTenantName(document.getTenantId())));
 
 			// Put the resource
-			String resource = storer.getResourceName(document, getSuitableFileVersion(document, fileVersion), suffix);
-			storer.store(dest, document.getId(), resource);
+			String resource = store.getResourceName(document, getSuitableFileVersion(document, fileVersion), suffix);
+			store.store(dest, document.getId(), resource);
 		} catch (Exception e) {
 			log.warn("Error rendering image for document: {} - {}", document.getId(), document.getFileName(), e);
 		} finally {
 			// Delete temporary resources
-			FileUtil.strongDelete(src);
-			FileUtil.strongDelete(dest);
+			FileUtil.delete(src);
+			FileUtil.delete(dest);
 		}
 	}
 
@@ -233,8 +239,8 @@ public class ThumbnailManager {
 		File target = FileUtil.createTempFile("scr",
 				"." + FileUtil.getExtension(DocUtil.getFileName(document, fileVersion)));
 		String fver = getSuitableFileVersion(document, fileVersion);
-		String resource = storer.getResourceName(document, fver, null);
-		storer.writeToFile(document.getId(), resource, target);
+		String resource = store.getResourceName(document, fver, null);
+		store.writeToFile(document.getId(), resource, target);
 		return target;
 	}
 
@@ -257,8 +263,11 @@ public class ThumbnailManager {
 	/**
 	 * Initializes the builders map
 	 */
-	private void initBuilders() {
-		builders.clear();
+	@PostConstruct
+	public synchronized void init() {
+		if (!builders.isEmpty())
+			return;
+
 		// Acquire the 'ThumbnailBuilder' extensions of the core plugin
 		PluginRegistry registry = PluginRegistry.getInstance();
 		Collection<Extension> exts = registry.getExtensions("logicaldoc-core", "ThumbnailBuilder");
@@ -285,11 +294,11 @@ public class ThumbnailManager {
 
 	public Map<String, ThumbnailBuilder> getBuilders() {
 		if (builders.isEmpty())
-			initBuilders();
+			init();
 		return builders;
 	}
 
-	public void setStorer(Storer storer) {
-		this.storer = storer;
+	public void setStore(Store store) {
+		this.store = store;
 	}
 }

@@ -2,14 +2,16 @@ package com.logicaldoc.gui.frontend.client.reports;
 
 import com.logicaldoc.gui.common.client.beans.GUIFolder;
 import com.logicaldoc.gui.common.client.data.DeletedFoldersDS;
+import com.logicaldoc.gui.common.client.grid.DateListGridField;
+import com.logicaldoc.gui.common.client.grid.DateListGridField.DateCellFormatter;
+import com.logicaldoc.gui.common.client.grid.FolderListGridField;
+import com.logicaldoc.gui.common.client.grid.IdListGridField;
+import com.logicaldoc.gui.common.client.grid.UserListGridField;
 import com.logicaldoc.gui.common.client.i18n.I18N;
+import com.logicaldoc.gui.common.client.util.GridUtil;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.widgets.FolderChangeListener;
 import com.logicaldoc.gui.common.client.widgets.FolderSelector;
-import com.logicaldoc.gui.common.client.widgets.grid.ColoredListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.FolderListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.UserListGridField;
 import com.logicaldoc.gui.frontend.client.folder.RestoreDialog;
 import com.smartgwt.client.widgets.form.fields.SelectItem;
 import com.smartgwt.client.widgets.form.fields.SpinnerItem;
@@ -40,15 +42,14 @@ public class DeletedFoldersReport extends ReportPanel implements FolderChangeLis
 
 	@Override
 	protected void prepareListGrid() {
-		ListGridField id = new ColoredListGridField("id");
-		id.setHidden(true);
-		id.setCanGroupBy(false);
+		ListGridField id = new IdListGridField();
 
 		ListGridField name = new FolderListGridField("name", I18N.message("name"));
 		name.setWidth(200);
 		name.setCanFilter(true);
 
-		ListGridField lastModified = new DateListGridField("lastModified", "lastmodified");
+		ListGridField lastModified = new DateListGridField("lastModified", "lastmodified",
+				DateCellFormatter.FORMAT_LONG);
 		lastModified.setCanGroupBy(false);
 
 		ListGridField deleteUser = new UserListGridField("deleteUser", "deleteUserId", "deletedby");
@@ -108,11 +109,7 @@ public class DeletedFoldersReport extends ReportPanel implements FolderChangeLis
 		restore.addClickHandler(event -> {
 			if (selection == null || selection.length == 0)
 				return;
-			final Long[] ids = new Long[selection.length];
-			for (int i = 0; i < selection.length; i++)
-				ids[i] = Long.parseLong(selection[i].getAttribute("id"));
-
-			new RestoreDialog(null, ids, evn -> refresh()).show();
+			new RestoreDialog(null, GridUtil.getIds(selection), evn -> refresh()).show();
 		});
 
 		contextMenu.setItems(restore);
@@ -122,5 +119,15 @@ public class DeletedFoldersReport extends ReportPanel implements FolderChangeLis
 	@Override
 	public void onChanged(GUIFolder folder) {
 		refresh();
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

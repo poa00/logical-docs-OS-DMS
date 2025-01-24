@@ -2,7 +2,6 @@ package com.logicaldoc.web.service;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -44,10 +43,10 @@ public class AttributeSetServiceImpl extends AbstractRemoteService implements At
 
 	@Override
 	public void delete(long setId) throws ServerException {
-		Session session = validateSession(getThreadLocalRequest());
+		Session session = validateSession();
 
 		try {
-			AttributeSetDAO dao = (AttributeSetDAO) Context.get().getBean(AttributeSetDAO.class);
+			AttributeSetDAO dao = Context.get(AttributeSetDAO.class);
 			dao.delete(setId);
 		} catch (Exception t) {
 			throwServerException(session, log, t);
@@ -55,17 +54,16 @@ public class AttributeSetServiceImpl extends AbstractRemoteService implements At
 	}
 
 	@Override
-	public void saveOptions(long setId, String attribute, GUIValue[] values) throws ServerException {
-		Session session = validateSession(getThreadLocalRequest());
+	public void saveOptions(long setId, String attribute, List<GUIValue> values) throws ServerException {
+		Session session = validateSession();
 
 		try {
-			AttributeOptionDAO dao = (AttributeOptionDAO) Context.get().getBean(AttributeOptionDAO.class);
+			AttributeOptionDAO dao = Context.get(AttributeOptionDAO.class);
 			dao.deleteBySetIdAndAttribute(setId, attribute);
-			for (int i = 0; i < values.length; i++) {
-				GUIValue value = values[i];
+			int i = 0;
+			for (GUIValue value : values) {
 				AttributeOption option = new AttributeOption(setId, attribute, value.getValue(), value.getCode());
-				option.setPosition(i);
-
+				option.setPosition(i++);
 				store(setId, option);
 			}
 		} catch (Exception t) {
@@ -75,7 +73,7 @@ public class AttributeSetServiceImpl extends AbstractRemoteService implements At
 
 	private void store(long setId, AttributeOption option) throws ServerException {
 		try {
-			AttributeOptionDAO dao = (AttributeOptionDAO) Context.get().getBean(AttributeOptionDAO.class);
+			AttributeOptionDAO dao = Context.get(AttributeOptionDAO.class);
 			dao.store(option);
 		} catch (Exception e) {
 			throw new ServerException(String.format("Options have not been %s", setId != 0L ? "updated" : "stored"), e);
@@ -83,10 +81,10 @@ public class AttributeSetServiceImpl extends AbstractRemoteService implements At
 	}
 
 	@Override
-	public void deleteOptions(long setId, String attribute, String[] values) throws ServerException {
-		Session session = validateSession(getThreadLocalRequest());
+	public void deleteOptions(long setId, String attribute, List<String> values) throws ServerException {
+		Session session = validateSession();
 		try {
-			AttributeOptionDAO dao = (AttributeOptionDAO) Context.get().getBean(AttributeOptionDAO.class);
+			AttributeOptionDAO dao = Context.get(AttributeOptionDAO.class);
 			List<AttributeOption> options = dao.findByAttribute(setId, attribute);
 			for (AttributeOption option : options)
 				for (String value : values)
@@ -101,7 +99,7 @@ public class AttributeSetServiceImpl extends AbstractRemoteService implements At
 
 	private void delete(AttributeOption option) throws ServerException {
 		try {
-			AttributeOptionDAO dao = (AttributeOptionDAO) Context.get().getBean(AttributeOptionDAO.class);
+			AttributeOptionDAO dao = Context.get(AttributeOptionDAO.class);
 			dao.delete(option.getId());
 		} catch (Exception e) {
 			throw new ServerException("Option has not been deleted", e);
@@ -110,12 +108,12 @@ public class AttributeSetServiceImpl extends AbstractRemoteService implements At
 
 	@Override
 	public GUIAttributeSet save(GUIAttributeSet guiAttributeSet) throws ServerException {
-		Session session = validateSession(getThreadLocalRequest());
+		Session session = validateSession();
 
 		try {
 			AttributeSet attributeSet;
 			if (guiAttributeSet.getId() != 0) {
-				AttributeSetDAO dao = (AttributeSetDAO) Context.get().getBean(AttributeSetDAO.class);
+				AttributeSetDAO dao = Context.get(AttributeSetDAO.class);
 				attributeSet = dao.findById(guiAttributeSet.getId());
 				dao.initialize(attributeSet);
 			} else {
@@ -124,6 +122,7 @@ public class AttributeSetServiceImpl extends AbstractRemoteService implements At
 
 			attributeSet.setTenantId(session.getTenantId());
 			attributeSet.setName(guiAttributeSet.getName());
+			attributeSet.setLabel(guiAttributeSet.getLabel());
 			attributeSet.setDescription(guiAttributeSet.getDescription());
 			attributeSet.setReadonly(guiAttributeSet.isReadonly() ? 1 : 0);
 			attributeSet.setType(guiAttributeSet.getType());
@@ -134,7 +133,7 @@ public class AttributeSetServiceImpl extends AbstractRemoteService implements At
 
 			guiAttributeSet.setId(attributeSet.getId());
 		} catch (Exception t) {
-			return (GUIAttributeSet) throwServerException(session, log, t);
+			return throwServerException(session, log, t);
 		}
 
 		return guiAttributeSet;
@@ -142,7 +141,7 @@ public class AttributeSetServiceImpl extends AbstractRemoteService implements At
 
 	private void store(GUIAttributeSet guiAttributeSet, AttributeSet attributeSet) throws ServerException {
 		try {
-			AttributeSetDAO dao = (AttributeSetDAO) Context.get().getBean(AttributeSetDAO.class);
+			AttributeSetDAO dao = Context.get(AttributeSetDAO.class);
 			dao.store(attributeSet);
 		} catch (Exception e) {
 			throw new ServerException(
@@ -151,18 +150,17 @@ public class AttributeSetServiceImpl extends AbstractRemoteService implements At
 		}
 	}
 
-	private void saveAttributes(GUIAttributeSet attributeSet, AttributeSet attSet) {
+	private void saveAttributes(GUIAttributeSet guiAttributeSet, AttributeSet attributeSet) {
 		Map<String, Attribute> attrs = new HashMap<>();
-		if (attributeSet.getAttributes() != null && attributeSet.getAttributes().length > 0) {
-			attSet.getAttributes().clear();
-			for (GUIAttribute attribute : attributeSet.getAttributes()) {
+		attributeSet.getAttributes().clear();
+		if (guiAttributeSet != null)
+			for (GUIAttribute attribute : guiAttributeSet.getAttributes()) {
 				if (attribute != null) {
-					saveAttribute(attribute, attributeSet, attrs);
+					saveAttribute(attribute, guiAttributeSet, attrs);
 				}
 			}
-		}
 		if (attrs.size() > 0)
-			attSet.setAttributes(attrs);
+			attributeSet.setAttributes(attrs);
 	}
 
 	private void saveAttribute(GUIAttribute attribute, GUIAttributeSet attributeSet, Map<String, Attribute> attrs) {
@@ -198,20 +196,24 @@ public class AttributeSetServiceImpl extends AbstractRemoteService implements At
 	}
 
 	public GUIAttributeSet getAttributeSet(String name) throws ServerException {
-		Session session = validateSession(getThreadLocalRequest());
-		AttributeSetDAO dao = (AttributeSetDAO) Context.get().getBean(AttributeSetDAO.class);
-		AttributeSet set = dao.findByName(name, session.getTenantId());
-		if (set != null)
-			return getAttributeSet(set.getId());
-		else
-			return null;
+		Session session = validateSession();
+		AttributeSetDAO dao = Context.get(AttributeSetDAO.class);
+		try {
+			AttributeSet set = dao.findByName(name, session.getTenantId());
+			if (set != null)
+				return getAttributeSet(set.getId());
+			else
+				return null;
+		} catch (Exception t) {
+			return throwServerException(session, log, t);
+		}
 	}
 
 	@Override
 	public GUIAttributeSet getAttributeSet(long setId) throws ServerException {
-		validateSession(getThreadLocalRequest());
+		validateSession();
 
-		AttributeSetDAO dao = (AttributeSetDAO) Context.get().getBean(AttributeSetDAO.class);
+		AttributeSetDAO dao = Context.get(AttributeSetDAO.class);
 		try {
 			AttributeSet attributeSet = dao.findById(setId);
 			if (attributeSet == null)
@@ -220,16 +222,14 @@ public class AttributeSetServiceImpl extends AbstractRemoteService implements At
 			GUIAttributeSet attSet = new GUIAttributeSet();
 			attSet.setId(setId);
 			attSet.setName(attributeSet.getName());
+			attSet.setLabel(attributeSet.getLabel());
 			attSet.setDescription(attributeSet.getDescription());
 			attSet.setReadonly(attributeSet.getReadonly() == 1);
 			attSet.setType(attributeSet.getType());
 
-			GUIAttribute[] attributes = readAttributes(attributeSet);
-
-			if (attributes.length > 0) {
-				Arrays.sort(attributes);
-				attSet.setAttributes(attributes);
-			}
+			List<GUIAttribute> attributes = readAttributes(attributeSet);
+			attributes.sort(null);
+			attSet.setAttributes(attributes);
 
 			return attSet;
 		} catch (Exception t) {
@@ -239,13 +239,10 @@ public class AttributeSetServiceImpl extends AbstractRemoteService implements At
 		return null;
 	}
 
-	private GUIAttribute[] readAttributes(AttributeSet attributeSet) {
-		GUIAttribute[] attributes = new GUIAttribute[attributeSet.getAttributeNames().size()];
-		int i = 0;
-		for (String attrName : attributeSet.getAttributeNames()) {
-			attributes[i] = readAttribute(attrName, attributeSet);
-			i++;
-		}
+	private List<GUIAttribute> readAttributes(AttributeSet attributeSet) {
+		List<GUIAttribute> attributes = new ArrayList<>();
+		for (String attrName : attributeSet.getAttributeNames())
+			attributes.add(readAttribute(attrName, attributeSet));
 		return attributes;
 	}
 
@@ -303,7 +300,7 @@ public class AttributeSetServiceImpl extends AbstractRemoteService implements At
 				list.add(buf.trim());
 			att.setStringValue(buf);
 		}
-		att.setOptions(list.toArray(new String[0]));
+		att.setOptions(list);
 	}
 
 	private boolean intToBoolean(int val) {
@@ -311,25 +308,25 @@ public class AttributeSetServiceImpl extends AbstractRemoteService implements At
 	}
 
 	@Override
-	public GUIAttributeSet[] getAttributeSets() throws ServerException {
-		Session session = validateSession(getThreadLocalRequest());
+	public List<GUIAttributeSet> getAttributeSets() throws ServerException {
+		Session session = validateSession();
 		try {
-			AttributeSetDAO dao = (AttributeSetDAO) Context.get().getBean(AttributeSetDAO.class);
+			AttributeSetDAO dao = Context.get(AttributeSetDAO.class);
 			List<GUIAttributeSet> guiSets = new ArrayList<>();
 			List<Long> setIds = dao.findAllIds(session.getTenantId());
 			for (Long setId : setIds)
 				guiSets.add(getAttributeSet(setId));
-			return guiSets.toArray(new GUIAttributeSet[0]);
+			return guiSets;
 		} catch (Exception t) {
-			return (GUIAttributeSet[]) throwServerException(session, log, t);
+			return throwServerException(session, log, t);
 		}
 	}
 
 	@Override
-	public GUIValue[] parseOptions(long setId, String attribute) throws ServerException {
-		Session session = validateSession(getThreadLocalRequest());
+	public List<GUIValue> parseOptions(long setId, String attribute) throws ServerException {
+		Session session = validateSession();
 
-		Map<String, File> uploadedFilesMap = UploadServlet.getReceivedFiles(session.getSid());
+		Map<String, File> uploadedFilesMap = UploadServlet.getUploads(session.getSid());
 		File file = uploadedFilesMap.values().iterator().next();
 		List<GUIValue> options = new ArrayList<>();
 
@@ -348,19 +345,18 @@ public class AttributeSetServiceImpl extends AbstractRemoteService implements At
 		} catch (Exception e) {
 			log.error("Unable to parse options in CSV file", e);
 		} finally {
-			UploadServlet.cleanReceivedFiles(session.getSid());
+			UploadServlet.cleanUploads(session.getSid());
 		}
 
-		GUIValue[] optionsArray = options.toArray(new GUIValue[0]);
-		saveOptions(setId, attribute, optionsArray);
-		return optionsArray;
+		saveOptions(setId, attribute, options);
+		return options;
 	}
 
 	@Override
 	public void applyValidationToTemplates(long setId, String attribute) throws ServerException {
-		Session session = validateSession(getThreadLocalRequest());
+		Session session = validateSession();
 		try {
-			AttributeSetDAO dao = (AttributeSetDAO) Context.get().getBean(AttributeSetDAO.class);
+			AttributeSetDAO dao = Context.get(AttributeSetDAO.class);
 			AttributeSet set = dao.findById(setId);
 			dao.initialize(set);
 
@@ -383,9 +379,9 @@ public class AttributeSetServiceImpl extends AbstractRemoteService implements At
 
 	@Override
 	public void applyInitializationToTemplates(long setId, String attribute) throws ServerException {
-		Session session = validateSession(getThreadLocalRequest());
+		Session session = validateSession();
 		try {
-			AttributeSetDAO dao = (AttributeSetDAO) Context.get().getBean(AttributeSetDAO.class);
+			AttributeSetDAO dao = Context.get(AttributeSetDAO.class);
 			AttributeSet set = dao.findById(setId);
 			dao.initialize(set);
 			Attribute setAttribute = set.getAttribute(attribute);
@@ -407,13 +403,13 @@ public class AttributeSetServiceImpl extends AbstractRemoteService implements At
 
 	@Override
 	public void applyAllToTemplates(long setId, String attributeName) throws ServerException {
-		Session session = validateSession(getThreadLocalRequest());
+		Session session = validateSession();
 		try {
-			AttributeSetDAO dao = (AttributeSetDAO) Context.get().getBean(AttributeSetDAO.class);
+			AttributeSetDAO dao = Context.get(AttributeSetDAO.class);
 			AttributeSet set = dao.findById(setId);
 			Attribute setAttribute = set.getAttribute(attributeName);
 
-			TemplateDAO templateDao = (TemplateDAO) Context.get().getBean(TemplateDAO.class);
+			TemplateDAO templateDao = Context.get(TemplateDAO.class);
 
 			/*
 			 * Update the attributes referenced in the templates

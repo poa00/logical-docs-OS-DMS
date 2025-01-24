@@ -1,16 +1,18 @@
 package com.logicaldoc.gui.frontend.client.document;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import java.util.List;
+
 import com.logicaldoc.gui.common.client.Constants;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Feature;
 import com.logicaldoc.gui.common.client.Menu;
 import com.logicaldoc.gui.common.client.ServerValidationException;
 import com.logicaldoc.gui.common.client.Session;
+import com.logicaldoc.gui.common.client.beans.GUIAccessControlEntry;
 import com.logicaldoc.gui.common.client.beans.GUIDocument;
 import com.logicaldoc.gui.common.client.controllers.DocumentController;
 import com.logicaldoc.gui.common.client.controllers.DocumentObserver;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.common.client.util.Util;
 import com.logicaldoc.gui.common.client.widgets.EditingTabSet;
@@ -66,7 +68,9 @@ public class DocumentDetailsPanel extends VLayout implements DocumentObserver {
 
 	protected Layout captureTabPanel;
 
-	protected StandardPropertiesPanel propertiesPanel;
+	protected Layout securityTabPanel;
+
+	protected DocumentStandardPropertiesPanel propertiesPanel;
 
 	protected DocumentExtendedPropertiesPanel extendedPropertiesPanel;
 
@@ -91,6 +95,8 @@ public class DocumentDetailsPanel extends VLayout implements DocumentObserver {
 	protected PublishingPanel retentionPoliciesPanel;
 
 	protected DocumentCapturePanel capturePanel;
+
+	protected DocumentSecurityPanel securityPanel;
 
 	protected EditingTabSet tabSet;
 
@@ -119,6 +125,8 @@ public class DocumentDetailsPanel extends VLayout implements DocumentObserver {
 	protected Tab subscriptionsTab;
 
 	protected Tab captureTab;
+
+	protected Tab securityTab;
 
 	public DocumentDetailsPanel() {
 		super();
@@ -220,6 +228,12 @@ public class DocumentDetailsPanel extends VLayout implements DocumentObserver {
 		subscriptionsTabPanel.setWidth100();
 		subscriptionsTabPanel.setHeight100();
 		subscriptionsTab.setPane(subscriptionsTabPanel);
+
+		securityTab = new Tab(I18N.message("security"));
+		securityTabPanel = new HLayout();
+		securityTabPanel.setWidth100();
+		securityTabPanel.setHeight100();
+		securityTab.setPane(securityTabPanel);
 	}
 
 	protected void prepareTabset() {
@@ -229,13 +243,7 @@ public class DocumentDetailsPanel extends VLayout implements DocumentObserver {
 		// This 'if condition' is necessary to know if the close image
 		// has been selected into the Documents list panel or into the
 		// Search list panel.
-		DocumentService.Instance.get().getById(document.getId(), new AsyncCallback<GUIDocument>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
+		DocumentService.Instance.get().getById(document.getId(), new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(GUIDocument doc) {
 				DocumentController.get().selected(doc);
@@ -245,6 +253,8 @@ public class DocumentDetailsPanel extends VLayout implements DocumentObserver {
 		tabSet.addTab(propertiesTab);
 
 		tabSet.addTab(extendedPropertiesTab);
+
+		tabSet.addTab(securityTab);
 
 		if (Menu.enabled(Menu.VERSIONS))
 			tabSet.addTab(versionsTab);
@@ -336,7 +346,7 @@ public class DocumentDetailsPanel extends VLayout implements DocumentObserver {
 		/*
 		 * Prepare the links tab
 		 */
-		prepareLInksTab();
+		prepareLinksTab();
 
 		/*
 		 * Prepare the signature tab
@@ -362,6 +372,11 @@ public class DocumentDetailsPanel extends VLayout implements DocumentObserver {
 		 * Prepare the subscriptions tab
 		 */
 		prepareSubscriptionsTab();
+
+		/*
+		 * Prepare the security tab
+		 */
+		prepareSecurityTab();
 	}
 
 	private void prepareSubscriptionsTab() {
@@ -372,7 +387,8 @@ public class DocumentDetailsPanel extends VLayout implements DocumentObserver {
 					subscriptionsTabPanel.removeMember(subscriptionsPanel);
 			}
 
-			if (document.getFolder().hasPermission(Constants.PERMISSION_SUBSCRIPTION)) {
+			if (document.hasPermission(GUIAccessControlEntry.PERMISSION_SUBSCRIPTION)) {
+				tabSet.showTab(subscriptionsTab);
 				try {
 					subscriptionsPanel = new DocumentSubscriptionsPanel(document);
 					subscriptionsTabPanel.addMember(subscriptionsPanel);
@@ -382,7 +398,7 @@ public class DocumentDetailsPanel extends VLayout implements DocumentObserver {
 					// Nothing to do
 				}
 			} else
-				tabSet.removeTab(subscriptionsTab);
+				tabSet.hideTab(subscriptionsTab);
 		}
 	}
 
@@ -442,7 +458,7 @@ public class DocumentDetailsPanel extends VLayout implements DocumentObserver {
 		}
 	}
 
-	private void prepareLInksTab() {
+	private void prepareLinksTab() {
 		if (linksPanel != null) {
 			linksPanel.destroy();
 			if (Boolean.TRUE.equals(linksTabPanel.contains(linksPanel)))
@@ -465,6 +481,7 @@ public class DocumentDetailsPanel extends VLayout implements DocumentObserver {
 		}
 
 		if (document.getDocRef() == null && Menu.enabled(Menu.ALIASES)) {
+			tabSet.showTab(aliasesTab);
 			try {
 				aliasesPanel = new AliasesPanel(document);
 				aliasesTabPanel.addMember(aliasesPanel);
@@ -474,7 +491,7 @@ public class DocumentDetailsPanel extends VLayout implements DocumentObserver {
 				// Nothing to do
 			}
 		} else
-			tabSet.removeTab(aliasesTab);
+			tabSet.hideTab(aliasesTab);
 	}
 
 	private void prepareHistoryTab() {
@@ -505,6 +522,25 @@ public class DocumentDetailsPanel extends VLayout implements DocumentObserver {
 		}
 	}
 
+	private void prepareSecurityTab() {
+		if (securityPanel != null) {
+			securityPanel.destroy();
+			if (Boolean.TRUE.equals(securityTabPanel.contains(securityPanel)))
+				securityTabPanel.removeMember(securityPanel);
+		}
+
+		if (document.hasPermission(GUIAccessControlEntry.PERMISSION_SECURITY)) {
+			tabSet.showTab(securityTab);
+			try {
+				securityPanel = new DocumentSecurityPanel(document);
+				securityTabPanel.addMember(securityPanel);
+			} catch (Exception t) {
+				// Nothing to do
+			}
+		} else
+			tabSet.hideTab(securityTab);
+	}
+
 	private void prepareCaptureTab(ChangedHandler changeHandler) {
 		if (capturePanel != null) {
 			capturePanel.destroy();
@@ -527,7 +563,7 @@ public class DocumentDetailsPanel extends VLayout implements DocumentObserver {
 		}
 
 		try {
-			propertiesPanel = new StandardPropertiesPanel(document, changeHandler);
+			propertiesPanel = new DocumentStandardPropertiesPanel(document, changeHandler);
 			propertiesTabPanel.addMember(propertiesPanel);
 		} catch (Exception t) {
 			// Nothing to do
@@ -635,20 +671,25 @@ public class DocumentDetailsPanel extends VLayout implements DocumentObserver {
 	}
 
 	private void save() {
-		DocumentService.Instance.get().save(document, new AsyncCallback<GUIDocument>() {
+		DocumentService.Instance.get().save(document, new DefaultAsyncCallback<>() {
 			@Override
 			public void onFailure(Throwable caught) {
-				if (caught instanceof ServerValidationException) {
-					handleValidationException((ServerValidationException) caught);
+				if (caught instanceof ServerValidationException validationException) {
+					handleValidationException(validationException);
 				} else {
-					GuiLog.serverError(caught);
+					super.onFailure(caught);
 				}
 			}
 
 			@Override
 			public void onSuccess(GUIDocument result) {
 				hideSave();
+
+				result.setStatus(GUIDocument.DOC_UNLOCKED);
+				result.setLockUser(null);
+				result.setLockUserId(null);
 				setDocument(result);
+
 				DocumentController.get().modified(result);
 
 				// If the document is an alias we should alter the file name
@@ -656,7 +697,6 @@ public class DocumentDetailsPanel extends VLayout implements DocumentObserver {
 					result.setId(document.getDocRef());
 					result.setDocRef(document.getId());
 					result.setFileName(document.getFileName());
-					result.setStatus(GUIDocument.DOC_UNLOCKED);
 					DocumentController.get().modified(result);
 				}
 			}
@@ -706,14 +746,13 @@ public class DocumentDetailsPanel extends VLayout implements DocumentObserver {
 	}
 
 	@Override
-	public void onDocumentsDeleted(GUIDocument[] documents) {
-		if (document != null && documents != null)
-			for (GUIDocument deletedDoc : documents) {
-				if (deletedDoc.getId() == document.getId()) {
-					removeMembers(getMembers());
-					return;
-				}
+	public void onDocumentsDeleted(List<GUIDocument> documents) {
+		for (GUIDocument deletedDoc : documents) {
+			if (deletedDoc.getId() == document.getId()) {
+				removeMembers(getMembers());
+				return;
 			}
+		}
 	}
 
 	@Override
@@ -746,5 +785,15 @@ public class DocumentDetailsPanel extends VLayout implements DocumentObserver {
 	protected void onDestroy() {
 		destroy();
 		super.onDestroy();
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

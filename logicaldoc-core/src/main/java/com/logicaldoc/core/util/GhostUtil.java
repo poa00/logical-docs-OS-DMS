@@ -9,7 +9,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,7 +75,7 @@ public class GhostUtil {
 						srcPdf.getPath() };
 		}
 
-		log.debug("Executing: {}", ghostCommand);
+		log.debug("Executing: {}", Arrays.asList(cmd));
 
 		ProcessBuilder pb = new ProcessBuilder();
 		pb.redirectErrorStream(true);
@@ -115,7 +114,7 @@ public class GhostUtil {
 			pages.addAll(Arrays.asList(children));
 		}
 
-		return pages.stream().sorted().collect(Collectors.toList());
+		return pages.stream().sorted().toList();
 	}
 
 	/**
@@ -137,7 +136,6 @@ public class GhostUtil {
 	 * http://www.javaworld.com/javaworld/jw-12-2000/jw-1229-traps.html
 	 */
 	protected static class StreamGobbler extends Thread {
-
 		InputStream is;
 
 		StreamGobbler(InputStream is) {
@@ -151,7 +149,7 @@ public class GhostUtil {
 				BufferedReader br = new BufferedReader(isr);
 				String line = null;
 				while ((line = br.readLine()) != null) {
-					System.out.println(line);
+					LoggerFactory.getLogger("console").info(line);
 				}
 			} catch (IOException ioe) {
 				log.error(ioe.getMessage());

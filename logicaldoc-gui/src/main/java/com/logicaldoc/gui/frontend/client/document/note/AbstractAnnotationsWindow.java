@@ -1,18 +1,16 @@
 package com.logicaldoc.gui.frontend.client.document.note;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIDocument;
 import com.logicaldoc.gui.common.client.beans.GUIDocumentNote;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.Util;
 import com.logicaldoc.gui.common.client.widgets.ImageDrawingPane;
@@ -101,20 +99,13 @@ public abstract class AbstractAnnotationsWindow extends Window {
 		setShowModalMask(true);
 		centerInPage();
 
-		DocumentService.Instance.get().getNotes(document.getId(), fileVersion, types,
-				new AsyncCallback<GUIDocumentNote[]>() {
-
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
-					@Override
-					public void onSuccess(GUIDocumentNote[] nts) {
-						notes.addAll(Arrays.asList(nts));
-						initGUI();
-					}
-				});
+		DocumentService.Instance.get().getNotes(document.getId(), fileVersion, types, new DefaultAsyncCallback<>() {
+			@Override
+			public void onSuccess(List<GUIDocumentNote> nts) {
+				notes.addAll(nts);
+				initGUI();
+			}
+		});
 	}
 
 	protected void showAnnotations(int page) {
@@ -164,8 +155,7 @@ public abstract class AbstractAnnotationsWindow extends Window {
 			}
 
 			if (note.isMovedOrResized()) {
-				if (item instanceof DrawLine) {
-					DrawLine line = (DrawLine) item;
+				if (item instanceof DrawLine line) {
 					note.setLeft(line.getStartLeftAsDouble() / pageDrawingPane.getImageWidth());
 					note.setTop(line.getStartTopAsDouble() / pageDrawingPane.getImageHeight());
 					note.setWidth(line.getEndLeftAsDouble() / pageDrawingPane.getImageWidth());
@@ -186,18 +176,12 @@ public abstract class AbstractAnnotationsWindow extends Window {
 	 */
 	protected void onSave() {
 		captureNotesPosition();
-		DocumentService.Instance.get().saveNotes(document.getId(), notes.toArray(new GUIDocumentNote[0]), types,
-				new AsyncCallback<Void>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
-					@Override
-					public void onSuccess(Void arg0) {
-						onNotesSaved();
-					}
-				});
+		DocumentService.Instance.get().saveNotes(document.getId(), fileVersion, notes, types, new DefaultAsyncCallback<>() {
+			@Override
+			public void onSuccess(Void arg) {
+				onNotesSaved();
+			}
+		});
 	}
 
 	protected void initGUI() {
@@ -256,6 +240,11 @@ public abstract class AbstractAnnotationsWindow extends Window {
 	 */
 	protected abstract void prepareAdditionalActions(ToolStrip toolStrip);
 
+	/**
+	 * Retrieves the internal panel containing the image
+	 * 
+	 * @return panel containing the image
+	 */
 	public ImageDrawingPane getPageDrawingPane() {
 		return pageDrawingPane;
 	}
@@ -274,13 +263,7 @@ public abstract class AbstractAnnotationsWindow extends Window {
 		pageDrawingPane = new ImageDrawingPane(getPageUrl(page), imageElements -> {
 			// Reload the document to update the pages count
 			if (document.getPreviewPages() <= 1)
-				DocumentService.Instance.get().getById(document.getId(), new AsyncCallback<GUIDocument>() {
-
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				DocumentService.Instance.get().getById(document.getId(), new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(GUIDocument dc) {
 						document.setPages(dc.getPreviewPages());
@@ -440,5 +423,16 @@ public abstract class AbstractAnnotationsWindow extends Window {
 	public static void hideKnowbs(DrawItem drawItem) {
 		drawItem.setCanDrag(false);
 		drawItem.hideAllKnobs();
+	}
+	
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+	
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

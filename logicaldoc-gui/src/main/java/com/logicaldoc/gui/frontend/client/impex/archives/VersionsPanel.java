@@ -1,17 +1,18 @@
 package com.logicaldoc.gui.frontend.client.impex.archives;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIArchive;
 import com.logicaldoc.gui.common.client.data.VersionsDS;
+import com.logicaldoc.gui.common.client.grid.DateListGridField;
+import com.logicaldoc.gui.common.client.grid.FileNameListGridField;
+import com.logicaldoc.gui.common.client.grid.FileSizeListGridField;
+import com.logicaldoc.gui.common.client.grid.IdListGridField;
+import com.logicaldoc.gui.common.client.grid.VersionListGridField;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.DocUtil;
+import com.logicaldoc.gui.common.client.util.GridUtil;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.LD;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.FileNameListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.FileSizeListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.VersionListGridField;
 import com.logicaldoc.gui.frontend.client.services.ImpexService;
 import com.smartgwt.client.widgets.events.ClickEvent;
 import com.smartgwt.client.widgets.form.fields.IntegerItem;
@@ -61,8 +62,8 @@ public class VersionsPanel extends VLayout {
 		toolbar.addFormItem(maxItem);
 		display.addClickHandler((ClickEvent event) -> {
 			if (Boolean.TRUE.equals(maxItem.validate()) && maxItem.getValue() != null) {
-				if (maxItem.getValue() instanceof Integer)
-					max = (Integer) maxItem.getValue();
+				if (maxItem.getValue() instanceof Integer intVal)
+					max = intVal;
 				else
 					max = Integer.parseInt(maxItem.getValue().toString());
 				initListGrid(archiveId, readonly);
@@ -78,8 +79,7 @@ public class VersionsPanel extends VLayout {
 		if (listGrid != null)
 			removeMember(listGrid);
 
-		ListGridField id = new ListGridField("id", 80);
-		id.setHidden(true);
+		ListGridField id = new IdListGridField();
 
 		ListGridField docid = new ListGridField("docid", I18N.message("id"), 80);
 
@@ -129,33 +129,24 @@ public class VersionsPanel extends VLayout {
 		delete.addClickHandler(event -> {
 			if (selection == null || selection.length == 0)
 				return;
-			final Long[] ids = new Long[selection.length];
-			for (int i = 0; i < selection.length; i++) {
-				ids[i] = Long.parseLong(selection[i].getAttribute("id"));
-			}
 
-			LD.ask(I18N.message("question"), I18N.message("confirmdelete"), (Boolean value) -> {
-				if (Boolean.TRUE.equals(value)) {
+			LD.ask(I18N.message("question"), I18N.message("confirmdelete"), answer -> {
+				if (Boolean.TRUE.equals(answer)) {
 					listGrid.removeSelectedData();
 					listGrid.deselectAllRecords();
 
-					ImpexService.Instance.get().deleteVersions(archiveId, ids, new AsyncCallback<GUIArchive>() {
-
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
-						}
-
-						@Override
-						public void onSuccess(GUIArchive archive) {
-							ListGridRecord selectedRecord = archivesList.getList().getSelectedRecord();
-							if (selectedRecord != null) {
-								selectedRecord.setAttribute("size", archive.getSize());
-								archivesList.getList()
-										.refreshRow(archivesList.getList().getRecordIndex(selectedRecord));
-							}
-						}
-					});
+					ImpexService.Instance.get().deleteVersions(archiveId, GridUtil.getIds(selection),
+							new DefaultAsyncCallback<>() {
+								@Override
+								public void onSuccess(GUIArchive archive) {
+									ListGridRecord selectedRecord = archivesList.getList().getSelectedRecord();
+									if (selectedRecord != null) {
+										selectedRecord.setAttribute("size", archive.getSize());
+										archivesList.getList()
+												.refreshRow(archivesList.getList().getRecordIndex(selectedRecord));
+									}
+								}
+							});
 				}
 			});
 		});
@@ -172,5 +163,15 @@ public class VersionsPanel extends VLayout {
 		super.destroy();
 		if (dataSource != null)
 			dataSource.destroy();
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

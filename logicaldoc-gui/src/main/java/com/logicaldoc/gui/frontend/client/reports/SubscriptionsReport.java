@@ -1,20 +1,21 @@
 package com.logicaldoc.gui.frontend.client.reports;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIDocument;
 import com.logicaldoc.gui.common.client.beans.GUIFolder;
 import com.logicaldoc.gui.common.client.data.SubscriptionsDS;
+import com.logicaldoc.gui.common.client.grid.ColoredListGridField;
+import com.logicaldoc.gui.common.client.grid.DateListGridField;
+import com.logicaldoc.gui.common.client.grid.EventsListGridField;
+import com.logicaldoc.gui.common.client.grid.UserListGridField;
+import com.logicaldoc.gui.common.client.grid.DateListGridField.DateCellFormatter;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
+import com.logicaldoc.gui.common.client.util.GridUtil;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.common.client.util.Util;
 import com.logicaldoc.gui.common.client.widgets.FolderChangeListener;
 import com.logicaldoc.gui.common.client.widgets.FolderSelector;
-import com.logicaldoc.gui.common.client.widgets.grid.ColoredListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.EventsListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.UserListGridField;
 import com.logicaldoc.gui.frontend.client.document.DocumentsPanel;
 import com.logicaldoc.gui.frontend.client.folder.FolderSubscriptionOptionListGridField;
 import com.logicaldoc.gui.frontend.client.services.AuditService;
@@ -22,7 +23,6 @@ import com.logicaldoc.gui.frontend.client.services.DocumentService;
 import com.logicaldoc.gui.frontend.client.subscription.SubscriptionDialog;
 import com.smartgwt.client.types.Alignment;
 import com.smartgwt.client.types.ListGridFieldType;
-import com.smartgwt.client.widgets.events.ClickEvent;
 import com.smartgwt.client.widgets.form.fields.SelectItem;
 import com.smartgwt.client.widgets.form.fields.SpinnerItem;
 import com.smartgwt.client.widgets.form.fields.events.ChangedEvent;
@@ -78,7 +78,7 @@ public class SubscriptionsReport extends ReportPanel implements FolderChangeList
 
 		ToolStripButton display = new ToolStripButton();
 		display.setTitle(I18N.message("display"));
-		display.addClickHandler((ClickEvent event) -> {
+		display.addClickHandler(click -> {
 			if (Boolean.TRUE.equals(max.validate()))
 				refresh();
 		});
@@ -113,7 +113,7 @@ public class SubscriptionsReport extends ReportPanel implements FolderChangeList
 		ListGridField userName = new UserListGridField("userName", USER_ID, "user");
 		userName.setCanEdit(false);
 
-		ListGridField created = new DateListGridField("created", "subscription");
+		ListGridField created = new DateListGridField("created", "subscription", DateCellFormatter.FORMAT_LONG);
 
 		ColoredListGridField option = new FolderSubscriptionOptionListGridField();
 
@@ -134,7 +134,7 @@ public class SubscriptionsReport extends ReportPanel implements FolderChangeList
 		icon.setAlign(Alignment.CENTER);
 		icon.setShowDefaultContextMenu(false);
 		icon.setImageURLPrefix(Util.imagePrefix());
-		icon.setImageURLSuffix(".png");
+		icon.setImageURLSuffix(".svg");
 		icon.setCanFilter(false);
 
 		list.setFields(id, userId, userName, created, option, icon, path, events);
@@ -146,30 +146,20 @@ public class SubscriptionsReport extends ReportPanel implements FolderChangeList
 		final ListGridRecord[] selection = list.getSelectedRecords();
 		if (selection == null || selection.length == 0)
 			return;
-		final long[] ids = new long[selection.length];
-		for (int i = 0; i < selection.length; i++) {
-			ids[i] = Long.parseLong(selection[i].getAttribute("id"));
-		}
 
 		MenuItem delete = new MenuItem();
 		delete.setTitle(I18N.message("ddelete"));
-		delete.addClickHandler(
-				event -> LD.ask(I18N.message("question"), I18N.message("confirmdelete"), (Boolean value) -> {
-					if (Boolean.TRUE.equals(value)) {
-						AuditService.Instance.get().deleteSubscriptions(ids, new AsyncCallback<Void>() {
-							@Override
-							public void onFailure(Throwable caught) {
-								GuiLog.serverError(caught);
-							}
-
-							@Override
-							public void onSuccess(Void result) {
-								list.removeSelectedData();
-								list.deselectAllRecords();
-							}
-						});
+		delete.addClickHandler(event -> LD.ask(I18N.message("question"), I18N.message("confirmdelete"), answer -> {
+			if (Boolean.TRUE.equals(answer)) {
+				AuditService.Instance.get().deleteSubscriptions(GridUtil.getIds(selection), new DefaultAsyncCallback<>() {
+					@Override
+					public void onSuccess(Void result) {
+						list.removeSelectedData();
+						list.deselectAllRecords();
 					}
-				}));
+				});
+			}
+		}));
 
 		MenuItem edit = new MenuItem();
 		edit.setTitle(I18N.message("edit"));
@@ -184,13 +174,7 @@ public class SubscriptionsReport extends ReportPanel implements FolderChangeList
 			if ("folder".equals(type))
 				DocumentsPanel.get().openInFolder(Long.parseLong(id), null);
 			else {
-				DocumentService.Instance.get().getById(Long.parseLong(id), new AsyncCallback<GUIDocument>() {
-
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				DocumentService.Instance.get().getById(Long.parseLong(id), new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(GUIDocument result) {
 						DocumentsPanel.get().openInFolder(result.getFolder().getId(), result.getId());
@@ -206,5 +190,15 @@ public class SubscriptionsReport extends ReportPanel implements FolderChangeList
 	@Override
 	public void onChanged(GUIFolder folder) {
 		refresh();
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

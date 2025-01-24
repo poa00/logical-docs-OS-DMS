@@ -16,7 +16,6 @@ import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Locale;
-import java.util.stream.Collectors;
 
 import org.apache.commons.lang.StringUtils;
 
@@ -31,6 +30,7 @@ public class StringUtil {
 	private static final String UTF_8 = "UTF-8";
 
 	private StringUtil() {
+		throw new IllegalStateException("Utility class");
 	}
 
 	/**
@@ -148,7 +148,7 @@ public class StringUtil {
 	}
 
 	public static String collectionToString(Collection<?> collection, String separator) {
-		return String.join(separator, collection.stream().map(Object::toString).collect(Collectors.toList()));
+		return String.join(separator, collection.stream().map(Object::toString).toList());
 	}
 
 	public static String removeNonUtf8Chars(String src) {
@@ -234,5 +234,17 @@ public class StringUtil {
 
 		// Append the measure unit
 		return numberPart + String.format(" %sB", " KMGTPE".charAt(z));
+	}
+
+	/**
+	 * Returns the default string in case the input is empty or null
+	 * 
+	 * @param input the input string
+	 * @param def the default string
+	 * 
+	 * @return input or default
+	 */
+	public static String defaultString(String input, String def) {
+		return StringUtils.defaultString(input, def);
 	}
 }

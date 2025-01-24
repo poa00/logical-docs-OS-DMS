@@ -35,7 +35,7 @@ public class TemplatesDataServlet extends AbstractDataServlet {
 				: null;
 		Integer type = request.getParameter("type") != null ? Integer.parseInt(request.getParameter("type")) : null;
 
-		TemplateDAO templateDao = (TemplateDAO) Context.get().getBean(TemplateDAO.class);
+		TemplateDAO templateDao = Context.get(TemplateDAO.class);
 		Template template = templateId != null ? templateDao.findById(templateId) : null;
 
 		PrintWriter writer = response.getWriter();
@@ -66,6 +66,7 @@ public class TemplatesDataServlet extends AbstractDataServlet {
 				writer.print("<template>");
 				writer.print("<id>" + templ.getId() + "</id>");
 				writer.print("<name><![CDATA[" + templ.getName() + "]]></name>");
+				writer.print("<label><![CDATA[" + StringUtils.defaultIfEmpty(templ.getLabel(), templ.getName())+ "]]></label>");
 				writer.print("<description><![CDATA[" + templ.getDescription() + "]]></description>");
 				writer.print("<readonly>" + Boolean.toString(templ.getReadonly() == 1) + "</readonly>");
 				writer.print("<type>" + templ.getType() + "</type>");

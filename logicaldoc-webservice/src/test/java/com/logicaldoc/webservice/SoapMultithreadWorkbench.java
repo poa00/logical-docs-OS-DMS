@@ -119,7 +119,7 @@ public class SoapMultithreadWorkbench extends SoapWorkbench {
 								documentClient.checkin(sid, docId, "soap massive test", wsDoc.getFileName(), false,
 										tmp);
 							} finally {
-								FileUtil.strongDelete(tmp);
+								FileUtil.delete(tmp);
 							}
 						}
 
@@ -197,9 +197,8 @@ public class SoapMultithreadWorkbench extends SoapWorkbench {
 				try {
 					for (int i = 0; i < 100; i++) {
 						WSDocument wsDoc = documentClient.getDocument(sid, docId);
-						WSAttribute[] attributes = wsDoc.getAttributes();
 						Double value = null;
-						for (WSAttribute att : attributes) {
+						for (WSAttribute att : wsDoc.getAttributes()) {
 							if (att.getName().equals("Total")) {
 								WSAttribute.setValue(att, att.getDoubleValue() + 1);
 								value = att.getDoubleValue();

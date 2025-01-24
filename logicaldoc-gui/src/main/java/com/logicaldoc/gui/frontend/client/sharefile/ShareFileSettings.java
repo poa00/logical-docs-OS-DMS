@@ -1,8 +1,9 @@
 package com.logicaldoc.gui.frontend.client.sharefile;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import java.util.List;
+
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.WindowUtils;
 import com.logicaldoc.gui.frontend.client.services.ShareFileService;
@@ -31,36 +32,29 @@ public class ShareFileSettings extends Window {
 		setPadding(2);
 		setAutoSize(true);
 
-		ShareFileService.Instance.get().loadSettings(new AsyncCallback<String[]>() {
-
+		ShareFileService.Instance.get().loadSettings(new DefaultAsyncCallback<>() {
 			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
-			@Override
-			public void onSuccess(String[] settings) {
+			public void onSuccess(List<String> settings) {
 				initGUI(settings);
 			}
-
 		});
 	}
 
-	private void initGUI(String[] settings) {
-		TextItem clientId = ItemFactory.newTextItem("clientid", settings[0]);
+	private void initGUI(List<String> settings) {
+		TextItem clientId = ItemFactory.newTextItem("clientid", settings.get(0));
 		clientId.setRequired(true);
 		clientId.setWidth(300);
 
-		TextItem clientSecret = ItemFactory.newTextItem("clientsecret", settings[1]);
+		TextItem clientSecret = ItemFactory.newTextItem("clientsecret", settings.get(1));
 		clientSecret.setRequired(true);
 		clientSecret.setWidth(300);
 
-		TextItem authBaseUrl = ItemFactory.newTextItem("authbaseurl", settings[2]);
+		TextItem authBaseUrl = ItemFactory.newTextItem("authbaseurl", settings.get(2));
 		authBaseUrl.setRequired(true);
 		authBaseUrl.setDisabled(true);
 		authBaseUrl.setWidth(300);
 
-		TextItem callbackUrl = ItemFactory.newTextItem("callbackurl", settings[3]);
+		TextItem callbackUrl = ItemFactory.newTextItem("callbackurl", settings.get(3));
 		callbackUrl.setRequired(false);
 		callbackUrl.setDisabled(true);
 		callbackUrl.setWidth(300);
@@ -81,17 +75,22 @@ public class ShareFileSettings extends Window {
 			return;
 
 		ShareFileService.Instance.get().authorize(form.getValueAsString("clientid"),
-				form.getValueAsString("clientsecret"), new AsyncCallback<String>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				form.getValueAsString("clientsecret"), new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(String authorizationUrl) {
 						WindowUtils.openUrl(authorizationUrl, "_blank", null);
 						destroy();
 					}
 				});
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

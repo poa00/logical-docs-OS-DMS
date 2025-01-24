@@ -1,6 +1,5 @@
 package com.logicaldoc.core.metadata;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.Collection;
@@ -11,6 +10,7 @@ import org.junit.Test;
 import com.logicaldoc.core.AbstractCoreTestCase;
 import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.security.Tenant;
+import com.logicaldoc.util.plugin.PluginException;
 
 import junit.framework.Assert;
 
@@ -25,7 +25,7 @@ public class HibernateTemplateDAOTest extends AbstractCoreTestCase {
 	private TemplateDAO dao;
 
 	@Before
-	public void setUp() throws FileNotFoundException, IOException, SQLException {
+	public void setUp() throws IOException, SQLException, PluginException {
 		super.setUp();
 
 		// Retrieve the instance under test from spring context. Make sure that
@@ -47,12 +47,12 @@ public class HibernateTemplateDAOTest extends AbstractCoreTestCase {
 	}
 
 	@Test
-	public void testFindAll() {
+	public void testFindAll() throws PersistenceException {
 		Collection<Template> templates = dao.findAll();
 		Assert.assertNotNull(templates);
 		Assert.assertEquals(4, templates.size());
 	}
-
+	
 	@Test
 	public void testFindById() throws PersistenceException {
 		Template template = dao.findById(1);
@@ -75,7 +75,25 @@ public class HibernateTemplateDAOTest extends AbstractCoreTestCase {
 	}
 
 	@Test
-	public void testFindByName() {
+	public void testClone() throws PersistenceException {
+		Template template = dao.findById(1);
+		Assert.assertNotNull(template);
+		dao.initialize(template);
+		Assert.assertEquals(1, template.getId());
+		Assert.assertEquals("test1", template.getName());
+		Assert.assertTrue(template.getAttributes().containsKey("attr1"));
+		
+		Template clone = dao.clone(1, "test1-Clone");
+		Assert.assertNotNull(clone);
+		clone = dao.findById(clone.getId());
+		dao.initialize(clone);
+		Assert.assertNotSame(1, clone.getId());
+		Assert.assertEquals("test1-Clone", clone.getName());
+		Assert.assertTrue(clone.getAttributes().containsKey("attr1"));
+	}
+	
+	@Test
+	public void testFindByName() throws PersistenceException {
 		Template template = dao.findByName("test1", Tenant.DEFAULT_ID);
 		Assert.assertNotNull(template);
 		dao.initialize(template);

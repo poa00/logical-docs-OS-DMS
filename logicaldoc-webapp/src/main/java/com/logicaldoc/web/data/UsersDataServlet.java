@@ -4,23 +4,24 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.text.DateFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.apache.commons.lang.StringUtils;
+
 import com.logicaldoc.core.PersistenceException;
-import com.logicaldoc.core.security.Group;
 import com.logicaldoc.core.security.Session;
-import com.logicaldoc.core.security.User;
-import com.logicaldoc.core.security.dao.GroupDAO;
-import com.logicaldoc.core.security.dao.UserDAO;
+import com.logicaldoc.core.security.user.Group;
+import com.logicaldoc.core.security.user.GroupDAO;
+import com.logicaldoc.core.security.user.User;
+import com.logicaldoc.core.security.user.UserDAO;
 import com.logicaldoc.util.Context;
-import com.logicaldoc.util.StringUtil;
 
 /**
  * This servlet is responsible for users data.
@@ -46,7 +47,7 @@ public class UsersDataServlet extends AbstractDataServlet {
 	}
 
 	private void printUsers(List<User> users, boolean required, boolean skipdisabled, HttpServletResponse response)
-			throws IOException {
+			throws IOException, PersistenceException {
 		PrintWriter writer = response.getWriter();
 		writer.print("<list>");
 		if (!required)
@@ -55,7 +56,7 @@ public class UsersDataServlet extends AbstractDataServlet {
 		/*
 		 * Iterate over records composing the response XML document
 		 */
-		UserDAO userDao = (UserDAO) Context.get().getBean(UserDAO.class);
+		UserDAO userDao = Context.get(UserDAO.class);
 		for (User user : users) {
 			if (user.getType() == User.TYPE_SYSTEM || (skipdisabled && user.getEnabled() != 1))
 				continue;
@@ -68,31 +69,39 @@ public class UsersDataServlet extends AbstractDataServlet {
 		writer.print("</list>");
 	}
 
-	private void printUser(PrintWriter writer, User user) {
+	private void printUser(PrintWriter writer, User user) throws PersistenceException {
 		DateFormat df = getDateFormat();
 
 		writer.print("<user>");
 		writer.print("<id>" + user.getId() + "</id>");
 		writer.print("<username><![CDATA[" + user.getUsername() + "]]></username>");
-		writer.print("<enabledIcon>" + (user.getEnabled() == 1 ? "0" : "2") + "</enabledIcon>");
-		writer.print("<eenabled>" + (user.getEnabled() == 1 ? "true" : "false") + "</eenabled>");
+		writer.print("<eenabled>" + Boolean.toString(user.getEnabled() == 1) + "</eenabled>");
 		writer.print("<guest>" + user.isReadonly() + "</guest>");
-		writer.print("<name><![CDATA[" + (user.getName() == null ? "" : user.getName()) + "]]></name>");
-		writer.print(
-				"<firstName><![CDATA[" + (user.getFirstName() == null ? "" : user.getFirstName()) + "]]></firstName>");
-		writer.print("<label><![CDATA[" + (user.getFullName() == null ? "" : user.getFullName()) + "]]></label>");
-		writer.print("<email><![CDATA[" + (user.getEmail() == null ? "" : user.getEmail()) + "]]></email>");
-		writer.print("<phone><![CDATA[" + (user.getTelephone() == null ? "" : user.getTelephone()) + "]]></phone>");
-		writer.print("<cell><![CDATA[" + (user.getTelephone2() == null ? "" : user.getTelephone2()) + "]]></cell>");
+		writer.print("<name><![CDATA[" + StringUtils.defaultString(user.getName()) + "]]></name>");
+		writer.print("<firstName><![CDATA[" + StringUtils.defaultString(user.getFirstName()) + "]]></firstName>");
+		writer.print("<label><![CDATA[" + StringUtils.defaultString(user.getFullName()) + "]]></label>");
+		writer.print("<email><![CDATA[" + StringUtils.defaultString(user.getEmail()) + "]]></email>");
+		writer.print("<phone><![CDATA[" + StringUtils.defaultString(user.getTelephone()) + "]]></phone>");
+		writer.print("<cell><![CDATA[" + StringUtils.defaultString(user.getTelephone2()) + "]]></cell>");
+		writer.print("<city><![CDATA[" + StringUtils.defaultString(user.getCity()) + "]]></city>");
+		writer.print("<department><![CDATA[" + StringUtils.defaultString(user.getDepartment()) + "]]></department>");
+		writer.print("<building><![CDATA[" + StringUtils.defaultString(user.getBuilding()) + "]]></building>");
+		writer.print("<organizationalUnit><![CDATA[" + StringUtils.defaultString(user.getOrganizationalUnit())
+				+ "]]></organizationalUnit>");
+		writer.print("<company><![CDATA[" + StringUtils.defaultString(user.getCompany()) + "]]></company>");
+
 		writer.print("<source>" + user.getSource() + "</source>");
 		if (user.getExpire() != null)
 			writer.print("<expire>" + df.format(user.getExpire()) + "</expire>");
+		if (user.getLastLogin() != null)
+			writer.print("<lastLogin>" + df.format(user.getLastLogin()) + "</lastLogin>");
+		if (user.getCreation() != null)
+			writer.print("<creation>" + df.format(user.getCreation()) + "</creation>");
 		if (user.getUserGroup() != null)
 			writer.print("<usergroup><![CDATA[" + user.getUserGroup().getId() + "]]></usergroup>");
 
-		String[] groups = Arrays.stream(user.getGroupNames()).filter(g -> !g.startsWith("_user_"))
-				.toArray(String[]::new);
-		writer.print("<groups><![CDATA[" + StringUtil.arrayToString(groups, ", ") + "]]></groups>");
+		writer.print("<groups><![CDATA[" + user.getGroups().stream().filter(g -> g.getType() == Group.TYPE_DEFAULT)
+				.map(Group::getName).collect(Collectors.joining(", ")) + "]]></groups>");
 		writer.print("<avatar>" + user.getId() + "</avatar>");
 
 		if (user.getTimeZone() != null)
@@ -103,8 +112,8 @@ public class UsersDataServlet extends AbstractDataServlet {
 	private List<User> findUsers(Session session, String groupIdOrName) throws PersistenceException {
 		List<User> users = new ArrayList<>();
 
-		UserDAO userDao = (UserDAO) Context.get().getBean(UserDAO.class);
-		GroupDAO groupDao = (GroupDAO) Context.get().getBean(GroupDAO.class);
+		UserDAO userDao = Context.get(UserDAO.class);
+		GroupDAO groupDao = Context.get(GroupDAO.class);
 
 		if (groupIdOrName != null && !groupIdOrName.trim().isEmpty()) {
 			Group group = null;

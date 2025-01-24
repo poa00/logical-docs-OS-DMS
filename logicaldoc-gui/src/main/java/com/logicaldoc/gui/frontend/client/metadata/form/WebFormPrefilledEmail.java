@@ -1,6 +1,6 @@
 package com.logicaldoc.gui.frontend.client.metadata.form;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIEmail;
 import com.logicaldoc.gui.common.client.beans.GUIForm;
 import com.logicaldoc.gui.common.client.i18n.I18N;
@@ -51,22 +51,16 @@ public class WebFormPrefilledEmail extends StickyWindow {
 		hintForm.setItems(hint);
 
 		addItem(hintForm);
-		
-		FormService.Instance.get().getById(formId, new AsyncCallback<GUIForm>() {
 
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
+		FormService.Instance.get().getById(formId, new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(GUIForm frm) {
-				extPanel = new ExtendedPropertiesPanel(frm, null, true, false, false);
+				extPanel = new ExtendedPropertiesPanel(frm, null, true, false, false, true);
 				addItem(extPanel);
 
 				SubmitItem send = new SubmitItem();
-				send.setTitle(I18N.message("send"));
-				send.addClickHandler(event -> onSend());
+				send.setTitle(I18N.message("submit"));
+				send.addClickHandler(event -> onSubmit());
 
 				DynamicForm sendForm = new DynamicForm();
 				sendForm.setTitleOrientation(TitleOrientation.TOP);
@@ -80,18 +74,17 @@ public class WebFormPrefilledEmail extends StickyWindow {
 
 	}
 
-	public void onSend() {
+	public void onSubmit() {
 		if (!extPanel.validate())
 			return;
 
 		LD.contactingServer();
 		FormService.Instance.get().invite((GUIForm) extPanel.getObject(), mail, I18N.getLocale(),
-				new AsyncCallback<Void>() {
+				new DefaultAsyncCallback<>() {
 
 					@Override
 					public void onFailure(Throwable caught) {
-						LD.clearPrompt();
-						GuiLog.serverError(caught);
+						super.onFailure(caught);
 						destroy();
 					}
 
@@ -102,5 +95,15 @@ public class WebFormPrefilledEmail extends StickyWindow {
 						destroy();
 					}
 				});
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

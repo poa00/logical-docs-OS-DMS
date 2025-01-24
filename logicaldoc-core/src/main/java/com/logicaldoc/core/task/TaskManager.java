@@ -8,6 +8,7 @@ import org.java.plugin.registry.Extension;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationContext;
+import org.springframework.stereotype.Component;
 
 import com.logicaldoc.core.document.TagsProcessor;
 import com.logicaldoc.core.searchengine.IndexOptimizer;
@@ -25,6 +26,7 @@ import com.logicaldoc.util.plugin.PluginRegistry;
  * @author Marco Meschieri - LogicalDOC
  * @since 3.5.0
  */
+@Component("taskManager")
 public class TaskManager {
 
 	protected static Logger log = LoggerFactory.getLogger(TaskManager.class);
@@ -39,9 +41,9 @@ public class TaskManager {
 	 */
 	Collection<Task> getTasks(ApplicationContext context) {
 		List<Task> tasks = new ArrayList<>();
-		tasks.add((Task) context.getBean(IndexOptimizer.NAME));
-		tasks.add((Task) context.getBean(IndexerTask.NAME));
-		tasks.add((Task) context.getBean(TagsProcessor.NAME));
+		tasks.add((Task) context.getBean(IndexOptimizer.class.getAnnotation(Component.class).value()));
+		tasks.add((Task) context.getBean(IndexerTask.class.getAnnotation(Component.class).value()));
+		tasks.add((Task) context.getBean(TagsProcessor.class.getAnnotation(Component.class).value()));
 
 		// Acquire the 'Task' extensions of the core plugin and add iterate over
 		// defined tasks
@@ -50,6 +52,8 @@ public class TaskManager {
 		for (Extension extension : exts) {
 			// Retrieve the task name
 			String name = extension.getParameter("name").valueAsString();
+			if (!context.containsBean(name))
+				name = Character.toLowerCase(name.charAt(0)) + name.substring(1);
 			tasks.add((Task) context.getBean(name));
 		}
 		return tasks;
@@ -62,12 +66,12 @@ public class TaskManager {
 	 * @return collection of tasks
 	 */
 	public Collection<Task> getTasks() {
-		Context context=Context.get();
-		
-		List<Task> tasks = new ArrayList<>();		
-		tasks.add((Task) context.getBean(IndexOptimizer.NAME));
-		tasks.add((Task) context.getBean(IndexerTask.NAME));
-		tasks.add((Task) context.getBean(TagsProcessor.NAME));
+		Context context = Context.get();
+
+		List<Task> tasks = new ArrayList<>();
+		tasks.add((Task) context.getBean(IndexOptimizer.class.getAnnotation(Component.class).value()));
+		tasks.add((Task) context.getBean(IndexerTask.class.getAnnotation(Component.class).value()));
+		tasks.add((Task) context.getBean(TagsProcessor.class.getAnnotation(Component.class).value()));
 
 		// Acquire the 'Task' extensions of the core plugin and add iterate over
 		// defined tasks

@@ -19,11 +19,21 @@ public class AutomationRoutineParametersPanel extends AutomationRoutineDetailsTa
 		setHeight100();
 		setMembersMargin(1);
 
-		propertiesPanel = new ExtendedPropertiesPanel(routine, changedHandler, true, false, true);
+		propertiesPanel = new ExtendedPropertiesPanel(routine, changedHandler, true, false, true, true);
 		setMembers(propertiesPanel);
 	}
 
 	public boolean validate() {
 		return propertiesPanel.validate();
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

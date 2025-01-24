@@ -1,14 +1,16 @@
 package com.logicaldoc.gui.frontend.client.settings.automation;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import java.util.Arrays;
+
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIAutomationRoutine;
 import com.logicaldoc.gui.common.client.data.AutomationRoutinesDS;
+import com.logicaldoc.gui.common.client.grid.IdListGridField;
+import com.logicaldoc.gui.common.client.grid.RefreshableListGrid;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.common.client.widgets.HTMLPanel;
 import com.logicaldoc.gui.common.client.widgets.InfoPanel;
-import com.logicaldoc.gui.common.client.widgets.grid.RefreshableListGrid;
 import com.logicaldoc.gui.frontend.client.services.AutomationService;
 import com.smartgwt.client.data.AdvancedCriteria;
 import com.smartgwt.client.data.Record;
@@ -59,8 +61,7 @@ public class AutomationRoutinesPanel extends VLayout {
 		listing.setHeight("50%");
 		listing.setShowResizeBar(true);
 
-		ListGridField id = new ListGridField("id", 50);
-		id.setHidden(true);
+		ListGridField id = new IdListGridField();
 
 		ListGridField name = new ListGridField("name", I18N.message("name"), 150);
 		name.setCanFilter(true);
@@ -118,19 +119,12 @@ public class AutomationRoutinesPanel extends VLayout {
 		list.addSelectionChangedHandler((SelectionEvent event) -> {
 			Record rec = list.getSelectedRecord();
 			if (rec != null)
-				AutomationService.Instance.get().getRoutine(rec.getAttributeAsLong("id"),
-						new AsyncCallback<GUIAutomationRoutine>() {
-
-							@Override
-							public void onFailure(Throwable caught) {
-								GuiLog.serverError(caught);
-							}
-
-							@Override
-							public void onSuccess(GUIAutomationRoutine routine) {
-								showRoutineDetails(routine);
-							}
-						});
+				AutomationService.Instance.get().getRoutine(rec.getAttributeAsLong("id"), new DefaultAsyncCallback<>() {
+					@Override
+					public void onSuccess(GUIAutomationRoutine routine) {
+						showRoutineDetails(routine);
+					}
+				});
 		});
 
 		list.addDataArrivedHandler(
@@ -153,18 +147,13 @@ public class AutomationRoutinesPanel extends VLayout {
 		Menu contextMenu = new Menu();
 
 		final ListGridRecord rec = list.getSelectedRecord();
-		final long id = Long.parseLong(rec.getAttributeAsString("id"));
+		final long id = rec.getAttributeAsLong("id");
 
 		MenuItem delete = new MenuItem();
 		delete.setTitle(I18N.message("ddelete"));
 		delete.addClickHandler(event -> LD.ask(I18N.message("question"), I18N.message("confirmdelete"), answer -> {
 			if (Boolean.TRUE.equals(answer)) {
-				AutomationService.Instance.get().deleteRoutines(new long[] { id }, new AsyncCallback<Void>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				AutomationService.Instance.get().deleteRoutines(Arrays.asList(id), new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Void result) {
 						list.removeSelectedData();
@@ -212,5 +201,15 @@ public class AutomationRoutinesPanel extends VLayout {
 		rec.setAttribute(AUTOMATION, routine.getAutomation());
 
 		list.refreshRow(list.getRecordIndex(rec));
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

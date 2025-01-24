@@ -1,14 +1,15 @@
 package com.logicaldoc.gui.frontend.client.search;
 
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIDocument;
 import com.logicaldoc.gui.common.client.beans.GUIResult;
 import com.logicaldoc.gui.common.client.beans.GUISearchOptions;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.frontend.client.document.grid.DocumentGridUtil;
 import com.logicaldoc.gui.frontend.client.panels.MainPanel;
@@ -23,7 +24,7 @@ import com.logicaldoc.gui.frontend.client.services.SearchService;
 public class Search {
 	private static Search instance;
 
-	private GUIDocument[] lastResult = new GUIDocument[0];
+	private List<GUIDocument> lastResult = new ArrayList<>();
 
 	private GUISearchOptions options = new GUISearchOptions();
 
@@ -70,21 +71,14 @@ public class Search {
 	public void search() {
 		LD.contactingServer();
 
-		SearchService.Instance.get().search(options, new AsyncCallback<GUIResult>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				LD.clearPrompt();
-				GuiLog.serverError(caught);
-			}
-
+		SearchService.Instance.get().search(options, new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(GUIResult result) {
 				try {
 					time = result.getTime();
 					estimatedHits = result.getEstimatedHits();
 					hasMore = result.isHasMore();
-					lastResult = result.getHits();				
+					lastResult = result.getHits();
 					for (SearchObserver observer : observers)
 						observer.onSearchArrived();
 				} finally {
@@ -96,7 +90,7 @@ public class Search {
 		});
 	}
 
-	public GUIDocument[] getLastResult() {
+	public List<GUIDocument> getLastResult() {
 		return lastResult;
 	}
 
@@ -105,7 +99,7 @@ public class Search {
 	}
 
 	public boolean isEmpty() {
-		return (getLastResult() == null || getLastResult().length == 0);
+		return getLastResult().isEmpty();
 	}
 
 	public boolean isHasMore() {

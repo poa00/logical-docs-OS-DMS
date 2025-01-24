@@ -1,6 +1,5 @@
 package com.logicaldoc.gui.common.client;
 
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -98,13 +97,13 @@ public class Feature {
 
 	public static final int FOLDER_TEMPLATE = 42;
 
-	public static final int GDRIVE = 43;
+	public static final int GOOGLE_DRIVE = 43;
 
-	public static final int SMB_STORAGE = 44;
+	public static final int SMB_STORE = 44;
 
 	public static final int FORMAT_CONVERSION = 45;
 
-	public static final int CLOUD_STORAGE = 46;
+	public static final int CLOUD_STORE = 46;
 
 	public static final int VIA = 47;
 
@@ -116,7 +115,7 @@ public class Feature {
 
 	public static final int PREVIEW = 51;
 
-	public static final int MULTI_STORAGE = 52;
+	public static final int MULTI_STORE = 52;
 
 	public static final int BOOKMARKS = 53;
 
@@ -209,22 +208,32 @@ public class Feature {
 	public static final int ZONAL_BARCODE = 98;
 
 	public static final int WEB_FORM = 99;
-	
+
 	public static final int DIGITAL_SIGNATURE_CLIENT = 100;
-	
+
 	public static final int VIEW_TICKET = 101;
-	
+
 	public static final int READING_CONFIRMATION = 102;
+
+	public static final int TECHNICAL_SUPPORT = 103;
+
+	public static final int CHATGPT = 104;
+
+	public static final int GOOGLE_CALENDAR = 105;
+	
+	public static final int SCANNER = 106;
+
+	public static final int ONLYOFFICE = 107;
 
 	private static Set<String> features = new HashSet<>();
 
 	private Feature() {
-		
+
 	}
-	
+
 	public static void init(GUIInfo info) {
 		features.clear();
-		Collections.addAll(features, info.getFeatures());
+		features.addAll(info.getFeatures());
 	}
 
 	public static boolean enabled(int feature) {

@@ -2,7 +2,6 @@ package com.logicaldoc.gui.common.client.beans;
 
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 public class GUIAttributeSet implements Serializable {
@@ -15,13 +14,15 @@ public class GUIAttributeSet implements Serializable {
 
 	private String name;
 
+	private String label;
+
 	private String description;
 
 	private boolean readonly = false;
 
 	private int type = TYPE_DEFAULT;
 
-	private GUIAttribute[] attributes;
+	private List<GUIAttribute> attributes = new ArrayList<>();
 
 	public long getId() {
 		return id;
@@ -47,15 +48,12 @@ public class GUIAttributeSet implements Serializable {
 		this.description = description;
 	}
 
-	public GUIAttribute[] getAttributes() {
+	public List<GUIAttribute> getAttributes() {
 		return attributes;
 	}
 
-	public GUIAttribute[] getAttributesOrderedByPosition() {
-		if (attributes == null)
-			return new GUIAttribute[0];
-
-		Arrays.sort(attributes, (arg0, arg1) -> Integer.compare(arg0.getPosition(), arg1.getPosition()));
+	public List<GUIAttribute> getAttributesOrderedByPosition() {
+		attributes.sort((arg0, arg1) -> Integer.compare(arg0.getPosition(), arg1.getPosition()));
 		return attributes;
 	}
 
@@ -68,27 +66,20 @@ public class GUIAttributeSet implements Serializable {
 		return null;
 	}
 
-	public void appendAttribute(GUIAttribute a) {
-		List<GUIAttribute> newAttrs = new ArrayList<>();
-		if (getAttributes() != null)
-			newAttrs.addAll(Arrays.asList(getAttributes()));
-		newAttrs.add(a);
-		attributes = newAttrs.toArray(new GUIAttribute[0]);
+	public void appendAttribute(GUIAttribute attribute) {
+		attributes.add(attribute);
 	}
 
 	public void removeAttribute(String name) {
-		if (getAttribute(name) == null)
-			return;
-
 		List<GUIAttribute> newAttrs = new ArrayList<>();
 		for (GUIAttribute att : getAttributes())
 			if (!att.getName().equals(name))
 				newAttrs.add(att);
 
-		attributes = newAttrs.toArray(new GUIAttribute[0]);
+		attributes = newAttrs;
 	}
 
-	public void reorderAttributes(List<String> names) {
+	public void repositionAttributes(List<String> names) {
 		List<GUIAttribute> newAttrs = new ArrayList<>();
 		int i = 0;
 		for (String attributeName : names) {
@@ -97,10 +88,10 @@ public class GUIAttributeSet implements Serializable {
 			newAttrs.add(att);
 		}
 
-		attributes = newAttrs.toArray(new GUIAttribute[0]);
+		attributes = newAttrs;
 	}
 
-	public void setAttributes(GUIAttribute[] attributes) {
+	public void setAttributes(List<GUIAttribute> attributes) {
 		this.attributes = attributes;
 	}
 
@@ -118,5 +109,13 @@ public class GUIAttributeSet implements Serializable {
 
 	public void setType(int type) {
 		this.type = type;
+	}
+
+	public String getLabel() {
+		return label;
+	}
+
+	public void setLabel(String label) {
+		this.label = label;
 	}
 }

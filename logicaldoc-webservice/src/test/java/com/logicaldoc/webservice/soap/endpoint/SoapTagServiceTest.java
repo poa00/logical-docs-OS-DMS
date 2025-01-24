@@ -1,6 +1,5 @@
 package com.logicaldoc.webservice.soap.endpoint;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.Arrays;
@@ -10,6 +9,7 @@ import org.junit.Test;
 
 import com.logicaldoc.core.folder.Folder;
 import com.logicaldoc.core.folder.FolderDAO;
+import com.logicaldoc.util.plugin.PluginException;
 import com.logicaldoc.webservice.AbstractWebserviceTestCase;
 import com.logicaldoc.webservice.model.WSDocument;
 import com.logicaldoc.webservice.model.WSFolder;
@@ -24,7 +24,7 @@ public class SoapTagServiceTest extends AbstractWebserviceTestCase {
 	private SoapTagService tagService;
 
 	@Override
-	public void setUp() throws FileNotFoundException, IOException, SQLException {
+	public void setUp() throws IOException, SQLException, PluginException {
 		super.setUp();
 		folderDao = (FolderDAO) context.getBean("FolderDAO");
 
@@ -34,66 +34,66 @@ public class SoapTagServiceTest extends AbstractWebserviceTestCase {
 
 	@Test
 	public void testAddDocumentTags() throws Exception {
-		WSDocument[] documents = tagService.findDocumentsByTag("", "abc");
+		List<WSDocument> documents = tagService.findDocumentsByTag("", "abc");
 		Assert.assertNotNull(documents);
-		Assert.assertEquals(1, documents.length);
+		Assert.assertEquals(1, documents.size());
 
-		tagService.addDocumentTags("", documents[0].getId(), new String[] { "pippo", "pluto" });
+		tagService.addDocumentTags("", documents.get(0).getId(), Arrays.asList("pippo", "pluto"));
 		documents = tagService.findDocumentsByTag("", "pippo");
 		Assert.assertNotNull(documents);
-		Assert.assertEquals(1, documents.length);
+		Assert.assertEquals(1, documents.size());
 	}
 
 	@Test
 	public void testAddFolderTags() throws Exception {
-		tagService.addFolderTags("", 4L, new String[] { "pippo", "pluto" });
-		WSFolder[] folders = tagService.findFoldersByTag("", "pippo");
+		tagService.addFolderTags("", 4L, Arrays.asList("pippo", "pluto"));
+		List<WSFolder> folders = tagService.findFoldersByTag("", "pippo");
 		Assert.assertNotNull(folders);
-		Assert.assertEquals(1, folders.length);
+		Assert.assertEquals(1, folders.size());
 		folders = tagService.findFoldersByTag("", "unexisting");
 		Assert.assertNotNull(folders);
-		Assert.assertEquals(0, folders.length);
+		Assert.assertEquals(0, folders.size());
 	}
 
 	@Test
 	public void testSetDocumentTags() throws Exception {
-		WSDocument[] documents = tagService.findDocumentsByTag("", "abc");
+		List<WSDocument> documents = tagService.findDocumentsByTag("", "abc");
 		Assert.assertNotNull(documents);
-		Assert.assertEquals(1, documents.length);
+		Assert.assertEquals(1, documents.size());
 
-		tagService.setDocumentTags("", documents[0].getId(), new String[] { "pippo", "pluto" });
+		tagService.setDocumentTags("", documents.get(0).getId(), List.of("pippo", "pluto"));
 		documents = tagService.findDocumentsByTag("", "pippo");
 		Assert.assertNotNull(documents);
-		Assert.assertEquals(1, documents.length);
+		Assert.assertEquals(1, documents.size());
 		documents = tagService.findDocumentsByTag("", "abc");
 		Assert.assertNotNull(documents);
-		Assert.assertEquals(0, documents.length);
+		Assert.assertEquals(0, documents.size());
 	}
 
 	@Test
 	public void testSetFolderTags() throws Exception {
-		tagService.addFolderTags("", 4L, new String[] { "pippo", "pluto" });
-		WSFolder[] folders = tagService.findFoldersByTag("", "pippo");
+		tagService.addFolderTags("", 4L, Arrays.asList("pippo", "pluto"));
+		List<WSFolder> folders = tagService.findFoldersByTag("", "pippo");
 		Assert.assertNotNull(folders);
-		Assert.assertEquals(1, folders.length);
+		Assert.assertEquals(1, folders.size());
 
-		tagService.setFolderTags("", 4L, new String[] { "paperino" });
+		tagService.setFolderTags("", 4L, Arrays.asList("paperino"));
 		folders = tagService.findFoldersByTag("", "pippo");
 		Assert.assertNotNull(folders);
-		Assert.assertEquals(0, folders.length);
+		Assert.assertEquals(0, folders.size());
 		folders = tagService.findFoldersByTag("", "paperino");
 		Assert.assertNotNull(folders);
-		Assert.assertEquals(1, folders.length);
+		Assert.assertEquals(1, folders.size());
 	}
 
 	@Test
 	public void testGetDocumentTags() throws Exception {
-		WSDocument[] documents = tagService.findDocumentsByTag("", "abc");
+		List<WSDocument> documents = tagService.findDocumentsByTag("", "abc");
 		Assert.assertNotNull(documents);
-		Assert.assertEquals(1, documents.length);
+		Assert.assertEquals(1, documents.size());
 
-		tagService.addDocumentTags("", documents[0].getId(), new String[] { "pippo", "pluto" });
-		List<String> tags = Arrays.asList(tagService.getDocumentTags("", documents[0].getId()));
+		tagService.addDocumentTags("", documents.get(0).getId(), Arrays.asList("pippo", "pluto"));
+		List<String> tags = tagService.getDocumentTags("", documents.get(0).getId());
 		Assert.assertTrue(tags.contains("abc"));
 		Assert.assertTrue(tags.contains("pippo"));
 		Assert.assertTrue(tags.contains("pluto"));
@@ -101,44 +101,43 @@ public class SoapTagServiceTest extends AbstractWebserviceTestCase {
 
 	@Test
 	public void testGetFolderTags() throws Exception {
-		tagService.addFolderTags("", 4L, new String[] { "pippo", "pluto" });
-		List<String> tags = Arrays.asList(tagService.getFolderTags("", 4L));
+		tagService.addFolderTags("", 4L, Arrays.asList("pippo", "pluto"));
+		List<String> tags = tagService.getFolderTags("", 4L);
 		Assert.assertTrue(tags.contains("pippo"));
 		Assert.assertTrue(tags.contains("pluto"));
 	}
 
 	@Test
 	public void testFindDocumentsByTag() throws Exception {
-		WSDocument[] documents = tagService.findDocumentsByTag("", "abc");
+		List<WSDocument> documents = tagService.findDocumentsByTag("", "abc");
 		Assert.assertNotNull(documents);
-		Assert.assertEquals(1, documents.length);
-		List<WSDocument> docsList = Arrays.asList(documents);
-		Assert.assertEquals(1, docsList.get(0).getId());
+		Assert.assertEquals(1, documents.size());
+		Assert.assertEquals(1, documents.get(0).getId());
 
 		documents = tagService.findDocumentsByTag("", "ask");
 		Assert.assertNotNull(documents);
-		Assert.assertEquals(1, documents.length);
-		docsList = Arrays.asList(documents);
-		Assert.assertEquals(2, docsList.get(0).getId());
+		Assert.assertEquals(1, documents.size());
+		Assert.assertEquals(2, documents.get(0).getId());
 
 		documents = tagService.findDocumentsByTag("", "xxx");
 		Assert.assertNotNull(documents);
-		Assert.assertEquals(0, documents.length);
+		Assert.assertEquals(0, documents.size());
 	}
 
 	@Test
 	public void testFindFoldersByTag() throws Exception {
-		Folder folder = folderDao.findById(4L);
-		folderDao.initialize(folder);
+		Folder folder = new Folder();
+		folder.setName("test");
+		folder.setParentId(5L);
 		folder.addTag("xyz");
 		folderDao.store(folder);
 
-		WSFolder[] folders = tagService.findFoldersByTag("", "xyz");
+		List<WSFolder> folders = tagService.findFoldersByTag("", "xyz");
 		Assert.assertNotNull(folders);
-		Assert.assertEquals(1, folders.length);
+		Assert.assertEquals(1, folders.size());
 
 		folders = tagService.findFoldersByTag("", "unexisting");
 		Assert.assertNotNull(folders);
-		Assert.assertEquals(0, folders.length);
+		Assert.assertEquals(0, folders.size());
 	}
 }

@@ -1,9 +1,7 @@
 package com.logicaldoc.util.config;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.sql.SQLException;
 
 import org.junit.Assert;
 import org.junit.Before;
@@ -22,7 +20,7 @@ public class SecurityConfiguratorTest {
 	File contextSecurityXml = new File("target/context-security.xml");
 
 	@Before
-	public void setUp() throws FileNotFoundException, IOException, SQLException {
+	public void setUp() throws IOException {
 		FileUtil.copyResource("/context-security.xml", contextSecurityXml);
 	}
 

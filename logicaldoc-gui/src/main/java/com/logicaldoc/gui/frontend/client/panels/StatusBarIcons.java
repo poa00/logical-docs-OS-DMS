@@ -1,5 +1,7 @@
 package com.logicaldoc.gui.frontend.client.panels;
 
+import java.util.List;
+
 import com.logicaldoc.gui.common.client.Feature;
 import com.logicaldoc.gui.common.client.Menu;
 import com.logicaldoc.gui.common.client.Session;
@@ -126,7 +128,7 @@ public class StatusBarIcons extends HLayout implements ClipboardObserver, UserOb
 		lockedCounter.setTitle(AwesomeFactory.getIconHtml("lock-alt", Integer.toString(user.getLockedDocs())));
 		checkoutCounter.setTitle(AwesomeFactory.getIconHtml("edit", Integer.toString(user.getCheckedOutDocs())));
 		messagesCounter.setTitle(AwesomeFactory.getIconHtml("envelope", Integer.toString(user.getUnreadMessages())));
-		workflowsCounter.setTitle(AwesomeFactory.getIconHtml("tasks", Integer.toString(user.getAssignedTasks())));
+		workflowsCounter.setTitle(AwesomeFactory.getIconHtml("tasks", Integer.toString(user.getTasks())));
 		eventsCounter.setTitle(AwesomeFactory.getIconHtml("calendar", Integer.toString(user.getUpcomingEvents())));
 	}
 
@@ -164,7 +166,17 @@ public class StatusBarIcons extends HLayout implements ClipboardObserver, UserOb
 	}
 
 	@Override
-	public void onNewReadingRequests(GUIReadingRequest[] readings) {
+	public void onNewReadingRequests(List<GUIReadingRequest> readings) {
 		onConfirmReading(0L);
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

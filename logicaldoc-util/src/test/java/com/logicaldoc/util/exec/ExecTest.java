@@ -27,7 +27,7 @@ public class ExecTest {
 		String cmdPath = "C:\\LogicalDOC\\imagemagick\\convert.exe";
 		File src = new File("C:\\tmp\\google.png");
 		File dest = new File("C:\\tmp\\outfile.pdf");
-		String commandLine = cmdPath + " -compress JPEG " + src.getPath() + " " + dest.getPath();
+		List<String> commandLine = List.of(cmdPath, " -compress JPEG ", src.getPath(), dest.getPath());
 		try {
 			int retval = new Exec().exec(commandLine, null, null, 30);
 			log.info("retval: {}", retval);
@@ -37,8 +37,7 @@ public class ExecTest {
 		}
 
 		if (SystemUtil.isWindows()) {
-			cmdPath = "target\\test-classes\\nothing.bat intel CORE i7";
-			commandLine = cmdPath;
+			commandLine = List.of("target\\test-classes\\nothing.bat", "intel", "CORE i7");
 			try {
 				int retval = new Exec().exec(commandLine, null, null, 30);
 				log.info("retval: {}", retval);
@@ -56,9 +55,14 @@ public class ExecTest {
 		boolean yyy = SystemUtil.isWindows();
 		assertEquals(yyy, xxx);
 
-		System.setProperty("os.name", "Linux");
-		xxx = new Exec().isWindows();
-		assertNotSame(yyy, xxx);
+		String originalOsName = System.getProperty("os.name");
+		try {
+			System.setProperty("os.name", "Linux");
+			xxx = new Exec().isWindows();
+			assertNotSame(yyy, xxx);
+		} finally {
+			System.setProperty("os.name", originalOsName);
+		}
 	}
 
 	@Test
@@ -70,7 +74,7 @@ public class ExecTest {
 		xxx.add("Gigaset");
 		xxx.add("AS410");
 		try {
-			int retval = new Exec().exec2(xxx, null, 10);
+			int retval = new Exec().execPB(xxx, null, 10);
 			log.info("retval: {}", retval);
 			assertEquals(0, retval);
 		} catch (IOException e) {
@@ -81,7 +85,7 @@ public class ExecTest {
 		try {
 			// Launch passing the execution folder
 			File userDir = new File(System.getProperty("user.dir"));
-			int retval = new Exec().exec2(xxx, userDir, 10);
+			int retval = new Exec().execPB(xxx, userDir, 10);
 			log.info("retval: {}", retval);
 			assertEquals(0, retval);
 		} catch (IOException e) {
@@ -136,12 +140,10 @@ public class ExecTest {
 		xxx.add("Maroon");
 		xxx.add("Anti-Hero");
 
-		String[] envp = { "TS10=MidnightTS" };
-
 		if (SystemUtil.isWindows()) {
 			try {
 				File userDir = new File(System.getProperty("user.dir"));
-				int retval = new Exec().exec(xxx, envp, userDir, 30);
+				int retval = new Exec().exec(xxx, List.of("TS10=MidnightTS"), userDir, 30);
 				log.info("retval: {}", retval);
 				assertEquals(0, retval);
 			} catch (IOException e) {
@@ -158,7 +160,7 @@ public class ExecTest {
 
 		try {
 			if (new Exec().isWindows()) {
-				String out = new Exec().exec(exeFile.getPath(), null, null);
+				String out = new Exec().execGetOutput(exeFile.getPath(), null, null);
 				assertNotNull(out);
 				assertTrue(out.contains("Midnights"));
 			}
@@ -169,59 +171,29 @@ public class ExecTest {
 	}
 
 	@Test
-	public void testExecStringStringArrayFileStringBufferInt() {
-		File exeFile = new File("target\\test-classes\\nothing.bat @TaylorSwift #Midnights");
-
-		String[] envp = { "TS10=MidnightTS" };
-
-		try {
-			if (new Exec().isWindows()) {
-				File userDir = new File(System.getProperty("user.dir"));
-				StringBuilder sb = new StringBuilder();
-				int retval = new Exec().exec(exeFile.getPath(), envp, userDir, sb, 20);
-				log.info("retval: {}", retval);
-				assertEquals(0, retval);
-				log.info("sb: {}", sb);
-				String out = sb.toString();
-				assertTrue(out.contains("TaylorSwift"));
-			}
-		} catch (IOException e) {
-			e.printStackTrace();
-			fail("Unexpected exception was thrown");
+	public void testExecStringStringArrayFileStringBufferInt() throws IOException {
+		if (new Exec().isWindows()) {
+			File userDir = new File(System.getProperty("user.dir"));
+			StringBuilder sb = new StringBuilder();
+			int retval = new Exec().exec("target\\test-classes\\nothing.bat @TaylorSwift #Midnights",
+					List.of("TS10=MidnightTS"), userDir, sb, 20);
+			assertEquals(0, retval);
+			assertTrue(sb.toString().toLowerCase().contains("taylorswift"));
 		}
 	}
 
 	@Test
-	public void testExecStringStringArrayFileWriterInt() {
+	public void testExecStringStringArrayFileWriterInt() throws IOException {
 		File exeFile = new File("target\\test-classes\\loop.bat");
 
-		String[] envp = { "TS10loopcount=1000000" };
-
-		try {
-			if (new Exec().isWindows()) {
-				File userDir = new File(System.getProperty("user.dir"));
-				StringWriter sw = new StringWriter();
-				int retval = new Exec().exec(exeFile.getPath(), envp, userDir, sw, 5);
-				log.info("retval: {}", retval);
-				assertEquals(1, retval);
-				String out = sw.toString();
-				assertTrue(out.isEmpty() || out.contains("1000000") || out.contains("Hello World!"));
-			}
-		} catch (IOException e) {
-			e.printStackTrace();
-			fail("Unexpected exception was thrown");
-		}
-	}
-
-	@Test
-	public void testNormalizePathForCommand() {
 		if (new Exec().isWindows()) {
-			String path = "target/test-classes/nothing.bat";
-			String retval = new Exec().normalizePathForCommand(path);
+			File userDir = new File(System.getProperty("user.dir"));
+			StringWriter sw = new StringWriter();
+			int retval = new Exec().exec(exeFile.getPath(), List.of("TS10loopcount=1000000"), userDir, sw, 5);
 			log.info("retval: {}", retval);
-			String expected = "\"target\\test-classes\\nothing.bat\"";
-			assertEquals(expected, retval);
+			assertEquals(1, retval);
+			String out = sw.toString();
+			assertTrue(out.isEmpty() || out.contains("1000000") || out.contains("Hello World!"));
 		}
 	}
-
 }

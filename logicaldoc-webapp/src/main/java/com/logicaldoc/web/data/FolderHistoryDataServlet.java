@@ -12,10 +12,10 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import com.logicaldoc.core.PersistenceException;
-import com.logicaldoc.core.document.dao.DocumentHistoryDAO;
-import com.logicaldoc.core.security.Menu;
+import com.logicaldoc.core.document.DocumentHistoryDAO;
 import com.logicaldoc.core.security.Session;
-import com.logicaldoc.core.security.dao.MenuDAO;
+import com.logicaldoc.core.security.menu.Menu;
+import com.logicaldoc.core.security.menu.MenuDAO;
 import com.logicaldoc.core.util.IconSelector;
 import com.logicaldoc.i18n.I18N;
 import com.logicaldoc.util.Context;
@@ -29,21 +29,20 @@ public class FolderHistoryDataServlet extends AbstractDataServlet {
 	protected void service(HttpServletRequest request, HttpServletResponse response, Session session, Integer max,
 			Locale locale) throws PersistenceException, IOException {
 
-		MenuDAO mDao = (MenuDAO) Context.get().getBean(MenuDAO.class);
+		MenuDAO mDao = Context.get(MenuDAO.class);
 		boolean showSid = mDao.isReadEnable(Menu.SESSIONS, session.getUserId());
 
 		PrintWriter writer = response.getWriter();
 		writer.write("<list>");
 
-		DocumentHistoryDAO dao = (DocumentHistoryDAO) Context.get().getBean(DocumentHistoryDAO.class);
+		DocumentHistoryDAO dao = Context.get(DocumentHistoryDAO.class);
 		StringBuilder query = new StringBuilder(
-				"select A.username, A.event, A.date, A.comment, A.filename, A.path, A.sessionId, A.id, A.reason, A.ip, A.device, A.geolocation, A.userId, A.color from FolderHistory A where A.deleted = 0 ");
+				"select A.username, A.event, A.date, A.comment, A.filename, A.path, A.sessionId, A.id, A.reason, A.ip, A.device, A.geolocation, A.userId, A.color, A.keyLabel from FolderHistory A where A.deleted = 0 ");
 		if (request.getParameter("id") != null)
 			query.append(" and A.folderId=" + request.getParameter("id"));
 		query.append(" order by A.date desc ");
 
-		List<Object> records = dao.findByQuery(query.toString(), (Map<String, Object>) null,
-				max != null ? max : 100);
+		List<?> records = dao.findByQuery(query.toString(), (Map<String, Object>) null, max != null ? max : 100);
 
 		/*
 		 * Iterate over records composing the response XML document
@@ -80,10 +79,11 @@ public class FolderHistoryDataServlet extends AbstractDataServlet {
 		writer.print("<userId>" + cols[12] + "</userId>");
 
 		printGeolocation(writer, cols);
-		
-		if(cols[13]!=null)
-			writer.print("<color>" + cols[12] + "</color>");	
-		
+
+		if (cols[13] != null)
+			writer.print("<color>" + cols[13] + "</color>");
+		if (cols[14] != null)
+			writer.print("<key><![CDATA[" + cols[14] + "]]></key>");
 		writer.print("</history>");
 	}
 

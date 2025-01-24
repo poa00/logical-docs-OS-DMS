@@ -1,9 +1,11 @@
 package com.logicaldoc.gui.frontend.client.sharefile;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import java.util.ArrayList;
+import java.util.List;
+
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.controllers.FolderController;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.frontend.client.document.DocumentsPanel;
 import com.logicaldoc.gui.frontend.client.folder.FolderNavigator;
@@ -77,28 +79,21 @@ public class ShareFileDialog extends Dialog {
 		if (selection == null)
 			return;
 
-		final Long[] docIds = MainPanel.get().isOnDocumentsTab()
+		final List<Long> docIds = MainPanel.get().isOnDocumentsTab()
 				? DocumentsPanel.get().getDocumentsGrid().getSelectedIds()
 				: SearchPanel.get().getDocumentsGrid().getSelectedIds();
 
-		SC.ask(docIds.length == 0
-				? I18N.message("exportdirtosfile", FolderController.get().getCurrentFolder().getName())
+		SC.ask(docIds.isEmpty() ? I18N.message("exportdirtosfile", FolderController.get().getCurrentFolder().getName())
 				: I18N.message("exportdocstosfile"), choice -> {
 					if (choice.booleanValue()) {
 						String targetId = selection.getAttributeAsString("iid");
-						Long[] folderIds = new Long[0];
-						if (docIds.length == 0 && FolderController.get().getCurrentFolder() != null)
-							folderIds[0] = FolderController.get().getCurrentFolder().getId();
+						List<Long> folderIds = new ArrayList<>();
+						if (docIds.isEmpty() && FolderController.get().getCurrentFolder() != null)
+							folderIds.add(FolderController.get().getCurrentFolder().getId());
 
 						LD.contactingServer();
 						ShareFileService.Instance.get().exportDocuments(targetId, folderIds, docIds,
-								new AsyncCallback<Boolean>() {
-									@Override
-									public void onFailure(Throwable caught) {
-										LD.clearPrompt();
-										GuiLog.serverError(caught);
-									}
-
+								new DefaultAsyncCallback<>() {
 									@Override
 									public void onSuccess(Boolean result) {
 										LD.clearPrompt();
@@ -118,22 +113,16 @@ public class ShareFileDialog extends Dialog {
 		if (selection == null)
 			return;
 
-		final String[] ids = new String[selection.length];
+		List<String> ids = new ArrayList<>();
 		for (int i = 0; i < selection.length; i++)
-			ids[i] = selection[i].getAttributeAsString("iid");
+			ids.add(selection[i].getAttributeAsString("iid"));
 
 		SC.ask(I18N.message("importfromsfile", FolderController.get().getCurrentFolder().getName()), choice -> {
 			if (choice.booleanValue()) {
 				ShareFileDialog.this.destroy();
 				LD.contactingServer();
 				ShareFileService.Instance.get().importDocuments(FolderController.get().getCurrentFolder().getId(), ids,
-						new AsyncCallback<Integer>() {
-							@Override
-							public void onFailure(Throwable caught) {
-								LD.clearPrompt();
-								GuiLog.serverError(caught);
-							}
-
+						new DefaultAsyncCallback<>() {
 							@Override
 							public void onSuccess(Integer count) {
 								LD.clearPrompt();
@@ -143,5 +132,15 @@ public class ShareFileDialog extends Dialog {
 						});
 			}
 		});
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

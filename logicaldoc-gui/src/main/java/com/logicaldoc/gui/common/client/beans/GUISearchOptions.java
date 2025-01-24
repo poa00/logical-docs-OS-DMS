@@ -1,7 +1,9 @@
 package com.logicaldoc.gui.common.client.beans;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 
 import com.logicaldoc.gui.common.client.Constants;
 import com.logicaldoc.gui.common.client.Session;
@@ -48,8 +50,6 @@ public class GUISearchOptions implements Serializable {
 
 	private Long folder = null;
 
-	private String[] fields = Constants.getFulltextDefaultFields();
-
 	private String language = null;
 
 	private Date dateFrom = null;
@@ -68,21 +68,23 @@ public class GUISearchOptions implements Serializable {
 
 	private String folderName;
 
-	private GUICriterion[] criteria;
-
 	private String topOperator;
-
-	private Long[] filterIds;
 
 	private int caseSensitive = 1;
 
 	private int retrieveAliases = 0;
 
+	private List<Long> filterIds = new ArrayList<>();
+
+	private List<GUICriterion> criteria = new ArrayList<>();
+
+	private List<String> fields = Constants.getFulltextDefaultFields();
+
 	/** Creates a new instance of SearchOptions */
 	public GUISearchOptions() {
 		if (Session.get() != null && Session.get().getSession() != null) {
 			Integer pageSize = null;
-			if(Session.get().getUser()!=null)
+			if (Session.get().getUser() != null)
 				pageSize = DocumentGridUtil.getPageSizeFromSpec(Session.get().getUser().getHitsGrid());
 			if (pageSize == null)
 				pageSize = Session.get().getConfigAsInt("search.hits");
@@ -110,7 +112,7 @@ public class GUISearchOptions implements Serializable {
 		return userId;
 	}
 
-	public String[] getFields() {
+	public List<String> getFields() {
 		return fields;
 	}
 
@@ -126,12 +128,12 @@ public class GUISearchOptions implements Serializable {
 		this.userId = userId;
 	}
 
-	public void setFields(String[] flds) {
+	public void setFields(List<String> flds) {
 		fields = flds;
 	}
 
 	public void addField(String s) {
-		fields[fields.length] = s;
+		fields.add(s);
 	}
 
 	public String getLanguage() {
@@ -260,11 +262,11 @@ public class GUISearchOptions implements Serializable {
 		this.folderName = folderName;
 	}
 
-	public GUICriterion[] getCriteria() {
+	public List<GUICriterion> getCriteria() {
 		return criteria;
 	}
 
-	public void setCriteria(GUICriterion[] criteria) {
+	public void setCriteria(List<GUICriterion> criteria) {
 		this.criteria = criteria;
 	}
 
@@ -276,11 +278,11 @@ public class GUISearchOptions implements Serializable {
 		this.topOperator = topOperator;
 	}
 
-	public Long[] getFilterIds() {
+	public List<Long> getFilterIds() {
 		return filterIds;
 	}
 
-	public void setFilterIds(Long[] filterIds) {
+	public void setFilterIds(List<Long> filterIds) {
 		this.filterIds = filterIds;
 	}
 

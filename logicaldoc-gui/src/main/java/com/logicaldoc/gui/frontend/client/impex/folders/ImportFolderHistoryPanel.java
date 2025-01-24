@@ -5,16 +5,16 @@ import com.logicaldoc.gui.common.client.beans.GUIDocument;
 import com.logicaldoc.gui.common.client.beans.GUIFolder;
 import com.logicaldoc.gui.common.client.beans.GUIImportFolder;
 import com.logicaldoc.gui.common.client.data.ImportFolderHistoryDS;
+import com.logicaldoc.gui.common.client.grid.ColoredListGridField;
+import com.logicaldoc.gui.common.client.grid.DateListGridField;
+import com.logicaldoc.gui.common.client.grid.FileNameListGridField;
+import com.logicaldoc.gui.common.client.grid.FileSizeListGridField;
+import com.logicaldoc.gui.common.client.grid.RefreshableListGrid;
+import com.logicaldoc.gui.common.client.grid.DateListGridField.DateCellFormatter;
 import com.logicaldoc.gui.common.client.i18n.I18N;
+import com.logicaldoc.gui.common.client.preview.PreviewPopup;
 import com.logicaldoc.gui.common.client.util.GridUtil;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
-import com.logicaldoc.gui.common.client.widgets.grid.ColoredListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField.DateCellFormatter;
-import com.logicaldoc.gui.common.client.widgets.grid.FileNameListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.FileSizeListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.RefreshableListGrid;
-import com.logicaldoc.gui.common.client.widgets.preview.PreviewPopup;
 import com.logicaldoc.gui.frontend.client.document.DocumentsPanel;
 import com.smartgwt.client.data.Record;
 import com.smartgwt.client.widgets.form.fields.CheckboxItem;
@@ -69,6 +69,8 @@ public class ImportFolderHistoryPanel extends ImportFolderDetailsTab {
 				return "<span class='event-ok'>" + I18N.message("iimport").toLowerCase() + CLOSE_SPAN;
 			else if (value.toString().contains("importfolder.updated"))
 				return "<span class='event-med'>" + I18N.message("update").toLowerCase() + CLOSE_SPAN;
+			else if (value.toString().contains("importfolder.warn"))
+				return "<span class='event-warning'>" + I18N.message("warning").toLowerCase() + CLOSE_SPAN;
 			else if (value.toString().contains("importfolder.error"))
 				return "<span class='event-error'>" + I18N.message("error").toLowerCase() + CLOSE_SPAN;
 			else
@@ -179,5 +181,15 @@ public class ImportFolderHistoryPanel extends ImportFolderDetailsTab {
 	boolean validate() {
 		importFolder.setRecordHistory(Boolean.TRUE.equals(recordHistory.getValueAsBoolean()));
 		return true;
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

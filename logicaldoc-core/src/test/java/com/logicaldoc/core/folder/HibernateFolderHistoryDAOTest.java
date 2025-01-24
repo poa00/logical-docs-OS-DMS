@@ -1,6 +1,5 @@
 package com.logicaldoc.core.folder;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.Arrays;
@@ -15,6 +14,7 @@ import org.junit.Test;
 import com.logicaldoc.core.AbstractCoreTestCase;
 import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.i18n.DateBean;
+import com.logicaldoc.util.plugin.PluginException;
 
 import junit.framework.Assert;
 
@@ -30,7 +30,7 @@ public class HibernateFolderHistoryDAOTest extends AbstractCoreTestCase {
 	private FolderHistoryDAO dao;
 
 	@Before
-	public void setUp() throws FileNotFoundException, IOException, SQLException {
+	public void setUp() throws IOException, SQLException, PluginException {
 		super.setUp();
 
 		// Retrieve the instance under test from spring context. Make sure that
@@ -55,7 +55,7 @@ public class HibernateFolderHistoryDAOTest extends AbstractCoreTestCase {
 
 	@SuppressWarnings("rawtypes")
 	@Test
-	public void testFindByUserId() {
+	public void testFindByUserId() throws PersistenceException {
 		Collection histories = dao.findByUserId(1);
 		Assert.assertNotNull(histories);
 		Assert.assertEquals(2, histories.size());
@@ -68,7 +68,7 @@ public class HibernateFolderHistoryDAOTest extends AbstractCoreTestCase {
 
 	@SuppressWarnings("rawtypes")
 	@Test
-	public void testFindByFolderId() {
+	public void testFindByFolderId() throws PersistenceException {
 		Collection histories = dao.findByFolderId(5);
 		Assert.assertNotNull(histories);
 		Assert.assertEquals(2, histories.size());
@@ -80,7 +80,7 @@ public class HibernateFolderHistoryDAOTest extends AbstractCoreTestCase {
 	}
 
 	@Test
-	public void testFindByFolderIdAndEvent() {
+	public void testFindByFolderIdAndEvent() throws PersistenceException {
 		List<FolderHistory> histories = dao.findByFolderIdAndEvent(5, "data test 03", null);
 		Assert.assertEquals(1, histories.size());
 
@@ -120,7 +120,6 @@ public class HibernateFolderHistoryDAOTest extends AbstractCoreTestCase {
 		Assert.assertEquals(3, histories.size());
 	}
 
-	@SuppressWarnings("deprecation")
 	@Test
 	public void testStore() throws PersistenceException {
 		FolderHistory history = new FolderHistory();
@@ -194,7 +193,7 @@ public class HibernateFolderHistoryDAOTest extends AbstractCoreTestCase {
 
 	@SuppressWarnings("rawtypes")
 	@Test
-	public void testFindByUserIdAndEvent() {
+	public void testFindByUserIdAndEvent() throws PersistenceException {
 		Collection histories = dao.findByUserIdAndEvent(1, "data test 03");
 		Assert.assertNotNull(histories);
 		Assert.assertEquals(1, histories.size());
@@ -214,7 +213,7 @@ public class HibernateFolderHistoryDAOTest extends AbstractCoreTestCase {
 	}
 
 	@Test
-	public void testFindByPath() {
+	public void testFindByPath() throws PersistenceException {
 		List<FolderHistory> histories = dao.findByPath("/Default/pippo%", null, null, null);
 		Assert.assertEquals(2, histories.size());
 

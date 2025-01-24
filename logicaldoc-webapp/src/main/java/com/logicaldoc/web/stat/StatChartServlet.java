@@ -5,6 +5,7 @@ import java.awt.Font;
 import java.awt.GraphicsEnvironment;
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -19,7 +20,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.logicaldoc.core.security.Session;
-import com.logicaldoc.core.security.User;
+import com.logicaldoc.core.security.user.User;
 import com.logicaldoc.gui.common.client.beans.GUIParameter;
 import com.logicaldoc.i18n.I18N;
 import com.logicaldoc.util.io.FileUtil;
@@ -46,9 +47,9 @@ public class StatChartServlet extends HttpServlet {
 			Session session = ServletUtil.validateSession(request);
 
 			// Avoid resource caching
+			response.setHeader("Cache-Control", "no-cache,no-store,must-revalidate");
+			response.setHeader("Expires", "0");
 			response.setHeader("Pragma", "no-cache");
-			response.setHeader("Cache-Control", "no-store");
-			response.setDateHeader("Expires", 0);
 
 			User user = session.getUser();
 
@@ -58,7 +59,7 @@ public class StatChartServlet extends HttpServlet {
 			String chart = request.getParameter("chart");
 			SystemServiceImpl service = new SystemServiceImpl();
 
-			GUIParameter[][] parameters = service.getStatistics(user.getLanguage());
+			List<List<GUIParameter>> parameters = service.getStatistics(user.getLanguage());
 
 			DefaultPieDataset dataset = prepareDataSet(parameters, chart, user);
 
@@ -94,11 +95,11 @@ public class StatChartServlet extends HttpServlet {
 
 			ServletUtil.downloadFile(request, response, chartFile, chart + ".png");
 		} catch (IOException ioe) {
-			log.error("Error generating the chart: {}", ioe.getMessage(), ioe);
+			log.error("Error generating the chart", ioe);
 		} catch (Exception ex) {
 			log.error(ex.getMessage(), ex);
 		} finally {
-			FileUtil.strongDelete(chartFile);
+			FileUtil.delete(chartFile);
 		}
 	}
 
@@ -126,25 +127,22 @@ public class StatChartServlet extends HttpServlet {
 		return font;
 	}
 
-	private DefaultPieDataset prepareDataSet(GUIParameter[][] parameters, String chart, User user) {
+	private DefaultPieDataset prepareDataSet(List<List<GUIParameter>> parameters, String chart, User user) {
 		int index = getIndex(chart);
 
 		DefaultPieDataset dataset = new DefaultPieDataset();
 		long total = 0;
-		for (GUIParameter param : parameters[index]) {
+		for (GUIParameter param : parameters.get(index)) {
 			if (param == null)
 				continue;
 			total += parseLong(param);
 		}
-		for (int i = 0; i < parameters[index].length; i++) {
-			GUIParameter param = parameters[index][i];
-			if (param != null) {
-				double val = parseLong(param);
-				if (total > 0) {
-					val = val * 100 / total;
-					if (val >= 1)
-						dataset.setValue(I18N.message(param.getName(), user.getLocale()), val);
-				}
+		for (GUIParameter param : parameters.get(index)) {
+			double val = parseLong(param);
+			if (total > 0) {
+				val = val * 100 / total;
+				if (val >= 1)
+					dataset.setValue(I18N.message(param.getName(), user.getLocale()), val);
 			}
 		}
 		return dataset;

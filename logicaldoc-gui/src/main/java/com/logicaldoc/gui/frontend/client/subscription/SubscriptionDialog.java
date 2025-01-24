@@ -1,11 +1,15 @@
 package com.logicaldoc.gui.frontend.client.subscription;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.List;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.i18n.I18N;
 import com.logicaldoc.gui.common.client.log.GuiLog;
+import com.logicaldoc.gui.common.client.util.EventSelectorOptions;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.frontend.client.services.AuditService;
 import com.smartgwt.client.types.HeaderControls;
@@ -15,7 +19,6 @@ import com.smartgwt.client.widgets.form.DynamicForm;
 import com.smartgwt.client.widgets.form.fields.ButtonItem;
 import com.smartgwt.client.widgets.form.fields.SelectItem;
 import com.smartgwt.client.widgets.form.fields.events.ChangedEvent;
-import com.smartgwt.client.widgets.form.fields.events.ClickEvent;
 import com.smartgwt.client.widgets.grid.ListGrid;
 import com.smartgwt.client.widgets.grid.ListGridRecord;
 
@@ -82,7 +85,8 @@ public class SubscriptionDialog extends Window {
 		notifyon.setValue((events == null || events.length == 0) ? "all" : SELECTION);
 
 		final SelectItem event;
-		event = ItemFactory.newEventsSelector(EVENT, I18N.message(EVENT), null, true, false, false, false, false);
+		event = ItemFactory.newEventsSelector(EVENT, I18N.message(EVENT), null,
+				new EventSelectorOptions(true, false, false, false, false, false, false));
 		event.setEndRow(true);
 		event.setDisabled(events == null || events.length == 0);
 		if (events != null)
@@ -113,23 +117,22 @@ public class SubscriptionDialog extends Window {
 		return selectedEvents;
 	}
 
-	private Long[] getSelectedIds(ListGrid grid) {
+	private List<Long> getSelectedIds(ListGrid grid) {
 		ListGridRecord[] selectedRecords = grid.getSelectedRecords();
-		Long[] selectedIds = new Long[selectedRecords.length];
-		for (int i = 0; i < selectedRecords.length; i++) {
-			selectedIds[i] = Long.parseLong(selectedRecords[i].getAttributeAsString("id"));
-		}
+		List<Long> selectedIds = new ArrayList<>();
+		for (int i = 0; i < selectedRecords.length; i++)
+			selectedIds.add(selectedRecords[i].getAttributeAsLong("id"));
 		return selectedIds;
 	}
 
 	private ButtonItem prepareSaveButton(ListGrid grid, DynamicForm form) {
-		Long[] selectedIds = getSelectedIds(grid);
+		List<Long> selectedIds = getSelectedIds(grid);
 
 		ButtonItem save = new ButtonItem();
 		save.setTitle(I18N.message("save"));
 		save.setAutoFit(true);
-		save.addClickHandler((ClickEvent event) -> {
-			String[] events = null;
+		save.addClickHandler(event -> {
+			List<String> events = new ArrayList<>();
 			final String eventsStr;
 			final String folderOption = form.getValueAsString(OPTION);
 			if (SELECTION.equals(form.getValueAsString(NOTIFYON))) {
@@ -137,7 +140,7 @@ public class SubscriptionDialog extends Window {
 				buf = buf.replace('[', ' ');
 				buf = buf.replace(']', ' ');
 				eventsStr = buf.replace(" ", "");
-				events = eventsStr.split(",");
+				events.addAll(Arrays.asList(eventsStr.split(",")));
 			} else
 				eventsStr = null;
 
@@ -147,26 +150,20 @@ public class SubscriptionDialog extends Window {
 		return save;
 	}
 
-	private void doUpdateSubscriptions(ListGrid grid, Long[] selectedIds, String[] events, final String eventsStr,
-			final String folderOption) {
-		AuditService.Instance.get().update(selectedIds, CURRENT.equals(folderOption), events,
-				new AsyncCallback<Void>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
-					@Override
-					public void onSuccess(Void ret) {
-						GuiLog.info(I18N.message("settingssaved"), null);
-						for (ListGridRecord rec : grid.getSelectedRecords()) {
-							rec.setAttribute("events", eventsStr);
-							if (folderOption != null && !folderOption.isEmpty())
-								rec.setAttribute("folderOption", folderOption.equals(CURRENT) ? "0" : "1");
-							grid.refreshRow(grid.getRecordIndex(rec));
-						}
-					}
-				});
+	private void doUpdateSubscriptions(ListGrid grid, List<Long> selectedIds, List<String> events,
+			final String eventsStr, final String folderOption) {
+		AuditService.Instance.get().update(selectedIds, CURRENT.equals(folderOption), events, new DefaultAsyncCallback<>() {
+			@Override
+			public void onSuccess(Void ret) {
+				GuiLog.info(I18N.message("settingssaved"), null);
+				for (ListGridRecord rec : grid.getSelectedRecords()) {
+					rec.setAttribute("events", eventsStr);
+					if (folderOption != null && !folderOption.isEmpty())
+						rec.setAttribute("folderOption", folderOption.equals(CURRENT) ? "0" : "1");
+					grid.refreshRow(grid.getRecordIndex(rec));
+				}
+			}
+		});
 	}
 
 	/**
@@ -175,7 +172,7 @@ public class SubscriptionDialog extends Window {
 	 * @param folderId identifier of the folder
 	 * @param docIds identifier of the documents
 	 */
-	public SubscriptionDialog(final Long folderId, final Long[] docIds) {
+	public SubscriptionDialog(final Long folderId, List<Long> docIds) {
 		setHeaderControls(HeaderControls.HEADER_LABEL, HeaderControls.CLOSE_BUTTON);
 
 		if (folderId != null)
@@ -229,30 +226,25 @@ public class SubscriptionDialog extends Window {
 		addItem(form);
 	}
 
-	private ButtonItem prepareSubscribeButton(final Long folderId, final Long[] docIds, final DynamicForm form) {
+	private ButtonItem prepareSubscribeButton(final Long folderId, List<Long> docIds, final DynamicForm form) {
 		ButtonItem subscribe = new ButtonItem();
 		subscribe.setTitle(I18N.message("subscribe"));
 		subscribe.setAutoFit(true);
-		subscribe.addClickHandler((ClickEvent event) -> {
-			String[] events = null;
+		subscribe.addClickHandler(event -> {
+			List<String> events = new ArrayList<>();
 			final String eventsStr;
 			if (SELECTION.equals(form.getValueAsString(NOTIFYON))) {
 				String buf = form.getValues().get(EVENT).toString().trim().toLowerCase();
 				buf = buf.replace('[', ' ');
 				buf = buf.replace(']', ' ');
 				eventsStr = buf.replace(" ", "");
-				events = eventsStr.split(",");
+				events.addAll(Arrays.asList(eventsStr.split(",")));
 			} else
 				eventsStr = null;
 
 			if (folderId != null)
 				AuditService.Instance.get().subscribeFolder(folderId, form.getValueAsString(OPTION).equals(CURRENT),
-						events, null, null, new AsyncCallback<Void>() {
-							@Override
-							public void onFailure(Throwable caught) {
-								GuiLog.serverError(caught);
-							}
-
+						events, null, null, new DefaultAsyncCallback<>() {
 							@Override
 							public void onSuccess(Void ret) {
 								GuiLog.info(I18N.message("foldersubscribed"), null);
@@ -261,12 +253,7 @@ public class SubscriptionDialog extends Window {
 							}
 						});
 			else
-				AuditService.Instance.get().subscribeDocuments(docIds, events, null, null, new AsyncCallback<Void>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				AuditService.Instance.get().subscribeDocuments(docIds, events, null, null, new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Void ret) {
 						GuiLog.info(I18N.message("documentsubscribed"), null);
@@ -281,9 +268,11 @@ public class SubscriptionDialog extends Window {
 	private SelectItem prepareEventSelector(final Long folderId) {
 		final SelectItem event;
 		if (folderId != null)
-			event = ItemFactory.newEventsSelector(EVENT, EVENT, null, true, false, false, false, false);
+			event = ItemFactory.newEventsSelector(EVENT, EVENT, null,
+					new EventSelectorOptions(true, false, false, false, false, false, false));
 		else
-			event = ItemFactory.newEventsSelector(EVENT, EVENT, null, false, false, false, false, false);
+			event = ItemFactory.newEventsSelector(EVENT, EVENT, null,
+					new EventSelectorOptions(false, false, false, false, false, false, false));
 		event.setEndRow(true);
 		event.setDisabled(true);
 		return event;

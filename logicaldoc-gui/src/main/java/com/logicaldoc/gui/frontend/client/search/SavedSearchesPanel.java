@@ -1,13 +1,14 @@
 package com.logicaldoc.gui.frontend.client.search;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUISearchOptions;
 import com.logicaldoc.gui.common.client.data.SavedSearchesDS;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.common.client.util.ValuesCallback;
 import com.logicaldoc.gui.common.client.widgets.GroupSelectorCombo;
@@ -61,13 +62,7 @@ public class SavedSearchesPanel extends VLayout {
 
 		list.addCellDoubleClickHandler(event -> {
 			ListGridRecord rec = event.getRecord();
-			SearchService.Instance.get().load(rec.getAttributeAsString("name"), new AsyncCallback<GUISearchOptions>() {
-
-				@Override
-				public void onFailure(Throwable caught) {
-					GuiLog.serverError(caught);
-				}
-
+			SearchService.Instance.get().load(rec.getAttributeAsString("name"), new DefaultAsyncCallback<>() {
 				@Override
 				public void onSuccess(GUISearchOptions options) {
 					Search.get().setOptions(options);
@@ -89,20 +84,13 @@ public class SavedSearchesPanel extends VLayout {
 		execute.setTitle(I18N.message("execute"));
 		execute.addClickHandler(event -> {
 			ListGridRecord selection = list.getSelectedRecord();
-			SearchService.Instance.get().load(selection.getAttributeAsString("name"),
-					new AsyncCallback<GUISearchOptions>() {
-
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
-						}
-
-						@Override
-						public void onSuccess(GUISearchOptions options) {
-							Search.get().setOptions(options);
-							Search.get().search();
-						}
-					});
+			SearchService.Instance.get().load(selection.getAttributeAsString("name"), new DefaultAsyncCallback<>() {
+				@Override
+				public void onSuccess(GUISearchOptions options) {
+					Search.get().setOptions(options);
+					Search.get().search();
+				}
+			});
 		});
 
 		MenuItem share = new MenuItem();
@@ -125,15 +113,7 @@ public class SavedSearchesPanel extends VLayout {
 						public void execute(Map<String, Object> values) {
 							LD.contactingServer();
 							SearchService.Instance.get().shareSearch(selection.getAttributeAsString("name"),
-									usersSelector.getUserIds(), groupsSelector.getGroupIds(),
-									new AsyncCallback<Void>() {
-
-										@Override
-										public void onFailure(Throwable caught) {
-											LD.clearPrompt();
-											GuiLog.serverError(caught);
-										}
-
+									usersSelector.getUserIds(), groupsSelector.getGroupIds(), new DefaultAsyncCallback<>() {
 										@Override
 										public void onSuccess(Void arg0) {
 											LD.clearPrompt();
@@ -149,19 +129,14 @@ public class SavedSearchesPanel extends VLayout {
 			ListGridRecord[] selection = list.getSelectedRecords();
 			if (selection == null || selection.length == 0)
 				return;
-			final String[] names = new String[selection.length];
+			List<String> names = new ArrayList<>();
 			for (int i = 0; i < selection.length; i++) {
-				names[i] = selection[i].getAttributeAsString("name");
+				names.add(selection[i].getAttributeAsString("name"));
 			}
 
 			LD.ask(I18N.message("question"), I18N.message("confirmdelete"), value -> {
 				if (Boolean.TRUE.equals(value)) {
-					SearchService.Instance.get().delete(names, new AsyncCallback<Void>() {
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
-						}
-
+					SearchService.Instance.get().delete(names, new DefaultAsyncCallback<>() {
 						@Override
 						public void onSuccess(Void result) {
 							list.removeSelectedData();
@@ -184,5 +159,15 @@ public class SavedSearchesPanel extends VLayout {
 		rec.setAttribute(DESCRIPTION, description);
 		rec.setAttribute("type", type);
 		list.addData(rec);
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

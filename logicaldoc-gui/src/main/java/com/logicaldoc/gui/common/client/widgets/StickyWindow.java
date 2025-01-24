@@ -6,9 +6,14 @@ import java.util.Map;
 import com.logicaldoc.gui.common.client.i18n.I18N;
 import com.smartgwt.client.types.HeaderControls;
 import com.smartgwt.client.widgets.HeaderControl;
-import com.smartgwt.client.widgets.Window;
 
-public abstract class StickyWindow extends Window {
+/**
+ * A Window that remembers its dimensions
+ * 
+ * @author Marco Meschieri - LogicalDOC
+ * @since 8.8
+ */
+public abstract class StickyWindow extends DelayedRedrawWindow {
 
 	/**
 	 * The key is a class name while the value is it's descriptor
@@ -16,7 +21,6 @@ public abstract class StickyWindow extends Window {
 	protected static Map<String, WindowStatus> statuses = new HashMap<>();
 
 	protected StickyWindow(String title) {
-
 		HeaderControl restore = new HeaderControl(HeaderControl.REFRESH, event -> restoreDefaultStatus());
 		restore.setTooltip(I18N.message("refresh"));
 
@@ -25,10 +29,13 @@ public abstract class StickyWindow extends Window {
 		else
 			setHeaderControls(HeaderControls.HEADER_LABEL, HeaderControls.CLOSE_BUTTON);
 		setTitle(I18N.message(title));
+
 		setCanDragResize(true);
 		setIsModal(true);
 		setShowModalMask(true);
-		centerInPage();
+
+		if (mustCenter())
+			centerInPage();
 
 		restoreCurrentStatus();
 
@@ -36,6 +43,10 @@ public abstract class StickyWindow extends Window {
 			addResizedHandler(event -> saveWindowStatus());
 		} else
 			setAutoSize(getAutoSize());
+	}
+
+	protected boolean mustCenter() {
+		return true;
 	}
 
 	@Override
@@ -64,7 +75,8 @@ public abstract class StickyWindow extends Window {
 	}
 
 	protected void restoreCurrentStatus() {
-		centerInPage();
+		if (mustCenter())
+			centerInPage();
 		WindowStatus status = getWindowStatus();
 		if (status != null) {
 			setWidth(status.getWidth());

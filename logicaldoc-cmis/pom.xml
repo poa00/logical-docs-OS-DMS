@@ -8,7 +8,7 @@
 	<parent>
 		<groupId>com.logicaldoc</groupId>
 		<artifactId>logicaldoc</artifactId>
-		<version>8.8.6</version>
+		<version>9.1.1</version>
 	</parent>
 
 	<artifactId>logicaldoc-cmis</artifactId>
@@ -56,7 +56,7 @@
 
 		<dependency>
 			<groupId>javax.servlet</groupId>
-			<artifactId>servlet-api</artifactId>
+			<artifactId>javax.servlet-api</artifactId>
 			<scope>provided</scope>
 		</dependency>
 

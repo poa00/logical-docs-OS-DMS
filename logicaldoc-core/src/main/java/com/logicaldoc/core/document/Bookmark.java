@@ -5,7 +5,6 @@ import org.slf4j.LoggerFactory;
 
 import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.PersistentObject;
-import com.logicaldoc.core.document.dao.DocumentDAO;
 import com.logicaldoc.core.folder.FolderDAO;
 import com.logicaldoc.core.util.IconSelector;
 import com.logicaldoc.util.Context;
@@ -110,8 +109,8 @@ public class Bookmark extends PersistentObject {
 	 * @return full path to the document
 	 */
 	public String getPath() {
-		FolderDAO folderDao = (FolderDAO) Context.get().getBean(FolderDAO.class);
-		DocumentDAO docDao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		FolderDAO folderDao = Context.get(FolderDAO.class);
+		DocumentDAO docDao = Context.get(DocumentDAO.class);
 		try {
 			return folderDao.computePathExtended(docDao.findById(targetId).getFolder().getId());
 		} catch (PersistenceException e) {
@@ -126,5 +125,34 @@ public class Bookmark extends PersistentObject {
 
 	public void setType(int type) {
 		this.type = type;
+	}
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = super.hashCode();
+		result = prime * result + ((title == null) ? 0 : title.hashCode());
+		result = prime * result + type;
+		result = prime * result + (int) (userId ^ (userId >>> 32));
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (!super.equals(obj))
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		Bookmark other = (Bookmark) obj;
+		if (title == null) {
+			if (other.title != null)
+				return false;
+		} else if (!title.equals(other.title))
+			return false;
+		if (type != other.type)
+			return false;
+		return userId == other.userId;
 	}
 }

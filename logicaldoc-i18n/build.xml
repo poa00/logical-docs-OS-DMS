@@ -1,9 +1,18 @@
-<project name="logicaldoc-i18n" default="po2prop" basedir="." xmlns:artifact="urn:maven-artifact-ant">
+<project name="logicaldoc-i18n" default="po2prop" basedir="." xmlns:resolver="antlib:org.apache.maven.resolver.ant">
 	<property file="${user.home}/logicaldoc-dev.properties" />
 	<property file="src/main/resources/i18n/i18n.properties" />
+	<property file="src/main/resources/i18n/messages.properties" prefix="messages" />
 	<import file="${logicaldoc.devroot}/build/ant/build.xml" />
 	<property name="i18n.root" location="." />
 
+	<macrodef name="propertycopy">
+	        <attribute name="name" />
+	        <attribute name="from" />
+	        <sequential>
+	            <property name="@{name}" value="${@{from}}" />
+	        </sequential>
+	</macrodef>	
+	
 	<target name="deploy" depends="init-all" description="Updates a deployed webapp">
 		<property environment="env" />
 		<property id="properties" file="build.properties" />
@@ -31,7 +40,7 @@
 
 	<target name="purify" depends="init-all">
 		<echo>Purify all bundles</echo>
-		<java classname="com.logicaldoc.i18n.PurifyRB">
+		<java fork="yes" classname="com.logicaldoc.i18n.PurifyRB">
 			<classpath>
 				<pathelement location="target/classes" />
 			</classpath>
@@ -161,4 +170,153 @@
 			</sequential>
 		</for>
 	</target>
+
+	<target name="detect-not-used-key">
+		<echo>Checking key ${key}</echo>
+		
+		<fileset id="matches1" dir="${logicaldoc.devroot}">
+			<patternset>
+				<include name="**/*.java" />
+				<include name="**/*.jsp" />
+				<exclude name="**/target/**" />
+			</patternset>
+			<contains text="&quot;${key}&quot;" />
+		</fileset>
+
+		<fileset id="matches2" dir="${logicaldoc.devroot}">
+			<patternset>
+				<include name="**/*.sql" />
+				<exclude name="**/target/**" />
+			</patternset>
+			<contains text="&apos;${key}&apos;" />
+		</fileset>
+
+		<if>
+			<and>
+				<resourcecount when="equal" count="0" refid="matches1" />
+				<resourcecount when="equal" count="0" refid="matches2" />
+			</and>
+			<then>
+				<propertycopy name="translation" from="messages.${key}" />
+				<echo>Key ${key} is never directly used: ${translation}</echo>
+				<echo file="${outfile}" append="true">${key};${translation}${line.separator}</echo>
+				
+				<var name="translation" unset="true"/>
+			</then>
+		</if>
+	</target>
+
+	<target name="find-unused-keys" depends="init-all">
+		<delete file="target/unused-keys" failonerror="false" />
+		<delete file="target/keys" failonerror="false" />
+
+		<loadfile property="keysonly" srcfile="src/main/resources/i18n/messages.properties">
+			<filterchain>
+				<tokenfilter>
+					<replaceregex pattern="(.+)=(.+)" replace="\1" />
+				</tokenfilter>
+			</filterchain>
+		</loadfile>
+
+		<echo file="target/keys" append="false">${keysonly}</echo>
+
+		<replace file="target/keys">
+			<!-- Please be sure this CDATA contains just a line feed, reformatting this file may invalidate this replace -->
+			<replacetoken><![CDATA[
+]]></replacetoken>
+			<replacevalue>,</replacevalue>
+		</replace>
+	    
+		<!-- remove the spaces -->
+		<replace file="target/keys">
+			<replacetoken><![CDATA[ ]]></replacetoken>
+			<replacevalue><![CDATA[]]></replacevalue>
+		</replace>
+		
+		<!-- remove the tabs -->
+		<replace file="target/keys">
+			<replacetoken><![CDATA[	]]></replacetoken>
+			<replacevalue><![CDATA[]]></replacevalue>
+		</replace>		
+
+		<loadfile property="keysonly2" srcfile="target/keys" />
+
+		<for list="${keysonly2}" param="key">
+			<sequential>
+				<!-- Remove all whitespace characters -->
+				<propertyregex property="keytrimmed"
+				               input="@{key}"
+							   defaultValue="@{key}"
+							   regexp="\s"
+							   replace=""
+						       global="true" />
+				<antcall target="detect-not-used-key">
+					<param name="key" value="${keytrimmed}" />
+					<param name="outfile" value="target/unused-keys.csv" />
+				</antcall>
+				<var name="keytrimmed" unset="true"/>
+			</sequential>
+		</for>
+	</target>
+	
+	
+	<target name="delete-keys" depends="init-all">
+			<delete file="target/deleted-keys" failonerror="false" />
+			<delete file="target/keys" failonerror="false" />
+		    <delete file="target/messages.properties" failonerror="false" />
+		
+		    <copy file="src/main/resources/i18n/messages.properties" tofile="target/messages-clean.properties" /> 
+		
+		    <echo>Delete all keys listed in target/keys-to-delete</echo>
+			<loadfile property="keysonly" srcfile="target/keys-to-delete">
+				<filterchain>
+					<tokenfilter>
+						<replaceregex pattern="(.+)=(.+)" replace="\1" />
+					</tokenfilter>
+				</filterchain>
+			</loadfile>
+
+			<echo file="target/keys" append="false">${keysonly}</echo>
+
+			<replace file="target/keys">
+				<!-- Please be sure this CDATA contains just a line feed, reformatting this file may invalidate this replace -->
+				<replacetoken><![CDATA[
+]]></replacetoken>
+				<replacevalue>,</replacevalue>
+			</replace>
+		    
+			<!-- remove the spaces -->
+			<replace file="target/keys">
+				<replacetoken><![CDATA[ ]]></replacetoken>
+				<replacevalue><![CDATA[]]></replacevalue>
+			</replace>
+			
+			<!-- remove the tabs -->
+			<replace file="target/keys">
+				<replacetoken><![CDATA[	]]></replacetoken>
+				<replacevalue><![CDATA[]]></replacevalue>
+			</replace>		
+
+			<loadfile property="keysonly2" srcfile="target/keys" />
+   
+			
+			<for list="${keysonly2}" param="key">
+				<sequential>
+					<!-- Remove all whitespace characters -->
+					<propertyregex property="keytrimmed"
+					               input="@{key}"
+								   defaultValue="@{key}"
+								   regexp="\s"
+								   replace=""
+							       global="true" />
+
+					<echo>Remove key ${keytrimmed}</echo>
+					<propertyfile file="target/messages-clean.properties">
+						<entry key="${keytrimmed}" operation="del" />
+					</propertyfile>
+					<echo file="target/deleted-keys" append="true">${keytrimmed}${line.separator}</echo>
+					<var name="keytrimmed" unset="true"/>
+				</sequential>
+			</for>
+		</target>
 </project>

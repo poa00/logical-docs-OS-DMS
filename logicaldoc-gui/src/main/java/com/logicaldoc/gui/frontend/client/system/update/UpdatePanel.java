@@ -1,6 +1,7 @@
 package com.logicaldoc.gui.frontend.client.system.update;
 
 import java.util.Date;
+import java.util.List;
 
 import com.google.gwt.http.client.Request;
 import com.google.gwt.http.client.RequestBuilder;
@@ -8,8 +9,8 @@ import com.google.gwt.http.client.RequestCallback;
 import com.google.gwt.http.client.RequestException;
 import com.google.gwt.http.client.Response;
 import com.google.gwt.user.client.Timer;
-import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.logicaldoc.gui.common.client.Feature;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIParameter;
 import com.logicaldoc.gui.common.client.i18n.I18N;
@@ -21,9 +22,11 @@ import com.logicaldoc.gui.common.client.widgets.ApplicationRestarting;
 import com.logicaldoc.gui.common.client.widgets.FeatureDisabled;
 import com.logicaldoc.gui.frontend.client.services.UpdateService;
 import com.smartgwt.client.types.Alignment;
+import com.smartgwt.client.types.ContentsType;
 import com.smartgwt.client.types.TitleOrientation;
 import com.smartgwt.client.types.VerticalAlignment;
 import com.smartgwt.client.util.SC;
+import com.smartgwt.client.widgets.HTMLPane;
 import com.smartgwt.client.widgets.IButton;
 import com.smartgwt.client.widgets.Label;
 import com.smartgwt.client.widgets.Progressbar;
@@ -43,7 +46,7 @@ import com.smartgwt.client.widgets.layout.VLayout;
 public class UpdatePanel extends VLayout {
 
 	private static final long MAX_WAIT_TIME = 2L * 60L * 1000L; // 2 minutes
-	
+
 	// Shows the install notes panel
 	VLayout notesPanel;
 
@@ -52,6 +55,8 @@ public class UpdatePanel extends VLayout {
 	private IButton upload;
 
 	private IButton confirmUpdate;
+
+	private IButton delete;
 
 	private TextAreaItem log;
 
@@ -83,28 +88,30 @@ public class UpdatePanel extends VLayout {
 
 		confirmUpdate = new IButton(I18N.message("confirmupdate"));
 
+		delete = new IButton(I18N.message("ddelete"));
+
 		if (!Feature.enabled(Feature.UPDATES)) {
 			setMembers(new FeatureDisabled(Feature.UPDATES));
 			return;
 		}
 
 		LD.contactingServer();
-		UpdateService.Instance.get().checkUpdate(new AsyncCallback<GUIParameter[]>() {
+
+		UpdateService.Instance.get().checkUpdate(new DefaultAsyncCallback<>() {
 			@Override
 			public void onFailure(Throwable caught) {
-				LD.clearPrompt();
-				GuiLog.serverError(caught);
+				super.onFailure(caught);
 				onUpdateUnavailable();
 			}
 
 			@Override
-			public void onSuccess(GUIParameter[] parameters) {
+			public void onSuccess(List<GUIParameter> parameters) {
 				LD.clearPrompt();
 
-				if (parameters == null) {
+				if (parameters.isEmpty()) {
 					onUpdateUnavailable();
-				} else if (parameters.length == 1 && parameters[0].getName().equals("error")) {
-					onUpdateTemporarilyUnavailable(parameters[0].getValue());
+				} else if (parameters.size() == 1 && parameters.get(0).getName().equals("error")) {
+					onUpdateTemporarilyUnavailable(parameters.get(0).getValue());
 				} else {
 					updateFileName = Util.getValue("file", parameters);
 
@@ -182,7 +189,7 @@ public class UpdatePanel extends VLayout {
 		addMember(upload);
 	}
 
-	private VLayout prepareActionsBar(final GUIParameter[] parameters) {
+	private VLayout prepareActionsBar(final List<GUIParameter> parameters) {
 		final Label barLabel = new Label(I18N.message("downloadprogress"));
 		barLabel.setHeight(16);
 		barLabel.setWrap(false);
@@ -193,7 +200,10 @@ public class UpdatePanel extends VLayout {
 		bar.setLength(300);
 
 		confirmUpdate.setAutoFit(true);
-		confirmUpdate.addClickHandler(event -> onConfirm());
+		confirmUpdate.addClickHandler(click -> onConfirm());
+
+		delete.setAutoFit(true);
+		delete.addClickHandler(click -> onDelete());
 
 		download = new IButton(I18N.message("download"));
 		download.setAutoFit(true);
@@ -201,11 +211,11 @@ public class UpdatePanel extends VLayout {
 			bar.setPercentDone(0);
 			download.setDisabled(true);
 			UpdateService.Instance.get().downloadUpdate(Util.getValue("id", parameters), updateFileName,
-					Long.parseLong(Util.getValue("size", parameters)), new AsyncCallback<Void>() {
+					Long.parseLong(Util.getValue("size", parameters)), new DefaultAsyncCallback<>() {
 
 						@Override
 						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
+							super.onFailure(caught);
 							download.setDisabled(false);
 						}
 
@@ -215,18 +225,12 @@ public class UpdatePanel extends VLayout {
 
 							new Timer() {
 								public void run() {
-									UpdateService.Instance.get().checkDownloadStatus(new AsyncCallback<int[]>() {
-
+									UpdateService.Instance.get().checkDownloadStatus(new DefaultAsyncCallback<>() {
 										@Override
-										public void onFailure(Throwable caught) {
-											GuiLog.serverError(caught);
-										}
+										public void onSuccess(List<Integer> status) {
+											bar.setPercentDone(status.get(1));
 
-										@Override
-										public void onSuccess(int[] status) {
-											bar.setPercentDone(status[1]);
-
-											if (status[1] == 100)
+											if (status.get(1) == 100)
 												onUpdatePackageLocallyAvailable(updateFileName);
 											else
 												schedule(50);
@@ -252,7 +256,7 @@ public class UpdatePanel extends VLayout {
 
 		HLayout buttonCanvas = new HLayout();
 		buttonCanvas.setMembersMargin(6);
-		buttonCanvas.setMembers(download, upload, confirmUpdate);
+		buttonCanvas.setMembers(download, upload, confirmUpdate, delete);
 		layout.addMember(buttonCanvas);
 
 		if (uploadFileAlreadyAvailableLocally)
@@ -268,31 +272,52 @@ public class UpdatePanel extends VLayout {
 	}
 
 	private void displayNotes(String fileName) {
-		UpdateService.Instance.get().getUpdateNotes(fileName, new AsyncCallback<String[]>() {
-
+		UpdateService.Instance.get().getUpdateNotes(fileName, new DefaultAsyncCallback<>() {
 			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
+			public void onSuccess(List<String> infos) {
+				VLayout panel = new VLayout();
 
-			@Override
-			public void onSuccess(String[] infos) {
-				DynamicForm form = new DynamicForm();
-				form.setTitleOrientation(TitleOrientation.TOP);
-				form.setColWidths("*");
-				form.setNumCols(1);
+				Label notesLabel = new Label(I18N.message("updatenotes"));
+				notesLabel.setWrap(false);
+				notesLabel.setAutoFit(true);
+				notesLabel.setHeight(20);
+				notesLabel.setStyleName("update-notes");
+				String notesContent = infos.get(1);
+				if (!notesContent.contains("<p") && !notesContent.contains("<div") && !notesContent.contains("<br")
+						&& !notesContent.contains("<span") && !notesContent.contains("<table"))
+					notesContent = notesContent.replace("\n", "<br>");
 
-				TextAreaItem changelog = ItemFactory.newTextAreaItem("changelog", infos[0]);
-				changelog.setWidth("100%");
-				changelog.setHeight(220);
+				HTMLPane notesContentPanel = new HTMLPane();
+				notesContentPanel.setWidth100();
+				notesContentPanel.setHeight("50%");
+				notesContentPanel.setShowEdges(true);
+				notesContentPanel.setContents(notesContent);
+				notesContentPanel.setContentsType(ContentsType.FRAGMENT);
 
-				TextAreaItem updatenotes = ItemFactory.newTextAreaItem("updatenotes", infos[1]);
-				updatenotes.setWidth("100%");
-				updatenotes.setHeight(220);
+				Label changesLabel = new Label(I18N.message("changelog"));
+				changesLabel.setWrap(false);
+				changesLabel.setAutoFit(true);
+				changesLabel.setHeight(20);
+				changesLabel.setStyleName("update-changelog");
+				String changesContent = infos.get(0);
+				if (!changesContent.contains("<p") && !changesContent.contains("<div")
+						&& !changesContent.contains("<br") && !changesContent.contains("<span")
+						&& !changesContent.contains("<table"))
+					changesContent = changesContent.replace("\n", "<br>");
 
-				form.setItems(updatenotes, changelog);
+				HTMLPane changesContentPanel = new HTMLPane();
+				changesContentPanel.setWidth100();
+				changesContentPanel.setHeight("50%");
+				changesContentPanel.setShowEdges(true);
+				changesContentPanel.setContents(changesContent);
+				changesContentPanel.setContentsType(ContentsType.FRAGMENT);
 
-				notesPanel.addMember(form);
+				Label separator = new Label(" ");
+				separator.setHeight(10);
+
+				panel.setMembers(notesLabel, notesContentPanel, separator, changesLabel, changesContentPanel);
+
+				notesPanel.addMember(panel);
 			}
 		});
 	}
@@ -330,7 +355,7 @@ public class UpdatePanel extends VLayout {
 		try {
 			builder.sendRequest(null, new RequestCallback() {
 				public void onError(Request request, Throwable exception) {
-					// Nothing to do
+					scheduleGetStatus();
 				}
 
 				public void onResponseReceived(Request request, Response response) {
@@ -351,17 +376,18 @@ public class UpdatePanel extends VLayout {
 							Util.uninstallCloseWindowAlert();
 							GuiLog.info(I18N.message("updateinstalled"));
 							Util.waitForUpAndRunning(Session.get().getTenantName(), I18N.getLocale());
-						} else if (!"running".equals(statusLabel) && elapsedTime > MAX_WAIT_TIME) {
+						} else if (!"running".equals(statusLabel) && elapsedTime > MAX_WAIT_TIME && command != null
+								&& !command.isEmpty()) {
 							LD.clearPrompt();
 							ApplicationRestarting.get(I18N.message("updatenotstarted", command)).show();
-						} else {
-							scheduleGetStatus();
 						}
+
+						scheduleGetStatus();
 					}
 				}
 			});
 		} catch (RequestException e) {
-			// Nothing to do
+			scheduleGetStatus();
 		}
 	}
 
@@ -370,7 +396,7 @@ public class UpdatePanel extends VLayout {
 			public void run() {
 				getStatus();
 			}
-		}.schedule(500);
+		}.schedule(1000);
 	}
 
 	private void onConfirm() {
@@ -378,13 +404,7 @@ public class UpdatePanel extends VLayout {
 			if (Boolean.TRUE.equals(choice)) {
 				confirmUpdate.setVisible(false);
 				download.setVisible(false);
-				UpdateService.Instance.get().confirmUpdate(updateFileName, new AsyncCallback<String>() {
-
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				UpdateService.Instance.get().confirmUpdate(updateFileName, new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(String path) {
 						Session.get().setUpdating(true);
@@ -394,5 +414,28 @@ public class UpdatePanel extends VLayout {
 				});
 			}
 		});
+	}
+
+	private void onDelete() {
+		SC.ask(I18N.message("delete"), I18N.message("deleteupdatepackagequestion"), choice -> {
+			if (Boolean.TRUE.equals(choice)) {
+				UpdateService.Instance.get().deleteUpdate(updateFileName, new DefaultAsyncCallback<>() {
+					@Override
+					public void onSuccess(Void v) {
+						refresh();
+					}
+				});
+			}
+		});
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

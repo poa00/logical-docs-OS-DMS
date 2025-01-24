@@ -1,5 +1,7 @@
 package com.logicaldoc.web.websockets;
 
+import java.util.Random;
+
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,6 +22,8 @@ public class WebsocketTool {
 
 	protected static Logger log = LoggerFactory.getLogger(WebsocketTool.class);
 
+	protected static final Random random = new Random();
+
 	/**
 	 * Send to the Interface the command to display a message
 	 * 
@@ -31,10 +35,13 @@ public class WebsocketTool {
 	public void showMessage(Session session, String message, String level) {
 		WebsocketMessage command = new WebsocketMessage(session.getSid(), "command");
 		command.setCommand("message");
+		command.setTenantId(session.getTenantId());
 		command.setUserId(session.getUserId());
 		command.setUsername(session.getUsername());
 		command.setPayload(message);
 		command.setTarget(level);
+		long randomLong = random.nextLong();
+		command.setId(randomLong < 0 ? randomLong : -randomLong);
 
 		EventEndpoint.distributeMessage(command);
 	}
@@ -44,16 +51,19 @@ public class WebsocketTool {
 	 * 
 	 * @param session the current session
 	 * @param url the url to open
-	 * @param target the target windows, if not specified the '_blank' target will be
-	 *        used
+	 * @param target the target windows, if not specified the '_blank' target
+	 *        will be used
 	 */
 	public void openUrl(Session session, String url, String target) {
 		WebsocketMessage command = new WebsocketMessage(session.getSid(), "command");
 		command.setCommand("openurl");
+		command.setTenantId(session.getTenantId());
 		command.setUserId(session.getUserId());
 		command.setUsername(session.getUsername());
 		command.setPayload(url);
 		command.setTarget(StringUtils.isNotEmpty(target) ? target : "_blank");
+		long randomLong = random.nextLong();
+		command.setId(randomLong < 0 ? randomLong : -randomLong);
 
 		EventEndpoint.distributeMessage(command);
 	}

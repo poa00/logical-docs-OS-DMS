@@ -1,11 +1,10 @@
 package com.logicaldoc.web.service;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.sql.SQLException;
+import static org.junit.Assert.assertNotNull;
 
-import org.junit.Assert;
-import org.junit.Before;
+import java.util.ArrayList;
+import java.util.List;
+
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,17 +19,12 @@ public class SettingServiceImplTest extends AbstractWebappTestCase {
 	private static Logger log = LoggerFactory.getLogger(SettingServiceImplTest.class);
 
 	// Instance under test
-	private SettingServiceImpl service = new SettingServiceImpl();
-
-	@Before
-	public void setUp() throws FileNotFoundException, IOException, SQLException {
-		super.setUp();
-	}
+	private SettingServiceImpl testSubject = new SettingServiceImpl();
 
 	@Test
 	public void testSaveEmailSettings() throws ServerException {
 		GUIEmailSettings emailSettings = new GUIEmailSettings();
-		emailSettings.setSmtpServer("smtp.logicalobjects.it");
+		emailSettings.setServer("smtp.logicalobjects.it");
 		emailSettings.setPort(8080);
 		emailSettings.setUsername("admin");
 		emailSettings.setPwd("pippo");
@@ -40,36 +34,32 @@ public class SettingServiceImplTest extends AbstractWebappTestCase {
 
 		String notThrownTest = null;
 		try {
-			service.saveEmailSettings(emailSettings);
+			testSubject.saveEmailSettings(emailSettings);
 			notThrownTest = "ok";
 		} catch (Exception t) {
 			t.printStackTrace();
 		}
-		Assert.assertNotNull(notThrownTest);
+		assertNotNull(notThrownTest);
 	}
 
 	@Test
 	public void testSaveSettings() throws ServerException {
-		GUIParameter[] params = new GUIParameter[50];
-		for (int i = 0; i < params.length; i++) {
-			GUIParameter p = new GUIParameter("param" + i + "_name", "Value " + i);
-			params[i] = p;
-		}
+		List<GUIParameter> params = new ArrayList<>();
+		for (int i = 0; i < 50; i++)
+			params.add(new GUIParameter("param" + i + "_name", "Value " + i));
 
 		String notThrownTest = null;
 		try {
-			service.saveSettings(params);
+			testSubject.saveSettings(params);
 			notThrownTest = "ok";
 		} catch (Exception t) {
 			log.error(t.getMessage(), t);
 		}
-		Assert.assertNotNull(notThrownTest);
+		assertNotNull(notThrownTest);
 	}
 
 	@Test
 	public void testSaveWSSettings() throws ServerException {
-		GUIParameter[] settings = new GUIParameter[2];
-
 		GUIParameter wsSettings = new GUIParameter();
 		wsSettings.setName("webservice.enabled");
 		wsSettings.setValue("true");
@@ -78,16 +68,13 @@ public class SettingServiceImplTest extends AbstractWebappTestCase {
 		wsSettings.setName("webdav.enabled");
 		wsSettings.setValue("true");
 
-		settings[0] = wsSettings;
-		settings[1] = wdSettings;
-
 		String notThrownTest = null;
 		try {
-			service.saveSettings(settings);
+			testSubject.saveSettings(List.of(wsSettings, wdSettings));
 			notThrownTest = "ok";
 		} catch (Exception t) {
 			log.error(t.getMessage(), t);
 		}
-		Assert.assertNotNull(notThrownTest);
+		assertNotNull(notThrownTest);
 	}
 }

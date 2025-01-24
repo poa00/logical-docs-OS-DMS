@@ -11,7 +11,7 @@ import javax.servlet.http.HttpServletResponse;
 
 import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.document.Rating;
-import com.logicaldoc.core.document.dao.RatingDAO;
+import com.logicaldoc.core.document.RatingDAO;
 import com.logicaldoc.core.security.Session;
 import com.logicaldoc.util.Context;
 
@@ -33,7 +33,7 @@ public class RatingsDataServlet extends AbstractDataServlet {
 
 		DateFormat df = getDateFormat();
 
-		RatingDAO ratingDao = (RatingDAO) Context.get().getBean(RatingDAO.class);
+		RatingDAO ratingDao = Context.get(RatingDAO.class);
 		List<Rating> ratings = ratingDao.findByDocId(Long.parseLong(docId));
 
 		PrintWriter writer = response.getWriter();

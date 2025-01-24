@@ -1,10 +1,13 @@
 package com.logicaldoc.gui.frontend.client.document;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import java.util.List;
+
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIArchive;
 import com.logicaldoc.gui.common.client.i18n.I18N;
 import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
+import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.frontend.client.services.ImpexService;
 import com.smartgwt.client.types.HeaderControls;
 import com.smartgwt.client.widgets.Window;
@@ -29,7 +32,7 @@ public class SendToArchiveDialog extends Window {
 	 * @param document True if the ids refers to documents, False in case of
 	 *        folders
 	 */
-	public SendToArchiveDialog(Long[] ids, boolean document) {
+	public SendToArchiveDialog(List<Long> ids, boolean document) {
 		setHeaderControls(HeaderControls.HEADER_LABEL, HeaderControls.CLOSE_BUTTON);
 
 		setTitle(I18N.message("sendtoexparchive"));
@@ -40,7 +43,7 @@ public class SendToArchiveDialog extends Window {
 		setShowModalMask(true);
 		centerInPage();
 
-		SelectItem archive = ItemFactory.newArchiveSelector(GUIArchive.MODE_EXPORT, GUIArchive.STATUS_OPENED);
+		SelectItem archive = ItemFactory.newArchiveSelector(GUIArchive.MODE_EXPORT, GUIArchive.STATUS_OPEN);
 		archive.setTitle(I18N.message("selectopenarchive"));
 		archive.setWrapTitle(false);
 		archive.setRequired(true);
@@ -49,45 +52,46 @@ public class SendToArchiveDialog extends Window {
 		send.setStartRow(false);
 		send.setTitle(I18N.message("sendtoexparchive"));
 		send.setAutoFit(true);
-		send.addClickHandler(event -> onSend(ids, document));
+		send.addClickHandler(event -> onSubmit(ids, document));
 
 		form.setFields(archive, send);
 		addItem(form);
 	}
 
-	public void onSend(Long[] ids, boolean document) {
+	public void onSubmit(List<Long> ids, boolean document) {
 		if (!form.validate())
 			return;
 
 		if (document)
 			ImpexService.Instance.get().addDocuments(Long.parseLong(form.getValueAsString("archive")), ids,
-					new AsyncCallback<Void>() {
-
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
-						}
-
+					new DefaultAsyncCallback<>() {
 						@Override
 						public void onSuccess(Void result) {
 							GuiLog.info(I18N.message("documentsaddedtoarchive"), null);
 							destroy();
 						}
 					});
-		else
-			ImpexService.Instance.get().addFolder(Long.parseLong(form.getValueAsString("archive")), ids[0],
-					new AsyncCallback<Void>() {
-
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
-						}
-
+		else {
+			LD.contactingServer();
+			ImpexService.Instance.get().addFolder(Long.parseLong(form.getValueAsString("archive")), ids.get(0),
+					new DefaultAsyncCallback<>() {
 						@Override
 						public void onSuccess(Void result) {
+							LD.clearPrompt();
 							GuiLog.info(I18N.message("documentsaddedtoarchive"), null);
 							destroy();
 						}
 					});
+		}
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+	
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

@@ -1,5 +1,7 @@
 package com.logicaldoc.gui.frontend.client.services;
 
+import java.util.List;
+
 import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIParameter;
 import com.logicaldoc.gui.common.client.beans.GUIResult;
@@ -23,9 +25,9 @@ public interface SearchEngineServiceAsync {
 
 	void countEntries(AsyncCallback<Long> callback);
 
-	void reorderTokenFilters(String[] filters, AsyncCallback<Void> callback);
+	void reorderTokenFilters(List<String> filters, AsyncCallback<Void> callback);
 
-	void saveTokenFilterSettings(String filter, GUIParameter[] settings, AsyncCallback<Void> callback);
+	void saveTokenFilterSettings(String filter, List<GUIParameter> settings, AsyncCallback<Void> callback);
 
 	void setTokenFilterStatus(String language, boolean active, AsyncCallback<Void> callback);
 
@@ -33,5 +35,5 @@ public interface SearchEngineServiceAsync {
 
 	void query(String query, int page, int size, AsyncCallback<GUIResult> callback);
 
-	void remove(Long[] entryIds, AsyncCallback<Void> callback);
+	void remove(List<Long> entryIds, AsyncCallback<Void> callback);
 }

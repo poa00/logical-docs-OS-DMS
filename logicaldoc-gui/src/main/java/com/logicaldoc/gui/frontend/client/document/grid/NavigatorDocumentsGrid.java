@@ -29,8 +29,7 @@ public class NavigatorDocumentsGrid extends DocumentsListGrid {
 		int pageSize = loadGridLayout(folder);
 		DocumentsDSParameters params = new DocumentsDSParameters(folder.getId(), null, pageSize, 1,
 				DocumentGridUtil.getSortSpec(this));
-		DocumentsDS dataSource = new DocumentsDS(params);
-		setDataSource(dataSource);
+		setDataSource(new DocumentsDS(params));
 
 		final List<ListGridField> fields = new ArrayList<>();
 
@@ -68,8 +67,7 @@ public class NavigatorDocumentsGrid extends DocumentsListGrid {
 				DocumentsDSParameters pars = new DocumentsDSParameters(getFolder().getId(), null,
 						getGridCursor().getPageSize(), getGridCursor().getCurrentPage(),
 						DocumentGridUtil.getSortSpec(event.getSortSpecifiers()));
-				DocumentsDS ds = new DocumentsDS(pars);
-				refresh(ds);
+				refresh(new DocumentsDS(pars));
 			} else {
 				// save the current folder's ID
 				lastChangedSortFolder = getFolder().getId();
@@ -83,5 +81,16 @@ public class NavigatorDocumentsGrid extends DocumentsListGrid {
 		 * then the grid displays correctly
 		 */
 		FolderNavigator.get().selectFolder(folder.getId());
+	}
+	
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+	
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

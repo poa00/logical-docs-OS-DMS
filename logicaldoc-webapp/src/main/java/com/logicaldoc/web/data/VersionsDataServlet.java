@@ -14,8 +14,8 @@ import javax.servlet.http.HttpServletResponse;
 
 import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.document.Document;
-import com.logicaldoc.core.document.dao.DocumentDAO;
-import com.logicaldoc.core.document.dao.VersionDAO;
+import com.logicaldoc.core.document.DocumentDAO;
+import com.logicaldoc.core.document.VersionDAO;
 import com.logicaldoc.core.security.Session;
 import com.logicaldoc.core.util.IconSelector;
 import com.logicaldoc.i18n.I18N;
@@ -38,7 +38,7 @@ public class VersionsDataServlet extends AbstractDataServlet {
 	protected void service(HttpServletRequest request, HttpServletResponse response, Session session, Integer max,
 			Locale locale) throws PersistenceException, IOException {
 
-		List<Object> records = executeQuery(request, max);
+		List<?> records = executeQuery(request, max);
 
 		/*
 		 * Iterate over records composing the response XML document
@@ -82,8 +82,8 @@ public class VersionsDataServlet extends AbstractDataServlet {
 		writer.write("</list>");
 	}
 
-	private List<Object> executeQuery(HttpServletRequest request, Integer max) throws PersistenceException {
-		VersionDAO dao = (VersionDAO) Context.get().getBean(VersionDAO.class);
+	private List<?> executeQuery(HttpServletRequest request, Integer max) throws PersistenceException {
+		VersionDAO dao = Context.get(VersionDAO.class);
 
 		Map<String, Object> params = new HashMap<>();
 
@@ -92,7 +92,7 @@ public class VersionsDataServlet extends AbstractDataServlet {
 						+ " A.customId, A.fileSize, A.type, A.templateName, A.workflowStatus, A.workflowStatusDisplay, A.userId, A.color ");
 		if (request.getParameter(DOC_ID) != null) {
 			long docId = Long.parseLong(request.getParameter(DOC_ID));
-			DocumentDAO ddao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+			DocumentDAO ddao = Context.get(DocumentDAO.class);
 			Document doc = ddao.findDocument(docId);
 			if (doc != null)
 				docId = doc.getId();

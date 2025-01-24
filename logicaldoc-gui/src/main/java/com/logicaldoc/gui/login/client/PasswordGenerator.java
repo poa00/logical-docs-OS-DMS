@@ -1,8 +1,8 @@
 package com.logicaldoc.gui.login.client;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
+import com.logicaldoc.gui.common.client.widgets.CopyTextFormItemIcon;
 import com.logicaldoc.gui.login.client.services.LoginService;
 import com.smartgwt.client.types.HeaderControls;
 import com.smartgwt.client.widgets.Window;
@@ -39,10 +39,10 @@ public class PasswordGenerator extends Window {
 
 	private void generatePassword() {
 		generate.setDisabled(true);
-		LoginService.Instance.get().generatePassword(username, new AsyncCallback<String>() {
+		LoginService.Instance.get().generatePassword(username, new DefaultAsyncCallback<>() {
 			@Override
 			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
+				super.onFailure(caught);
 				generate.setDisabled(false);
 			}
 
@@ -59,6 +59,7 @@ public class PasswordGenerator extends Window {
 		password = new StaticTextItem(I18N.message("password"));
 		password.setWrapTitle(false);
 		password.setWrap(false);
+		password.setIcons(new CopyTextFormItemIcon());
 
 		generate = new ButtonItem("generate", I18N.message("generate"));
 		generate.addClickHandler(event -> {
@@ -72,5 +73,15 @@ public class PasswordGenerator extends Window {
 
 		addItem(form);
 		generatePassword();
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

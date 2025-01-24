@@ -127,7 +127,7 @@ public abstract class AbstractEmailDialog extends Window {
 
 			setRecipients(mail, to, cc, bcc);
 
-			onSend(mail);
+			onSubmit(mail);
 		});
 
 		addItem(recipientsStack);
@@ -165,20 +165,20 @@ public abstract class AbstractEmailDialog extends Window {
 		List<GUIContact> tos = new ArrayList<>();
 		for (String email : to)
 			tos.add(new GUIContact(email));
-		mail.setTos(tos.toArray(new GUIContact[0]));
+		mail.setTos(tos);
 
 		List<GUIContact> ccs = new ArrayList<>();
 		for (String email : cc)
 			ccs.add(new GUIContact(email));
-		mail.setCcs(ccs.toArray(new GUIContact[0]));
+		mail.setCcs(ccs);
 
 		List<GUIContact> bccs = new ArrayList<>();
 		for (String email : bcc)
 			bccs.add(new GUIContact(email));
-		mail.setBccs(bccs.toArray(new GUIContact[0]));
+		mail.setBccs(bccs);
 	}
 
-	protected abstract void onSend(GUIEmail mail);
+	protected abstract void onSubmit(GUIEmail mail);
 
 	private SectionStack prepareRecipientsGrid() {
 		SectionStack sectionStack = new SectionStack();
@@ -316,5 +316,30 @@ public abstract class AbstractEmailDialog extends Window {
 		newRecords[records.length].setAttribute("type", "to");
 		newRecords[records.length].setAttribute(EMAIL, "");
 		recipientsGrid.setRecords(newRecords);
+	}
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = super.hashCode();
+		result = prime * result + ((form == null) ? 0 : form.hashCode());
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (!super.equals(obj))
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		AbstractEmailDialog other = (AbstractEmailDialog) obj;
+		if (form == null) {
+			if (other.form != null)
+				return false;
+		} else if (!form.equals(other.form))
+			return false;
+		return true;
 	}
 }

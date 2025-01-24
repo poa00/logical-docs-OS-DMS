@@ -1,19 +1,21 @@
 package com.logicaldoc.gui.frontend.client.reports;
 
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.logicaldoc.gui.common.client.Feature;
-import com.logicaldoc.gui.common.client.beans.GUICalendarEventSearchCriteria;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUICalendarEvent;
-import com.logicaldoc.gui.common.client.beans.GUIUser;
+import com.logicaldoc.gui.common.client.beans.GUICalendarEventSearchCriteria;
+import com.logicaldoc.gui.common.client.grid.DateListGridField;
+import com.logicaldoc.gui.common.client.grid.DateListGridField.DateCellFormatter;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.GridUtil;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.widgets.InfoPanel;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField;
 import com.logicaldoc.gui.frontend.client.administration.AdminPanel;
 import com.logicaldoc.gui.frontend.client.services.CalendarService;
 import com.smartgwt.client.types.Alignment;
@@ -47,7 +49,7 @@ public class CalendarReport extends AdminPanel {
 
 	private static final String DESCRIPTION = "description";
 
-	private static final String PARTICIPANTS = "participants";
+	private static final String ATTENDEES = "attendees";
 
 	private static final String STATUS = "status";
 
@@ -155,7 +157,7 @@ public class CalendarReport extends AdminPanel {
 		subtypeCol.setWidth(100);
 		subtypeCol.setCanFilter(true);
 
-		ListGridField date = new DateListGridField("date", "date");
+		ListGridField date = new DateListGridField("date", "date", DateCellFormatter.FORMAT_LONG);
 
 		ListGridField endDate = new DateListGridField("endDate", "enddate");
 
@@ -205,7 +207,7 @@ public class CalendarReport extends AdminPanel {
 		description.setWidth(400);
 		description.setHidden(true);
 
-		ListGridField participants = new ListGridField(PARTICIPANTS, I18N.message(PARTICIPANTS));
+		ListGridField participants = new ListGridField(ATTENDEES, I18N.message(ATTENDEES));
 		participants.setWidth(300);
 
 		list = new ListGrid();
@@ -267,7 +269,7 @@ public class CalendarReport extends AdminPanel {
 	private void onSearch() {
 		list.setData();
 
-		final Map<String, Object> values =  vm.getValues();
+		final Map<String, Object> values = vm.getValues();
 
 		if (Boolean.FALSE.equals(vm.validate()))
 			return;
@@ -301,21 +303,22 @@ public class CalendarReport extends AdminPanel {
 
 		int maxRecords = getMaxRecords(values);
 
-		GUICalendarEventSearchCriteria criteria = new GUICalendarEventSearchCriteria(fromValue, toValue, endDateFrom, endDateTo, frequencyValue);
+		GUICalendarEventSearchCriteria criteria = new GUICalendarEventSearchCriteria(fromValue, toValue, endDateFrom,
+				endDateTo, frequencyValue);
 		criteria.setStatus(statusValue);
 		criteria.setTitle(titleValue);
 		criteria.setType(typeValue);
 		criteria.setSubtype(subtypeValue);
 		criteria.setMaxRecords(maxRecords);
-		
+
 		doSearch(criteria);
 	}
 
 	private int getMaxRecords(final Map<String, Object> values) {
 		int maxRecords = 0;
 		if (values.get(DISPLAYMAX) != null) {
-			if (values.get(DISPLAYMAX) instanceof Integer)
-				maxRecords = (Integer) values.get(DISPLAYMAX);
+			if (values.get(DISPLAYMAX) instanceof Integer intValue)
+				maxRecords = intValue;
 			else
 				maxRecords = Integer.parseInt((String) values.get(DISPLAYMAX));
 		}
@@ -323,46 +326,41 @@ public class CalendarReport extends AdminPanel {
 	}
 
 	private void doSearch(GUICalendarEventSearchCriteria criteria) {
-		CalendarService.Instance.get().find(criteria, new AsyncCallback<GUICalendarEvent[]>() {
+		CalendarService.Instance.get().find(criteria, new DefaultAsyncCallback<>() {
+			@Override
+			public void onSuccess(List<GUICalendarEvent> result) {
+				List<ListGridRecord> records = new ArrayList<>();
+				for (GUICalendarEvent event : result) {
+					ListGridRecord rec = new ListGridRecord();
+					rec.setAttribute("date", event.getStart());
+					rec.setAttribute(TITLE, event.getTitle());
+					rec.setAttribute("type", event.getType());
+					rec.setAttribute(SUBTYPE, event.getSubType());
+					rec.setAttribute(FREQUENCY, event.getFrequency());
+					rec.setAttribute(STATUS, event.getStatus());
+					rec.setAttribute(DESCRIPTION, event.getDescription());
+					rec.setAttribute("endDate", event.getDeadline());
+					rec.setAttribute(ATTENDEES,
+							event.getAttendees().stream().map(Object::toString).collect(Collectors.joining(", ")));
+					records.add(rec);
+				}
+				list.setData(records.toArray(new ListGridRecord[0]));
 
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
+				layout.removeMember(infoPanel);
+				infoPanel = new InfoPanel("");
+				infoPanel.setMessage(I18N.message("showelements", Integer.toString(list.getTotalRows())));
+				layout.addMember(infoPanel, 2);
+			}
+		});
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
 
-					@Override
-					public void onSuccess(GUICalendarEvent[] result) {
-						if (result != null && result.length > 0) {
-							ListGridRecord[] records = new ListGridRecord[result.length];
-							for (int i = 0; i < result.length; i++) {
-								ListGridRecord rec = new ListGridRecord();
-								rec.setAttribute("date", result[i].getStartDate());
-								rec.setAttribute(TITLE, result[i].getTitle());
-								rec.setAttribute("type", result[i].getType());
-								rec.setAttribute(SUBTYPE, result[i].getSubType());
-								rec.setAttribute(FREQUENCY, result[i].getFrequency());
-								rec.setAttribute(STATUS, result[i].getStatus());
-								rec.setAttribute(DESCRIPTION, result[i].getDescription());
-								rec.setAttribute("endDate", result[i].getDeadline());
-
-								StringBuilder participants = new StringBuilder();
-								GUIUser[] users = result[i].getParticipants();
-								for (GUIUser user : users) {
-									if (participants.length() > 0)
-										participants.append(", ");
-									participants.append(user.toString());
-								}
-								rec.setAttribute(PARTICIPANTS, participants.toString());
-
-								records[i] = rec;
-							}
-							list.setData(records);
-						}
-						layout.removeMember(infoPanel);
-						infoPanel = new InfoPanel("");
-						infoPanel.setMessage(I18N.message("showelements", Integer.toString(list.getTotalRows())));
-						layout.addMember(infoPanel, 2);
-					}
-				});
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

@@ -16,9 +16,9 @@ import org.slf4j.LoggerFactory;
 
 import com.logicaldoc.core.PersistenceException;
 import com.logicaldoc.core.imaging.ImageUtil;
-import com.logicaldoc.core.security.User;
-import com.logicaldoc.core.security.dao.TenantDAO;
-import com.logicaldoc.core.security.dao.UserDAO;
+import com.logicaldoc.core.security.TenantDAO;
+import com.logicaldoc.core.security.user.User;
+import com.logicaldoc.core.security.user.UserDAO;
 import com.logicaldoc.util.Context;
 import com.logicaldoc.util.config.ContextProperties;
 import com.logicaldoc.util.io.FileUtil;
@@ -120,16 +120,15 @@ public class UserUtil {
 	 * @param avatarImageFile The file containing the avatar image
 	 */
 	public static void saveAvatar(User user, File avatarImageFile) {
-		UserDAO userDao = (UserDAO) Context.get().getBean(UserDAO.class);
-		userDao.initialize(user);
-
-		TenantDAO tenantDao = (TenantDAO) Context.get().getBean(TenantDAO.class);
-		String tenantName = tenantDao.getTenantName(user.getTenantId());
-
-		int size = Context.get().getProperties().getInt(tenantName + ".gui.avatar.size", 128);
+		UserDAO userDao = Context.get(UserDAO.class);
+		TenantDAO tenantDao = Context.get(TenantDAO.class);
 
 		File tmpAvatarImage = null;
 		try {
+			userDao.initialize(user);
+			String tenantName = tenantDao.getTenantName(user.getTenantId());
+			int size = Context.get().getProperties().getInt(tenantName + ".gui.avatar.size", 128);
+
 			tmpAvatarImage = FileUtil.createTempFile(AVATAR, ".png");
 			BufferedImage avatar = ImageIO.read(avatarImageFile);
 			avatar = ImageUtil.cropCenterSquare(avatar, size);
@@ -139,7 +138,7 @@ public class UserUtil {
 		} catch (Exception t) {
 			log.warn(ERROR_GENERATING_DEFAULT_THE_AVATAR_FOR_USER, user, t);
 		} finally {
-			FileUtil.strongDelete(tmpAvatarImage);
+			FileUtil.delete(tmpAvatarImage);
 		}
 	}
 
@@ -150,17 +149,17 @@ public class UserUtil {
 	 * @param user The user to elaborate
 	 */
 	public static void generateDefaultAvatar(User user) {
-		UserDAO userDao = (UserDAO) Context.get().getBean(UserDAO.class);
-		userDao.initialize(user);
-
-		TenantDAO tenantDao = (TenantDAO) Context.get().getBean(TenantDAO.class);
-		String tenantName = tenantDao.getTenantName(user.getTenantId());
-
-		int size = Context.get().getProperties().getInt(tenantName + ".gui.avatar.size", 128);
-
+		UserDAO userDao = Context.get(UserDAO.class);
+		
 		File tmpAvatarImage = null;
 		try {
+			userDao.initialize(user);
 			tmpAvatarImage = FileUtil.createTempFile(AVATAR, ".png");
+
+			TenantDAO tenantDao = Context.get(TenantDAO.class);
+			String tenantName = tenantDao.getTenantName(user.getTenantId());
+			int size = Context.get().getProperties().getInt(tenantName + ".gui.avatar.size", 128);
+
 			BufferedImage avatar = UserUtil.generateDefaultAvatarImage(user, size);
 			ImageIO.write(avatar, "png", tmpAvatarImage);
 			user.setAvatar(ImageUtil.encodeImage(tmpAvatarImage));
@@ -177,20 +176,43 @@ public class UserUtil {
 			if (log.isDebugEnabled())
 				log.debug(ERROR_GENERATING_DEFAULT_THE_AVATAR_FOR_USER, user, t);
 		} finally {
-			FileUtil.strongDelete(tmpAvatarImage);
+			FileUtil.delete(tmpAvatarImage);
 		}
 	}
 
-	private static BufferedImage generateDefaultAvatarImage(User user, int size) throws IOException {
+	private static BufferedImage generateDefaultAvatarImage(User user, int size) {
+		/*
+		 * Check Gravatar with main email
+		 */
+		BufferedImage avatarImage = getImageFromGravatar(user, size);
+
+		/*
+		 * Now generate one from scratch
+		 */
+		if (avatarImage == null) {
+			try {
+				Avatar avatar = IdenticonAvatar.newAvatarBuilder().size(size, size).build();
+				avatarImage = avatar.create(user.getId() > 0 ? user.getId() : -user.getId());
+			} catch (Exception t) {
+				log.warn("Cannot generate avatar for user {}", user, t);
+			}
+		}
+
+		avatarImage = getImageCentralSquare(size, avatarImage);
+
+		return avatarImage;
+	}
+
+	protected static BufferedImage getImageFromGravatar(User user, int size) {
+		if (!Context.get().getProperties().getBoolean("gravatar.enabled", false))
+			return null;
+
+		BufferedImage avatarImage = null;
 		Gravatar gravatar = new Gravatar();
 		gravatar.setRating(GravatarRating.GENERAL_AUDIENCES);
 		gravatar.setDefaultImage(GravatarDefaultImage.GRAVATAR_ICON);
 		gravatar.setSize(size);
 
-		/*
-		 * Check Gravatar with main email
-		 */
-		BufferedImage avatarImage = null;
 		byte[] bytes;
 		try {
 			bytes = gravatar.download(user.getEmail());
@@ -212,21 +234,6 @@ public class UserUtil {
 				log.warn("Cannot download gravatar for email {}", user.getEmail2(), t);
 			}
 		}
-
-		/*
-		 * Now generate one from scratch
-		 */
-		if (avatarImage == null) {
-			try {
-				Avatar avatar = IdenticonAvatar.newAvatarBuilder().size(size, size).build();
-				avatarImage = avatar.create(user.getId() > 0 ? user.getId() : -user.getId());
-			} catch (Exception t) {
-				log.warn("Cannot generate avatar for user {}", user, t);
-			}
-		}
-
-		avatarImage = getImageCentralSquare(size, avatarImage);
-
 		return avatarImage;
 	}
 
@@ -248,7 +255,7 @@ public class UserUtil {
 	public static String getAvatarImage(String userIdOrName) throws PersistenceException {
 		String content = TRANSPARENT_IMAGE;
 
-		UserDAO userDao = (UserDAO) Context.get().getBean(UserDAO.class);
+		UserDAO userDao = Context.get(UserDAO.class);
 		User user = null;
 		if (userIdOrName != null)
 			try {

@@ -3,17 +3,19 @@ package com.logicaldoc.core.ticket;
 import java.util.Calendar;
 import java.util.Collection;
 import java.util.Date;
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+
+import javax.annotation.Resource;
 
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.LoggerFactory;
 
 import com.logicaldoc.core.HibernatePersistentObjectDAO;
 import com.logicaldoc.core.PersistenceException;
+import com.logicaldoc.core.document.DocumentDAO;
 import com.logicaldoc.core.document.DocumentEvent;
 import com.logicaldoc.core.document.DocumentHistory;
-import com.logicaldoc.core.document.dao.DocumentDAO;
 import com.logicaldoc.util.config.ContextProperties;
 
 /**
@@ -22,12 +24,13 @@ import com.logicaldoc.util.config.ContextProperties;
  * @author Marco Meschieri - LogicalDOC
  * @since 3.0
  */
-@SuppressWarnings("unchecked")
 public class HibernateTicketDAO extends HibernatePersistentObjectDAO<Ticket> implements TicketDAO {
 
+	@Resource(name = "DocumentDAO")
 	private DocumentDAO documentDAO;
 
-	private ContextProperties contextProperties;
+	@Resource(name = "ContextProperties")
+	private ContextProperties config;
 
 	public HibernateTicketDAO() {
 		super(Ticket.class);
@@ -46,7 +49,7 @@ public class HibernateTicketDAO extends HibernatePersistentObjectDAO<Ticket> imp
 
 		if (entity.getExpired() == null) {
 			// Retrieve the time to live
-			int ttl = contextProperties.getInt("ticket.ttl");
+			int ttl = config.getInt("ticket.ttl");
 			Calendar cal = Calendar.getInstance();
 			cal.add(Calendar.HOUR_OF_DAY, +ttl);
 			entity.setExpired(cal.getTime());
@@ -95,10 +98,8 @@ public class HibernateTicketDAO extends HibernatePersistentObjectDAO<Ticket> imp
 	@Override
 	public Ticket findByTicketId(String ticketid) {
 		try {
-			Map<String, Object> params = new HashMap<>();
-			params.put("ticketid", ticketid);
-			Collection<Ticket> coll = findByQuery("from Ticket _ticket where _ticket.ticketId = :ticketid", params,
-					null);
+			List<Ticket> coll = findByObjectQuery("from Ticket _ticket where _ticket.ticketId = :ticketid",
+					Map.of("ticketid", ticketid), null);
 			Ticket ticket = null;
 			if (!coll.isEmpty()) {
 				ticket = coll.iterator().next();
@@ -119,9 +120,8 @@ public class HibernateTicketDAO extends HibernatePersistentObjectDAO<Ticket> imp
 		boolean result = true;
 
 		try {
-			Map<String, Object> params = new HashMap<>();
-			params.put("docId", docId);
-			Collection<Ticket> coll = findByQuery("from Ticket _ticket where _ticket.docId = :docId", params, null);
+			List<Ticket> coll = findByObjectQuery("from Ticket _ticket where _ticket.docId = :docId",
+					Map.of("docId", docId), null);
 			for (Ticket downloadTicket : coll) {
 				downloadTicket.setDeleted(1);
 				saveOrUpdate(downloadTicket);
@@ -134,8 +134,8 @@ public class HibernateTicketDAO extends HibernatePersistentObjectDAO<Ticket> imp
 		return result;
 	}
 
-	public void setContextProperties(ContextProperties contextProperties) {
-		this.contextProperties = contextProperties;
+	public void setConfig(ContextProperties config) {
+		this.config = config;
 	}
 
 	@Override
@@ -144,9 +144,8 @@ public class HibernateTicketDAO extends HibernatePersistentObjectDAO<Ticket> imp
 			return;
 
 		try {
-			Map<String, Object> params = new HashMap<>();
-			params.put("expired", new Date());
-			Collection<Ticket> coll = findByQuery("from Ticket _ticket where _ticket.expired < :expired", params, null);
+			Collection<Ticket> coll = findByObjectQuery("from Ticket _ticket where _ticket.expired < :expired",
+					Map.of("expired", new Date()), null);
 			for (Ticket downloadTicket : coll) {
 				downloadTicket.setDeleted(1);
 				saveOrUpdate(downloadTicket);

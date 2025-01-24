@@ -1,6 +1,7 @@
 package com.logicaldoc.gui.frontend.client.services;
 
 import java.util.Date;
+import java.util.List;
 
 import com.google.gwt.core.client.GWT;
 import com.google.gwt.user.client.rpc.RemoteService;
@@ -8,8 +9,8 @@ import com.google.gwt.user.client.rpc.RemoteServiceRelativePath;
 import com.google.gwt.user.client.rpc.ServiceDefTarget;
 import com.logicaldoc.gui.common.client.LDRpcRequestBuilder;
 import com.logicaldoc.gui.common.client.ServerException;
-import com.logicaldoc.gui.common.client.beans.GUICalendarEventSearchCriteria;
 import com.logicaldoc.gui.common.client.beans.GUICalendarEvent;
+import com.logicaldoc.gui.common.client.beans.GUICalendarEventSearchCriteria;
 
 /**
  * The client side stub for the Calendar Service. This service allows the
@@ -50,17 +51,18 @@ public interface CalendarService extends RemoteService {
 	 * 
 	 * @throws ServerException an error happened in the server application
 	 */
-	public GUICalendarEvent[] find(GUICalendarEventSearchCriteria criteria) throws ServerException;
+	public List<GUICalendarEvent> find(GUICalendarEventSearchCriteria criteria) throws ServerException;
 
 	/**
 	 * Deletes an event. If the event is a master, in any case all the
 	 * occurrences will be deleted too
 	 * 
 	 * @param eventId identifier of the event
+	 * @param alertCancelation flat to alert attendees about the cancelation
 	 * 
 	 * @throws ServerException an error happened in the server application
 	 */
-	public void deleteEvent(long eventId) throws ServerException;
+	public void deleteEvent(long eventId, boolean alertCancelation) throws ServerException;
 
 	/**
 	 * Counts the number of events that start from now until a given date

@@ -1,22 +1,27 @@
 package com.logicaldoc.util;
 
-import java.util.Date;
-
-import com.logicaldoc.util.crypt.CryptUtil;
-import com.logicaldoc.util.time.DateUtil;
+import org.apache.commons.lang.StringEscapeUtils;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document.OutputSettings;
+import org.jsoup.safety.Safelist;
 
 public class UtilWorkbench {
 
-	/**
-	 * @param args
-	 * @throws Exception
-	 */
 	public static void main(String[] args) throws Exception {
-		System.out.println(CryptUtil.cryptString("admin"));
-		
-		System.out.println(DateUtil.truncateToDay(new Date()));
-		
-		System.out.println(StringUtil.printFileSize(205971L*1024*1024));
+		String unsafeHtmlContent = "TEST<&#x003c;img src=1 onerror=confirm(document.domain)&#x003e;>TEST2";
+
+		OutputSettings outputSettings = new OutputSettings().indentAmount(0).prettyPrint(false);
+		Safelist whiteList = Safelist.simpleText().preserveRelativeLinks(false);
+
+		String previousSanitized = "";
+		String sanitized = StringEscapeUtils
+				.unescapeHtml(Jsoup.clean(unsafeHtmlContent, "", whiteList, outputSettings));
+		while (!previousSanitized.equals(sanitized)) {
+			previousSanitized = sanitized;
+			sanitized = StringEscapeUtils.unescapeHtml(Jsoup.clean(previousSanitized, "", whiteList, outputSettings));
+		}
+
+		System.out.println(sanitized);
 
 //		File file = new File("target/context.properties");
 //		ContextProperties context=new ContextProperties(file);

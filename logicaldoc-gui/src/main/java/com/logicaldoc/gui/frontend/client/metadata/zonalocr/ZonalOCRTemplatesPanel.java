@@ -1,15 +1,15 @@
 package com.logicaldoc.gui.frontend.client.metadata.zonalocr;
 
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.LinkedHashMap;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIAttribute;
 import com.logicaldoc.gui.common.client.beans.GUIOCRTemplate;
 import com.logicaldoc.gui.common.client.beans.GUITemplate;
 import com.logicaldoc.gui.common.client.beans.GUIZone;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.LD;
 import com.logicaldoc.gui.common.client.util.PrintUtil;
@@ -25,7 +25,6 @@ import com.smartgwt.client.widgets.Canvas;
 import com.smartgwt.client.widgets.events.ClickEvent;
 import com.smartgwt.client.widgets.form.fields.FormItem;
 import com.smartgwt.client.widgets.form.fields.SelectItem;
-import com.smartgwt.client.widgets.form.fields.events.ChangedEvent;
 import com.smartgwt.client.widgets.grid.ListGridRecord;
 import com.smartgwt.client.widgets.layout.HLayout;
 import com.smartgwt.client.widgets.toolbar.ToolStrip;
@@ -59,7 +58,7 @@ public class ZonalOCRTemplatesPanel extends ZoneTemplatePanel {
 				selectedOcrTemplate != null ? selectedOcrTemplate.getId() : null);
 	}
 
-	private void refresh(Long templateId, Long barcodeTemplateId) {
+	private void refresh(Long templateId, Long ocrTemplateId) {
 		if (toolStrip != null)
 			removeMember(toolStrip);
 
@@ -69,21 +68,19 @@ public class ZonalOCRTemplatesPanel extends ZoneTemplatePanel {
 
 		addTemplateSelector(templateId, toolBar);
 
-		addOcrTemplateSelector(templateId, barcodeTemplateId, toolBar);
+		addOcrTemplateSelector(templateId, ocrTemplateId, toolBar);
 
 		addNewButton(toolBar);
 
 		addSettingsButton(toolBar);
 
-		addDeleteButton(toolBar);
-
 		addSaveButton(toolBar);
-
-		toolBar.addSeparator();
 
 		addAddZoneButton(toolBar);
 
 		addDeleteZonesButton(toolBar);
+
+		addDeleteButton(toolBar);
 
 		toolBar.addSeparator();
 
@@ -157,7 +154,7 @@ public class ZonalOCRTemplatesPanel extends ZoneTemplatePanel {
 		deleteZones.addClickHandler(
 				event -> LD.ask(I18N.message("deletezones"), I18N.message("deletezonesquestion"), (Boolean answer) -> {
 					if (Boolean.TRUE.equals(answer)) {
-						selectedOcrTemplate.setZones(new GUIZone[0]);
+						selectedOcrTemplate.setZones(new ArrayList<>());
 						setSelectedOcrTemplate(selectedOcrTemplate);
 					}
 				}));
@@ -173,7 +170,7 @@ public class ZonalOCRTemplatesPanel extends ZoneTemplatePanel {
 
 			LinkedHashMap<String, String> map = new LinkedHashMap<>();
 			for (GUIAttribute att : selectedOcrTemplate.getTemplate().getAttributes()) {
-				if (att.getParent() == null && selectedOcrTemplate.getZone(att.getName()) == null)
+				if (att.getParent() == null && selectedOcrTemplate.getZone(att.getName()) == null && !att.isSection())
 					map.put(att.getName(), att.getName() + " (" + AttributeTypeFormatter.format(att.getType()) + ")");
 			}
 			select.setValueMap(map);
@@ -199,12 +196,7 @@ public class ZonalOCRTemplatesPanel extends ZoneTemplatePanel {
 		ToolStripButton save = new ToolStripButton();
 		save.setTitle(I18N.message("save"));
 		save.addClickHandler(
-				event -> ZonalOCRService.Instance.get().save(selectedOcrTemplate, new AsyncCallback<GUIOCRTemplate>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				event -> ZonalOCRService.Instance.get().save(selectedOcrTemplate, new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(GUIOCRTemplate template) {
 						ZonalOCRTemplatesPanel.this.selectedOcrTemplate = template;
@@ -222,12 +214,7 @@ public class ZonalOCRTemplatesPanel extends ZoneTemplatePanel {
 			if (selectedOcrTemplate != null && selectedOcrTemplate.getId() != 0L)
 				LD.ask(I18N.message("question"), I18N.message("confirmdeleteocrtemplate"), (Boolean yes) -> {
 					if (Boolean.TRUE.equals(yes)) {
-						ZonalOCRService.Instance.get().delete(selectedOcrTemplate.getId(), new AsyncCallback<Void>() {
-							@Override
-							public void onFailure(Throwable caught) {
-								GuiLog.serverError(caught);
-							}
-
+						ZonalOCRService.Instance.get().delete(selectedOcrTemplate.getId(), new DefaultAsyncCallback<>() {
 							@Override
 							public void onSuccess(Void result) {
 								selectedOcrTemplate = null;
@@ -274,19 +261,12 @@ public class ZonalOCRTemplatesPanel extends ZoneTemplatePanel {
 		ocrTemplateSelector.setEndRow(false);
 		ocrTemplateSelector.addChangedHandler(event -> {
 			ListGridRecord rec = ocrTemplateSelector.getSelectedRecord();
-			ZonalOCRService.Instance.get().getTemplate(rec.getAttributeAsLong("id"),
-					new AsyncCallback<GUIOCRTemplate>() {
-
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
-						}
-
-						@Override
-						public void onSuccess(GUIOCRTemplate tmpl) {
-							setSelectedOcrTemplate(tmpl);
-						}
-					});
+			ZonalOCRService.Instance.get().getTemplate(rec.getAttributeAsLong("id"), new DefaultAsyncCallback<>() {
+				@Override
+				public void onSuccess(GUIOCRTemplate tmpl) {
+					setSelectedOcrTemplate(tmpl);
+				}
+			});
 		});
 		ocrTemplateSelector.setDisabled(selectedDocumentTemplate == null);
 		toolStrip.addFormItem(ocrTemplateSelector);
@@ -297,7 +277,7 @@ public class ZonalOCRTemplatesPanel extends ZoneTemplatePanel {
 		templateSelector.setWrapTitle(false);
 		templateSelector.setMultiple(false);
 		templateSelector.setEndRow(false);
-		templateSelector.addChangedHandler((ChangedEvent event) -> {
+		templateSelector.addChangedHandler(changed -> {
 			selectedOcrTemplate = null;
 
 			ListGridRecord rec = templateSelector.getSelectedRecord();
@@ -341,5 +321,15 @@ public class ZonalOCRTemplatesPanel extends ZoneTemplatePanel {
 	@Override
 	protected ZoneCanvas newZoneCanvas(GUIZone zone) {
 		return new ZonalOCRZoneCanvas(zone, this);
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

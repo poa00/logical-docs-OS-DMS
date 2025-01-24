@@ -17,7 +17,7 @@ import com.logicaldoc.core.conversion.FormatConverterManager;
 import com.logicaldoc.core.conversion.NotAvailableConverter;
 import com.logicaldoc.core.security.Session;
 import com.logicaldoc.core.security.Tenant;
-import com.logicaldoc.core.security.dao.MenuDAO;
+import com.logicaldoc.core.security.menu.MenuDAO;
 import com.logicaldoc.util.Context;
 import com.logicaldoc.util.config.ContextProperties;
 
@@ -43,7 +43,7 @@ public class FormatConvertersDataServlet extends AbstractDataServlet {
 		String out = request.getParameter("out");
 		String converterSpecification = request.getParameter("converter");
 
-		MenuDAO mDao = (MenuDAO) Context.get().getBean(MenuDAO.class);
+		MenuDAO mDao = Context.get(MenuDAO.class);
 		boolean parameters = session.getTenantId() == Tenant.DEFAULT_ID && mDao.isReadEnable(1750, session.getUserId());
 
 		PrintWriter writer = response.getWriter();
@@ -104,7 +104,7 @@ public class FormatConvertersDataServlet extends AbstractDataServlet {
 	}
 
 	private FormatConverterManager getManager() {
-		FormatConverterManager manager = (FormatConverterManager) Context.get().getBean(FormatConverterManager.class);
+		FormatConverterManager manager = Context.get(FormatConverterManager.class);
 		manager.getConverters();
 		return manager;
 	}

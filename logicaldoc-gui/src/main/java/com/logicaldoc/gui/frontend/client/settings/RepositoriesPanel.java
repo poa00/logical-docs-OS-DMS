@@ -1,10 +1,11 @@
 package com.logicaldoc.gui.frontend.client.settings;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
 import com.logicaldoc.gui.common.client.beans.GUIParameter;
 import com.logicaldoc.gui.common.client.i18n.I18N;
@@ -35,7 +36,7 @@ public class RepositoriesPanel extends AdminPanel {
 
 	@Override
 	public void onDraw() {
-		body.setMembers(new StoragesPanel());
+		body.setMembers(new StoresPanel());
 
 		// The Folders Tab
 		Tab foldersTab = new Tab();
@@ -47,17 +48,11 @@ public class RepositoriesPanel extends AdminPanel {
 
 		tabs.addTab(foldersTab);
 
-		SettingService.Instance.get().loadSettingsByNames(new String[] { "conf.dbdir", "conf.exportdir",
-				"conf.importdir", "conf.logdir", "conf.plugindir", "conf.userdir" },
-				new AsyncCallback<GUIParameter[]>() {
-
+		SettingService.Instance.get().loadSettingsByNames(Arrays.asList("conf.dbdir", "conf.exportdir",
+				"conf.importdir", "conf.logdir", "conf.plugindir", "conf.userdir"),
+				new DefaultAsyncCallback<>() {
 					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
-					@Override
-					public void onSuccess(GUIParameter[] folderParameters) {
+					public void onSuccess(List<GUIParameter> folderParameters) {
 						List<FormItem> items = new ArrayList<>();
 
 						for (GUIParameter f : folderParameters) {
@@ -84,28 +79,31 @@ public class RepositoriesPanel extends AdminPanel {
 		final List<GUIParameter> settings = new ArrayList<>();
 		@SuppressWarnings("unchecked")
 		Map<String, Object> values = foldersForm.getValues();
-		for (Map.Entry<String, Object> entry : values.entrySet()){
-			String name=entry.getKey();
+		for (Map.Entry<String, Object> entry : values.entrySet()) {
+			String name = entry.getKey();
 			if (!"save".equals(name))
 				settings.add(new GUIParameter(ItemFactory.originalItemName(name), entry.getValue().toString().trim()));
 		}
 
-		SettingService.Instance.get().saveSettings(settings.toArray(new GUIParameter[0]), new AsyncCallback<Void>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
+		SettingService.Instance.get().saveSettings(settings, new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(Void arg) {
 				GuiLog.info(I18N.message("settingssaved"), null);
 
 				// Replicate the settings in the current session
-				for (GUIParameter setting : settings) {
+				for (GUIParameter setting : settings)
 					Session.get().setConfig(setting.getName(), setting.getValue());
-				}
 			}
 		});
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

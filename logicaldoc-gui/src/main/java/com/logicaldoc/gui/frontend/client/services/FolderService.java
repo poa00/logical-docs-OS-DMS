@@ -1,11 +1,14 @@
 package com.logicaldoc.gui.frontend.client.services;
 
+import java.util.List;
+
 import com.google.gwt.core.client.GWT;
 import com.google.gwt.user.client.rpc.RemoteService;
 import com.google.gwt.user.client.rpc.RemoteServiceRelativePath;
 import com.google.gwt.user.client.rpc.ServiceDefTarget;
 import com.logicaldoc.gui.common.client.LDRpcRequestBuilder;
 import com.logicaldoc.gui.common.client.ServerException;
+import com.logicaldoc.gui.common.client.beans.GUIAccessControlEntry;
 import com.logicaldoc.gui.common.client.beans.GUIFolder;
 import com.logicaldoc.gui.common.client.beans.GUIValue;
 import com.logicaldoc.gui.frontend.client.clipboard.Clipboard;
@@ -74,10 +77,10 @@ public interface FolderService extends RemoteService {
 	 * 
 	 * @throws ServerException an error happened in the server application
 	 */
-	public void applyRights(GUIFolder folder, boolean subfolders) throws ServerException;
+	public void saveACL(GUIFolder folder, boolean subfolders) throws ServerException;
 
 	/**
-	 * Inherits the rights of another folder
+	 * Inherits the ACL of another folder
 	 * 
 	 * @param folderId The folder that has to be updated
 	 * @param rightsFolderId the folder that defines the rights
@@ -86,7 +89,7 @@ public interface FolderService extends RemoteService {
 	 * 
 	 * @throws ServerException an error happened in the server application
 	 */
-	public GUIFolder inheritRights(long folderId, long rightsFolderId) throws ServerException;
+	public GUIFolder inheritACL(long folderId, long rightsFolderId) throws ServerException;
 
 	/**
 	 * Applies all extended attributes to a sub-tree
@@ -107,13 +110,13 @@ public interface FolderService extends RemoteService {
 	public void applyTags(long parentId) throws ServerException;
 
 	/**
-	 * Applies the storage setting to a sub-tree
+	 * Applies the store setting to a sub-tree
 	 * 
 	 * @param parentId The parent folder containing the tags
 	 * 
 	 * @throws ServerException an error happened in the server application
 	 */
-	public void applyStorage(long parentId) throws ServerException;
+	public void applyStore(long parentId) throws ServerException;
 
 	/**
 	 * Applies all OCR settings to a sub-tree
@@ -148,7 +151,7 @@ public interface FolderService extends RemoteService {
 	 * 
 	 * @throws ServerException an error happened in the server application
 	 */
-	public void delete(long[] folderIds) throws ServerException;
+	public void delete(List<Long> folderIds) throws ServerException;
 
 	/**
 	 * Deletes a selection of folders from trash
@@ -157,7 +160,7 @@ public interface FolderService extends RemoteService {
 	 * 
 	 * @throws ServerException an error happened in the server application
 	 */
-	public void deleteFromTrash(Long[] ids) throws ServerException;
+	public void deleteFromTrash(List<Long> ids) throws ServerException;
 
 	/**
 	 * Restores a given folder
@@ -167,7 +170,7 @@ public interface FolderService extends RemoteService {
 	 * 
 	 * @throws ServerException an error happened in the server application
 	 */
-	public void restore(Long[] folderIds, long targetId) throws ServerException;
+	public void restore(List<Long> folderIds, long targetId) throws ServerException;
 
 	/**
 	 * Moves some folders under a target folder
@@ -177,7 +180,7 @@ public interface FolderService extends RemoteService {
 	 * 
 	 * @throws ServerException an error happened in the server application
 	 */
-	public void move(long[] folderIds, long targetId) throws ServerException;
+	public void move(List<Long> folderIds, long targetId) throws ServerException;
 
 	/**
 	 * Merges some folders to a target folder
@@ -187,7 +190,7 @@ public interface FolderService extends RemoteService {
 	 * 
 	 * @throws ServerException an error happened in the server application
 	 */
-	public void merge(long[] folderIds, long targetId) throws ServerException;
+	public void merge(List<Long> folderIds, long targetId) throws ServerException;
 
 	/**
 	 * Copies a folder under a target folder
@@ -201,7 +204,7 @@ public interface FolderService extends RemoteService {
 	 * 
 	 * @throws ServerException an error happened in the server application
 	 */
-	public void copyFolders(long[] folderIds, long targetId, boolean foldersOnly, String securityOption,
+	public void copyFolders(List<Long> folderIds, long targetId, boolean foldersOnly, String securityOption,
 			GUIFolder model) throws ServerException;
 
 	/**
@@ -211,12 +214,16 @@ public interface FolderService extends RemoteService {
 	 * @param folderId the target folder identifier
 	 * @param action the selected action({@link Clipboard#COPY} or
 	 *        {@link Clipboard#COPY})
+	 * @param links if the links must be copied too
+	 * @param notes if the notes and annotations must be copied too
+	 * @param security if the security settings must be copied too
 	 * 
 	 * @throws ServerException an error happened in the server application
 	 */
-	public void paste(long[] docIds, long folderId, String action) throws ServerException;
+	public void paste(List<Long> docIds, long folderId, String action, boolean links, boolean notes, boolean security)
+			throws ServerException;
 
-	public void pasteAsAlias(long[] docIds, long folderId, String type) throws ServerException;
+	public void pasteAsAlias(List<Long> docIds, long folderId, String type) throws ServerException;
 
 	/**
 	 * Loads the folders templates
@@ -225,7 +232,7 @@ public interface FolderService extends RemoteService {
 	 * 
 	 * @throws ServerException an error happened in the server application
 	 */
-	public GUIValue[] loadTemplates() throws ServerException;
+	public List<GUIValue> loadTemplates() throws ServerException;
 
 	/**
 	 * Saves the passed folder templates
@@ -234,7 +241,7 @@ public interface FolderService extends RemoteService {
 	 * 
 	 * @throws ServerException an error happened in the server application
 	 */
-	public void saveTemplates(GUIValue[] templates) throws ServerException;
+	public void saveTemplates(List<GUIValue> templates) throws ServerException;
 
 	/**
 	 * Applies a template to a folder
@@ -253,11 +260,12 @@ public interface FolderService extends RemoteService {
 	 * 
 	 * @param folderId identifier of the folder
 	 * 
-	 * @return the statistics (total number of documents, total number of subfolders, total size
+	 * @return the statistics (total number of documents, total number of
+	 *         subfolders, total size
 	 * 
 	 * @throws ServerException an error happened in the server application
 	 */
-	public long[] computeStats(long folderId) throws ServerException;
+	public List<Long> computeStats(long folderId) throws ServerException;
 
 	/**
 	 * Sets the pagination informations for the visualization of the folders
@@ -281,9 +289,8 @@ public interface FolderService extends RemoteService {
 	 */
 	public void applyGridLayout(long folderId) throws ServerException;
 
-	
 	/**
-	 * Read the uploaded image and converts it into Base64 
+	 * Read the uploaded image and converts it into Base64
 	 * 
 	 * @return the string conversion of the uploaded image
 	 * 
@@ -291,12 +298,20 @@ public interface FolderService extends RemoteService {
 	 */
 	public String readImage() throws ServerException;
 	
+	/**
+	 * Gets the allowed permissions on a set of folders in regards of the
+	 * current user
+	 * 
+	 * @param folderIds collection of the folders
+	 */
+	public GUIAccessControlEntry getAllowedPermissions(List<Long> folderIds) throws ServerException;
+
 	public static class Instance {
 		private static FolderServiceAsync inst;
 
 		private Instance() {
 		}
-		
+
 		public static FolderServiceAsync get() {
 			if (inst == null) {
 				inst = GWT.create(FolderService.class);

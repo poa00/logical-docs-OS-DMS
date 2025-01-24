@@ -1,8 +1,9 @@
 package com.logicaldoc.gui.frontend.client.metadata.barcode;
 
+import java.util.ArrayList;
 import java.util.Date;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIBarcodeTemplate;
 import com.logicaldoc.gui.common.client.beans.GUIBarcodeZone;
 import com.logicaldoc.gui.common.client.beans.GUIOCRTemplate;
@@ -83,7 +84,7 @@ public class BarcodeTemplatesPanel extends ZoneTemplatePanel {
 	private void onSave() {
 		if (!((GUIBarcodeTemplate) selectedOcrTemplate).isZonal()) {
 			Record[] records = positionalGrid.getRecords();
-			GUIBarcodeZone[] patterns = new GUIBarcodeZone[records.length];
+			ArrayList<GUIZone> patterns = new ArrayList<>();
 			int i = 0;
 			for (Record rec : records) {
 				GUIBarcodeZone patt = new GUIBarcodeZone();
@@ -91,24 +92,18 @@ public class BarcodeTemplatesPanel extends ZoneTemplatePanel {
 				patt.setInclude(rec.getAttributeAsString("include"));
 				patt.setExclude(rec.getAttributeAsString("exclude"));
 				patt.setFormats(rec.getAttributeAsString("formats"));
-				patterns[i++] = patt;
-				patt.setIndex(i);
+				patt.setIndex(i++);
+				patterns.add(patt);
 			}
 			selectedOcrTemplate.setZones(patterns);
 		}
 
-		BarcodeService.Instance.get().save((GUIBarcodeTemplate) selectedOcrTemplate,
-				new AsyncCallback<GUIBarcodeTemplate>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
-					@Override
-					public void onSuccess(GUIBarcodeTemplate template) {
-						GuiLog.info(I18N.message("settingssaved"), null);
-					}
-				});
+		BarcodeService.Instance.get().save((GUIBarcodeTemplate) selectedOcrTemplate, new DefaultAsyncCallback<>() {
+			@Override
+			public void onSuccess(GUIBarcodeTemplate template) {
+				GuiLog.info(I18N.message("settingssaved"), null);
+			}
+		});
 	}
 
 	private void refresh(Long documentTemplateId, Long barcodeTemplateId) {
@@ -234,13 +229,7 @@ public class BarcodeTemplatesPanel extends ZoneTemplatePanel {
 		delete.addClickHandler(deleteClick -> LD.ask(I18N.message("question"),
 				I18N.message("confirmdeletebarcodetemplate"), (Boolean yes) -> {
 					if (Boolean.TRUE.equals(yes))
-						BarcodeService.Instance.get().delete(selectedOcrTemplate.getId(), new AsyncCallback<Void>() {
-
-							@Override
-							public void onFailure(Throwable caught) {
-								GuiLog.serverError(caught);
-							}
-
+						BarcodeService.Instance.get().delete(selectedOcrTemplate.getId(), new DefaultAsyncCallback<>() {
 							@Override
 							public void onSuccess(Void arg0) {
 								selectedOcrTemplate = null;
@@ -295,7 +284,7 @@ public class BarcodeTemplatesPanel extends ZoneTemplatePanel {
 	private void addNewTemplateButton() {
 		ToolStripButton newTemplate = new ToolStripButton();
 		newTemplate.setTitle(I18N.message("new"));
-		newTemplate.addClickHandler((ClickEvent newTemplateClick) -> {
+		newTemplate.addClickHandler(click -> {
 			GUIBarcodeTemplate newBarcodeTemplate = new GUIBarcodeTemplate();
 			newBarcodeTemplate.setTemplate(selectedDocumentTemplate);
 			new BarcodeTemplateSettings(BarcodeTemplatesPanel.this, newBarcodeTemplate).show();
@@ -304,25 +293,19 @@ public class BarcodeTemplatesPanel extends ZoneTemplatePanel {
 	}
 
 	private void addBarcodeTemplateSelector(Long documentTemplateId, Long barcodeTemplateId) {
-		SelectItem barcodeTemplateSelector = ItemFactory.newBarcodeTemplateSelector(false, documentTemplateId, barcodeTemplateId);
+		SelectItem barcodeTemplateSelector = ItemFactory.newBarcodeTemplateSelector(false, documentTemplateId,
+				barcodeTemplateId);
 		barcodeTemplateSelector.setWrapTitle(false);
 		barcodeTemplateSelector.setMultiple(false);
 		barcodeTemplateSelector.setEndRow(false);
-		barcodeTemplateSelector.addChangedHandler((ChangedEvent barcodeTemplateSelectorChanged) -> {
+		barcodeTemplateSelector.addChangedHandler(changed -> {
 			ListGridRecord rec = barcodeTemplateSelector.getSelectedRecord();
-			BarcodeService.Instance.get().getTemplate(rec.getAttributeAsLong("id"),
-					new AsyncCallback<GUIBarcodeTemplate>() {
-
-						@Override
-						public void onFailure(Throwable caught) {
-							GuiLog.serverError(caught);
-						}
-
-						@Override
-						public void onSuccess(GUIBarcodeTemplate tmpl) {
-							setSelectedOcrTemplate(tmpl);
-						}
-					});
+			BarcodeService.Instance.get().getTemplate(rec.getAttributeAsLong("id"), new DefaultAsyncCallback<>() {
+				@Override
+				public void onSuccess(GUIBarcodeTemplate tmpl) {
+					setSelectedOcrTemplate(tmpl);
+				}
+			});
 		});
 		toolStrip.addFormItem(barcodeTemplateSelector);
 	}
@@ -373,5 +356,15 @@ public class BarcodeTemplatesPanel extends ZoneTemplatePanel {
 	@Override
 	protected ZoneCanvas newZoneCanvas(GUIZone zone) {
 		return new BarcodeZoneCanvas(zone, this);
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

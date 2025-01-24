@@ -3,18 +3,17 @@ package com.logicaldoc.gui.frontend.client.folder;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
-import com.logicaldoc.gui.common.client.Constants;
 import com.logicaldoc.gui.common.client.Feature;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
+import com.logicaldoc.gui.common.client.beans.GUIAccessControlEntry;
 import com.logicaldoc.gui.common.client.beans.GUIFolder;
-import com.logicaldoc.gui.common.client.beans.GUIRight;
-import com.logicaldoc.gui.common.client.data.RightsDS;
+import com.logicaldoc.gui.common.client.data.AccessControlListDS;
+import com.logicaldoc.gui.common.client.grid.UserListGridField;
 import com.logicaldoc.gui.common.client.i18n.I18N;
 import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.GridUtil;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.util.LD;
-import com.logicaldoc.gui.common.client.widgets.grid.UserListGridField;
 import com.logicaldoc.gui.frontend.client.services.FolderService;
 import com.smartgwt.client.data.Record;
 import com.smartgwt.client.types.Alignment;
@@ -49,6 +48,8 @@ import com.smartgwt.client.widgets.menu.events.MenuItemClickEvent;
  */
 public class FolderSecurityPanel extends FolderDetailTab {
 
+	private static final String PREVIEW = "preview";
+
 	private static final String ARCHIVE = "archive";
 
 	private static final String WORKFLOW = "workflow";
@@ -59,7 +60,7 @@ public class FolderSecurityPanel extends FolderDetailTab {
 
 	private static final String AUTOMATION = "automation";
 
-	private static final String STORAGE = "storage";
+	private static final String STORE = "store";
 
 	private static final String READINGREQ = "readingreq";
 
@@ -81,6 +82,8 @@ public class FolderSecurityPanel extends FolderDetailTab {
 
 	private static final String WRITE = "write";
 
+	private static final String CUSTOMID = "customid";
+
 	private static final String DOWNLOAD = "download";
 
 	private static final String PRINT = "print";
@@ -91,7 +94,7 @@ public class FolderSecurityPanel extends FolderDetailTab {
 
 	private static final String ENTITY_ID = "entityId";
 
-	private RightsDS dataSource;
+	private AccessControlListDS aclDS;
 
 	private ListGrid list;
 
@@ -137,6 +140,10 @@ public class FolderSecurityPanel extends FolderDetailTab {
 		read.setType(ListGridFieldType.BOOLEAN);
 		read.setCanEdit(true);
 
+		ListGridField preview = new ListGridField(PREVIEW, prepareHeaderLabel(PREVIEW));
+		preview.setType(ListGridFieldType.BOOLEAN);
+		preview.setCanEdit(true);
+
 		ListGridField print = new ListGridField(PRINT, prepareHeaderLabel(PRINT));
 		print.setType(ListGridFieldType.BOOLEAN);
 		print.setCanEdit(true);
@@ -148,6 +155,10 @@ public class FolderSecurityPanel extends FolderDetailTab {
 		ListGridField write = new ListGridField(WRITE, prepareHeaderLabel(WRITE));
 		write.setType(ListGridFieldType.BOOLEAN);
 		write.setCanEdit(true);
+
+		ListGridField customid = new ListGridField(CUSTOMID, prepareHeaderLabel(CUSTOMID));
+		customid.setType(ListGridFieldType.BOOLEAN);
+		customid.setCanEdit(true);
 
 		ListGridField add = new ListGridField("add", prepareHeaderLabel("addfolder"));
 		add.setType(ListGridFieldType.BOOLEAN);
@@ -196,19 +207,22 @@ public class FolderSecurityPanel extends FolderDetailTab {
 		list.setAutoFetchData(true);
 		list.setRotateHeaderTitles(true);
 		list.setHeaderHeight(100);
-		dataSource = new RightsDS(folder.getId(), true);
-		list.setDataSource(dataSource);
+
+		aclDS = new AccessControlListDS(folder.getId(), "folder");
+		list.setDataSource(aclDS);
 
 		List<ListGridField> fields = new ArrayList<>();
 		fields.add(entityId);
 		fields.add(entity);
 		fields.add(read);
+		fields.add(preview);
 		fields.add(print);
 		fields.add(download);
 		fields.add(email);
 		fields.add(write);
 		fields.add(add);
 		fields.add(rename);
+		fields.add(customid);
 		fields.add(delete);
 		fields.add(move);
 		fields.add(security);
@@ -222,7 +236,7 @@ public class FolderSecurityPanel extends FolderDetailTab {
 		addCalendar(fields);
 		addSubscription(fields);
 		addAutomation(fields);
-		addStorage(fields);
+		addStore(fields);
 		addReadingReq(fields);
 
 		list.setFields(fields.toArray(new ListGridField[0]));
@@ -236,13 +250,7 @@ public class FolderSecurityPanel extends FolderDetailTab {
 
 	private void displayInheritingPanel(GUIFolder folder) {
 		FolderService.Instance.get().getFolder(folder.getSecurityRef().getId(), true, false, false,
-				new AsyncCallback<GUIFolder>() {
-
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(final GUIFolder refFolder) {
 						inheritInfoPanel = new HLayout();
@@ -288,13 +296,13 @@ public class FolderSecurityPanel extends FolderDetailTab {
 		}
 	}
 
-	private void addStorage(List<ListGridField> fields) {
-		if (Feature.enabled(Feature.MULTI_STORAGE)) {
-			ListGridField storage = new ListGridField(STORAGE, prepareHeaderLabel(STORAGE));
-			storage.setType(ListGridFieldType.BOOLEAN);
-			storage.setCanEdit(true);
-			storage.setAutoFitWidth(true);
-			fields.add(storage);
+	private void addStore(List<ListGridField> fields) {
+		if (Feature.enabled(Feature.MULTI_STORE)) {
+			ListGridField store = new ListGridField(STORE, prepareHeaderLabel(STORE));
+			store.setType(ListGridFieldType.BOOLEAN);
+			store.setCanEdit(true);
+			store.setAutoFitWidth(true);
+			fields.add(store);
 		}
 	}
 
@@ -361,15 +369,15 @@ public class FolderSecurityPanel extends FolderDetailTab {
 		buttons.setHeight(20);
 		container.addMember(buttons);
 
-		Button applyRights = new Button(I18N.message("applyrights"));
-		applyRights.setAutoFit(true);
-		buttons.addMember(applyRights);
+		Button save = new Button(I18N.message("save"));
+		save.setAutoFit(true);
+		buttons.addMember(save);
 
 		Button applyRightsSubfolders = new Button(I18N.message("applytosubfolders"));
 		applyRightsSubfolders.setAutoFit(true);
 		buttons.addMember(applyRightsSubfolders);
 
-		applyRights.addClickHandler((ClickEvent applyClick) -> onSave(false));
+		save.addClickHandler((ClickEvent applyClick) -> onSave(false));
 
 		applyRightsSubfolders.addClickHandler((ClickEvent rightsClick) -> onSave(true));
 
@@ -377,27 +385,15 @@ public class FolderSecurityPanel extends FolderDetailTab {
 		inheritFromParent.setAutoFit(true);
 		buttons.addMember(inheritFromParent);
 		inheritFromParent.addClickHandler((ClickEvent event) -> FolderService.Instance.get()
-				.getFolder(folder.getParentId(), false, false, false, new AsyncCallback<GUIFolder>() {
-
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				.getFolder(folder.getParentId(), false, false, false, new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(GUIFolder parent) {
 						LD.ask(I18N.message("inheritrights"),
-								I18N.message("inheritrightsask", new String[] { folder.getName(), parent.getName() }),
+								I18N.message("inheritrightsask", folder.getName(), parent.getName()),
 								(Boolean interitConfirmed) -> {
 									if (Boolean.TRUE.equals(interitConfirmed)) {
-										FolderService.Instance.get().inheritRights(folder.getId(), folder.getParentId(),
-												new AsyncCallback<GUIFolder>() {
-
-													@Override
-													public void onFailure(Throwable caught) {
-														GuiLog.serverError(caught);
-													}
-
+										FolderService.Instance.get().inheritACL(folder.getId(), folder.getParentId(),
+												new DefaultAsyncCallback<>() {
 													@Override
 													public void onSuccess(GUIFolder arg) {
 														FolderSecurityPanel.this.refresh(arg);
@@ -409,7 +405,7 @@ public class FolderSecurityPanel extends FolderDetailTab {
 
 				}));
 
-		Button inheritRights = new Button(I18N.message("inheritrights"));
+		Button inheritRights = new Button(I18N.message("inherit"));
 		inheritRights.setAutoFit(true);
 		buttons.addMember(inheritRights);
 		inheritRights
@@ -450,6 +446,7 @@ public class FolderSecurityPanel extends FolderDetailTab {
 			rec.setAttribute(ENTITY,
 					selectedRecord.getAttribute("label") + " (" + selectedRecord.getAttribute("username") + ")");
 			rec.setAttribute("read", true);
+			rec.setAttribute(PREVIEW, true);
 
 			list.addData(rec);
 			user.clearValue();
@@ -483,6 +480,7 @@ public class FolderSecurityPanel extends FolderDetailTab {
 			rec.setAttribute(AVATAR, "group");
 			rec.setAttribute(ENTITY, selectedRecord.getAttribute("name"));
 			rec.setAttribute("read", true);
+			rec.setAttribute(PREVIEW, true);
 			list.addData(rec);
 			group.clearValue();
 		});
@@ -502,7 +500,7 @@ public class FolderSecurityPanel extends FolderDetailTab {
 	}
 
 	private void addCellContextClickHandler(GUIFolder folder) {
-		if (folder != null && folder.hasPermission(Constants.PERMISSION_SECURITY)) {
+		if (folder != null && folder.hasPermission(GUIAccessControlEntry.PERMISSION_SECURITY)) {
 			list.addCellContextClickHandler((CellContextClickEvent contextClick) -> {
 				if (contextClick.getColNum() == 0) {
 					Menu contextMenu = setupContextMenu();
@@ -514,56 +512,54 @@ public class FolderSecurityPanel extends FolderDetailTab {
 	}
 
 	/**
-	 * Creates an array of all the right
+	 * Creates the collection of all the ACL
 	 * 
-	 * @return the array of rights
+	 * @return the list of ACEs
 	 */
-	public GUIRight[] getRights() {
+	public List<GUIAccessControlEntry> getACL() {
 		int totalRecords = list.getRecordList().getLength();
-		List<GUIRight> tmp = new ArrayList<>();
+		List<GUIAccessControlEntry> acl = new ArrayList<>();
 
 		for (int i = 0; i < totalRecords; i++) {
 			Record rec = list.getRecordList().get(i);
-			if (!Boolean.TRUE.equals(rec.getAttributeAsBoolean("read")))
-				continue;
+			GUIAccessControlEntry ace = new GUIAccessControlEntry();
+			ace.setName(rec.getAttributeAsString(ENTITY));
+			ace.setEntityId(Long.parseLong(rec.getAttribute(ENTITY_ID)));
+			ace.setRead(Boolean.TRUE.equals(rec.getAttributeAsBoolean("read")));
+			ace.setPreview(Boolean.TRUE.equals(rec.getAttributeAsBoolean(PREVIEW)));
+			ace.setPrint(Boolean.TRUE.equals(rec.getAttributeAsBoolean(PRINT)));
+			ace.setWrite(Boolean.TRUE.equals(rec.getAttributeAsBoolean(WRITE)));
+			ace.setCustomid(Boolean.TRUE.equals(rec.getAttributeAsBoolean(CUSTOMID)));
+			ace.setDelete(Boolean.TRUE.equals(rec.getAttributeAsBoolean(DELETE)));
+			ace.setAdd(Boolean.TRUE.equals(rec.getAttributeAsBoolean("add")));
+			ace.setWorkflow(Boolean.TRUE.equals(rec.getAttributeAsBoolean(WORKFLOW)));
+			ace.setSign(Boolean.TRUE.equals(rec.getAttributeAsBoolean("sign")));
+			ace.setImport(Boolean.TRUE.equals(rec.getAttributeAsBoolean(IMPORT)));
+			ace.setExport(Boolean.TRUE.equals(rec.getAttributeAsBoolean(EXPORT)));
+			ace.setImmutable(Boolean.TRUE.equals(rec.getAttributeAsBoolean(IMMUTABLE)));
+			ace.setRename(Boolean.TRUE.equals(rec.getAttributeAsBoolean(RENAME)));
+			ace.setSecurity(Boolean.TRUE.equals(rec.getAttributeAsBoolean(SECURITY)));
+			ace.setArchive(Boolean.TRUE.equals(rec.getAttributeAsBoolean(ARCHIVE)));
+			ace.setDownload(Boolean.TRUE.equals(rec.getAttributeAsBoolean(DOWNLOAD)));
+			ace.setCalendar(Boolean.TRUE.equals(rec.getAttributeAsBoolean(CALENDAR)));
+			ace.setSubscription(Boolean.TRUE.equals(rec.getAttributeAsBoolean(SUBSCRIPTION)));
+			ace.setPassword(Boolean.TRUE.equals(rec.getAttributeAsBoolean(PASSWORD)));
+			ace.setMove(Boolean.TRUE.equals(rec.getAttributeAsBoolean("move")));
+			ace.setEmail(Boolean.TRUE.equals(rec.getAttributeAsBoolean(EMAIL)));
+			ace.setAutomation(Boolean.TRUE.equals(rec.getAttributeAsBoolean(AUTOMATION)));
+			ace.setStore(Boolean.TRUE.equals(rec.getAttributeAsBoolean(STORE)));
+			ace.setReadingreq(Boolean.TRUE.equals(rec.getAttributeAsBoolean(READINGREQ)));
 
-			GUIRight right = new GUIRight();
-
-			right.setName(rec.getAttributeAsString(ENTITY));
-			right.setEntityId(Long.parseLong(rec.getAttribute(ENTITY_ID)));
-			right.setPrint(rec.getAttributeAsBoolean(PRINT));
-			right.setWrite(rec.getAttributeAsBoolean(WRITE));
-			right.setDelete(rec.getAttributeAsBoolean(DELETE));
-			right.setAdd(rec.getAttributeAsBoolean("add"));
-			right.setWorkflow(rec.getAttributeAsBoolean(WORKFLOW));
-			right.setSign(rec.getAttributeAsBoolean("sign"));
-			right.setImport(rec.getAttributeAsBoolean(IMPORT));
-			right.setExport(rec.getAttributeAsBoolean(EXPORT));
-			right.setImmutable(rec.getAttributeAsBoolean(IMMUTABLE));
-			right.setRename(rec.getAttributeAsBoolean(RENAME));
-			right.setSecurity(rec.getAttributeAsBoolean(SECURITY));
-			right.setArchive(rec.getAttributeAsBoolean(ARCHIVE));
-			right.setDownload(rec.getAttributeAsBoolean(DOWNLOAD));
-			right.setCalendar(rec.getAttributeAsBoolean(CALENDAR));
-			right.setSubscription(rec.getAttributeAsBoolean(SUBSCRIPTION));
-			right.setPassword(rec.getAttributeAsBoolean(PASSWORD));
-			right.setMove(rec.getAttributeAsBoolean("move"));
-			right.setEmail(rec.getAttributeAsBoolean(EMAIL));
-			right.setAutomation(rec.getAttributeAsBoolean(AUTOMATION));
-			right.setStorage(rec.getAttributeAsBoolean(STORAGE));
-			right.setReadingreq(rec.getAttributeAsBoolean(READINGREQ));
-
-			tmp.add(right);
+			acl.add(ace);
 		}
-
-		return tmp.toArray(new GUIRight[0]);
+		return acl;
 	}
 
 	@Override
 	public void destroy() {
 		super.destroy();
-		if (dataSource != null)
-			dataSource.destroy();
+		if (aclDS != null)
+			aclDS.destroy();
 	}
 
 	/**
@@ -595,31 +591,28 @@ public class FolderSecurityPanel extends FolderDetailTab {
 
 	public void onSave(final boolean recursive) {
 		// Apply all rights
-		folder.setRights(this.getRights());
+		folder.setAccessControlList(this.getACL());
 
-		FolderService.Instance.get().applyRights(folder, recursive, new AsyncCallback<Void>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
+		FolderService.Instance.get().saveACL(folder, recursive, new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(Void result) {
 				if (!recursive)
 					GuiLog.info(I18N.message("appliedrights"), null);
 				else
 					GuiLog.info(I18N.message("appliedrightsonsubfolders"), null);
-
-				int totalRecords = list.getRecordList().getLength();
-				for (int i = 0; i < totalRecords; i++) {
-					Record rec = list.getRecordList().get(i);
-					if (!Boolean.TRUE.equals(rec.getAttributeAsBoolean("read")))
-						list.removeData(rec);
-				}
 				folder.setSecurityRef(null);
 				refresh(folder);
 			}
 		});
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

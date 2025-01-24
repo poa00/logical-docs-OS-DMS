@@ -6,14 +6,13 @@ import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.logicaldoc.gui.common.client.Constants;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIAttribute;
-import com.logicaldoc.gui.common.client.beans.GUIDocument;
 import com.logicaldoc.gui.common.client.beans.GUISearchOptions;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
 import com.logicaldoc.gui.common.client.widgets.FolderSelector;
 import com.logicaldoc.gui.frontend.client.services.TemplateService;
@@ -23,10 +22,10 @@ import com.smartgwt.client.types.TitleOrientation;
 import com.smartgwt.client.widgets.form.DynamicForm;
 import com.smartgwt.client.widgets.form.ValuesManager;
 import com.smartgwt.client.widgets.form.fields.CheckboxItem;
+import com.smartgwt.client.widgets.form.fields.FormItemIcon;
 import com.smartgwt.client.widgets.form.fields.IntegerItem;
 import com.smartgwt.client.widgets.form.fields.MiniDateRangeItem;
 import com.smartgwt.client.widgets.form.fields.MultiComboBoxItem;
-import com.smartgwt.client.widgets.form.fields.PickerIcon;
 import com.smartgwt.client.widgets.form.fields.SelectItem;
 import com.smartgwt.client.widgets.form.fields.TextItem;
 import com.smartgwt.client.widgets.layout.VLayout;
@@ -38,6 +37,8 @@ import com.smartgwt.client.widgets.layout.VLayout;
  * @since 6.0
  */
 public class FulltextForm extends VLayout implements SearchObserver {
+	private static final String SEARCH = "search";
+
 	private static final String TEMPLATE = "template";
 
 	private static final String LANGUAGE = "language";
@@ -82,17 +83,24 @@ public class FulltextForm extends VLayout implements SearchObserver {
 		form1.setTitleOrientation(TitleOrientation.TOP);
 		form1.setNumCols(3);
 
-		PickerIcon searchPicker = new PickerIcon(PickerIcon.SEARCH, event -> search());
-		PickerIcon clear = new PickerIcon(PickerIcon.CLEAR, event -> {
+		FormItemIcon search = new FormItemIcon();
+		search.setPrompt(I18N.message(SEARCH));
+		search.setSrc("[SKIN]/magnifying-glass.svg");
+		search.addFormItemClickHandler(click -> search());
+
+		FormItemIcon clear = new FormItemIcon();
+		clear.setPrompt(I18N.message("clear"));
+		clear.setSrc("[SKIN]/trash.svg");
+		clear.addFormItemClickHandler(click -> {
 			vm.clearValues();
 			prepareFields(null);
 		});
 
-		expression = ItemFactory.newTextItem(EXPRESSION_STR, I18N.message("search") + "...");
+		expression = ItemFactory.newTextItem(EXPRESSION_STR, I18N.message(SEARCH) + "...");
 		expression.setWidth("*");
 		expression.setColSpan(3);
 		expression.setRequired(true);
-		expression.setIcons(searchPicker, clear);
+		expression.setIcons(search, clear);
 		expression.addKeyPressHandler(event -> {
 			if (event.getKeyName() == null)
 				return;
@@ -100,7 +108,7 @@ public class FulltextForm extends VLayout implements SearchObserver {
 				search();
 		});
 		expression.addClickHandler(event -> {
-			if ((I18N.message("search") + "...").equals(event.getItem().getValue())) {
+			if ((I18N.message(SEARCH) + "...").equals(event.getItem().getValue())) {
 				event.getItem().setValue("");
 			}
 		});
@@ -115,9 +123,9 @@ public class FulltextForm extends VLayout implements SearchObserver {
 		SelectItem template = ItemFactory.newTemplateSelector(true, null);
 		template.setMultiple(false);
 		template.setColSpan(3);
-		template.addChangedHandler(event -> {
-			if (event.getValue() != null && !"".equals(event.getValue()))
-				prepareFields(Long.parseLong((String) event.getValue()));
+		template.addChangedHandler(changed -> {
+			if (changed.getValue() != null && !"".equals(changed.getValue()))
+				prepareFields(Long.parseLong((String) changed.getValue()));
 			else
 				prepareFields(null);
 		});
@@ -191,13 +199,13 @@ public class FulltextForm extends VLayout implements SearchObserver {
 
 		List<String> fields = new ArrayList<>();
 		Collections.addAll(fields, searchinItem.getValues());
-		
+
 		if (fields.contains(Constants.FULLTEXT_FIELD_FILENAME) && !fields.contains(Constants.FULLTEXT_FIELD_TITLE))
 			fields.add(Constants.FULLTEXT_FIELD_TITLE);
 		if (fields.contains(Constants.FULLTEXT_FIELD_TITLE) && !fields.contains(Constants.FULLTEXT_FIELD_FILENAME))
 			fields.add(Constants.FULLTEXT_FIELD_FILENAME);
 
-		options.setFields(fields.toArray(new String[0]));
+		options.setFields(fields);
 
 		options.setFolder(folder.getFolderId());
 		options.setFolderName(folder.getFolderName());
@@ -213,17 +221,11 @@ public class FulltextForm extends VLayout implements SearchObserver {
 
 	private void setSubfolderCondition(GUISearchOptions options) {
 		options.setSearchInSubPath(Boolean.parseBoolean(vm.getValueAsString("subfolders")));
-		if (Boolean.parseBoolean(vm.getValueAsString(SEARCHINHITS))) {
-			GUIDocument[] docs = Search.get().getLastResult();
-			Long[] ids = new Long[docs.length];
-			int i = 0;
-			for (GUIDocument doc : docs) {
-				ids[i] = doc.getId();
-				i++;
-			}
-			options.setFilterIds(ids);
-		} else
-			options.setFilterIds(null);
+		if (Boolean.parseBoolean(vm.getValueAsString(SEARCHINHITS)))
+			options.setFilterIds(
+					Search.get().getLastResult().stream().map(doc -> doc.getId()).collect(Collectors.toList()));
+		else
+			options.setFilterIds(new ArrayList<>());
 	}
 
 	private void setTemplateCondition(Map<String, Object> values, GUISearchOptions options) {
@@ -310,19 +312,13 @@ public class FulltextForm extends VLayout implements SearchObserver {
 		if (templateId == null)
 			return;
 
-		TemplateService.Instance.get().getAttributes(templateId, null, new AsyncCallback<GUIAttribute[]>() {
+		TemplateService.Instance.get().getAttributes(templateId, null, new DefaultAsyncCallback<>() {
 			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
-			@Override
-			public void onSuccess(GUIAttribute[] result) {
-				for (GUIAttribute att : result) {
-					if (att.getType() == GUIAttribute.TYPE_STRING && !att.isHidden()) {
-						fieldsMap.put("ext_" + att.getName(), att.getDisplayName());
-					}
-				}
+			public void onSuccess(List<GUIAttribute> result) {
+				for (GUIAttribute att : result.stream()
+						.filter(att -> att.getType() == GUIAttribute.TYPE_STRING && !att.isHidden())
+						.collect(Collectors.toList()))
+					fieldsMap.put("ext_" + att.getName(), att.getDisplayName());
 				searchinItem.setValueMap(fieldsMap);
 			}
 		});
@@ -344,5 +340,15 @@ public class FulltextForm extends VLayout implements SearchObserver {
 	@Override
 	protected void onDraw() {
 		initGUI();
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

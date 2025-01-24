@@ -50,11 +50,6 @@ public class Device extends PersistentObject implements Serializable {
 	private String type;
 
 	/**
-	 * Instant of gridRecord creation
-	 */
-	private Date creation = new Date();
-
-	/**
 	 * Instant of last login
 	 */
 	private Date lastLogin;
@@ -85,9 +80,9 @@ public class Device extends PersistentObject implements Serializable {
 	 * @param request the current request
 	 */
 	public Device(HttpServletRequest request) {
-		UserAgent agent = UserAgent.parseUserAgentString(request.getHeader("User-Agent"));
-
 		setDeviceId(getDeviceId(request));
+		
+		UserAgent agent = UserAgent.parseUserAgentString(request.getHeader("User-Agent"));
 		setBrowser(agent.getBrowser().getName());
 
 		if (agent.getBrowserVersion() != null)
@@ -131,14 +126,6 @@ public class Device extends PersistentObject implements Serializable {
 
 	public void setType(String type) {
 		this.type = type;
-	}
-
-	public Date getCreation() {
-		return creation;
-	}
-
-	public void setCreation(Date creation) {
-		this.creation = creation;
 	}
 
 	public Date getLastLogin() {
@@ -244,18 +231,28 @@ public class Device extends PersistentObject implements Serializable {
 	}
 
 	@Override
-	public boolean equals(Object obj) {
-		if (!(obj instanceof Device))
-			return false;
-		Device other = (Device) obj;
-		if (deviceId != null)
-			return deviceId.equals(other.getDeviceId()) || super.equals(obj);
-		else
-			return super.equals(obj);
+	public int hashCode() {
+		final int prime = 31;
+		int result = super.hashCode();
+		result = prime * result + ((deviceId == null) ? 0 : deviceId.hashCode());
+		result = prime * result + (int) (userId ^ (userId >>> 32));
+		return result;
 	}
 
 	@Override
-	public int hashCode() {
-		return deviceId.hashCode();
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (!super.equals(obj))
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		Device other = (Device) obj;
+		if (deviceId == null) {
+			if (other.deviceId != null)
+				return false;
+		} else if (!deviceId.equals(other.deviceId))
+			return false;
+		return userId == other.userId;
 	}
 }

@@ -4,6 +4,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import com.google.gwt.core.client.GWT;
 import com.google.gwt.user.client.Timer;
 import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIDocument;
@@ -14,7 +15,6 @@ import com.logicaldoc.gui.common.client.beans.GUIUser;
 import com.logicaldoc.gui.common.client.controllers.DocumentObserver;
 import com.logicaldoc.gui.common.client.controllers.UserController;
 import com.logicaldoc.gui.common.client.i18n.I18N;
-import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.services.InfoService;
 import com.logicaldoc.gui.common.client.services.SecurityService;
 import com.logicaldoc.gui.common.client.util.Util;
@@ -97,7 +97,7 @@ public class Session implements DocumentObserver {
 	}
 
 	public void init(final GUISession session) {
-		InfoService.Instance.get().getSessionInfo(new AsyncCallback<GUIParameter[]>() {
+		InfoService.Instance.get().getSessionInfo(new AsyncCallback<>() {
 
 			@Override
 			public void onFailure(Throwable caught) {
@@ -105,7 +105,7 @@ public class Session implements DocumentObserver {
 			}
 
 			@Override
-			public void onSuccess(GUIParameter[] parameters) {
+			public void onSuccess(List<GUIParameter> parameters) {
 				Session.get().guiSession = session;
 				Session.get().info = session.getInfo();
 
@@ -131,13 +131,13 @@ public class Session implements DocumentObserver {
 				setupPingTimer(session);
 			}
 
-			private boolean updateStatusIconCountsAndSessionValid(GUIParameter[] parameters, GUIUser user) {
+			private boolean updateStatusIconCountsAndSessionValid(List<GUIParameter> parameters, GUIUser user) {
 				boolean validSession = false;
 				for (GUIParameter parameter : parameters) {
 					if (parameter.getName().equals("messages"))
 						user.setMessages(Integer.parseInt(parameter.getValue()));
 					else if (parameter.getName().equals("workflows"))
-						user.setAssignedTasks(Integer.parseInt(parameter.getValue()));
+						user.setTasks(Integer.parseInt(parameter.getValue()));
 					else if (parameter.getName().equals("events"))
 						user.setUpcomingEvents(Integer.parseInt(parameter.getValue()));
 					else if (parameter.getName().equals("valid"))
@@ -159,7 +159,7 @@ public class Session implements DocumentObserver {
 		 */
 		timer = new Timer() {
 			public void run() {
-				InfoService.Instance.get().ping(new AsyncCallback<Boolean>() {
+				InfoService.Instance.get().ping(new AsyncCallback<>() {
 					@Override
 					public void onFailure(Throwable caught) {
 						missedPingCount++;
@@ -278,7 +278,7 @@ public class Session implements DocumentObserver {
 	}
 
 	public boolean isServerPushEnabled() {
-		return "true".equals(Session.get().getConfig("gui.serverpush"));
+		return Session.get().getConfigAsBoolean("gui.serverpush");
 	}
 
 	public boolean isShowThumbnail() {
@@ -290,25 +290,25 @@ public class Session implements DocumentObserver {
 	}
 
 	public void logout() {
-		SecurityService.Instance.get().logout(new AsyncCallback<Void>() {
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-				SC.warn(caught.getMessage());
-			}
+		if (Session.get().getSession().isSingleSignOn() && Session.get().getConfigAsBoolean("saml.slo.enabled")) {
+			Session.get().close();
+			Util.redirect(GWT.getHostPageBaseURL() + "saml/logout");
+		} else {
+			SecurityService.Instance.get().logout(new DefaultAsyncCallback<>() {
+				@Override
+				public void onSuccess(Void result) {
+					CookiesManager.removeSid();
 
-			@Override
-			public void onSuccess(Void result) {
-				CookiesManager.removeSid();
-
-				try {
-					String tenant = Session.get().getUser().getTenant().getName();
-					Session.get().close();
-					Util.redirectToLoginUrl(tenant);
-				} catch (Exception t) {
-					// Nothing to do
+					try {
+						String tenant = Session.get().getUser().getTenant().getName();
+						Session.get().close();
+						Util.redirectToLoginUrl(tenant);
+					} catch (Exception t) {
+						// Nothing to do
+					}
 				}
-			}
-		});
+			});
+		}
 	}
 
 	@Override
@@ -337,7 +337,7 @@ public class Session implements DocumentObserver {
 	}
 
 	@Override
-	public void onDocumentsDeleted(GUIDocument[] documents) {
+	public void onDocumentsDeleted(List<GUIDocument> documents) {
 		// Nothing to do
 	}
 

@@ -1,5 +1,7 @@
 package com.logicaldoc.gui.frontend.client.services;
 
+import java.util.List;
+
 import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.logicaldoc.gui.common.client.beans.GUIKeystore;
 
@@ -17,9 +19,13 @@ public interface SignServiceAsync {
 
 	void generateNewCertificate(AsyncCallback<Void> callback);
 
+	void importCertificate(String certificate, String privateKey, AsyncCallback<Void> callback);
+
+	void getUploadedContent(AsyncCallback<String> callback);
+
 	void deleteCertificate(AsyncCallback<Void> callback);
 
-	void signDocuments(Long[] docIds, String reason, int page, String signX, String signY, String signWidth,
+	void signDocuments(List<Long> docIds, String reason, int page, String signX, String signY, String signWidth,
 			AsyncCallback<Void> callback);
 
 	void isVisualSignatureEnabled(AsyncCallback<Boolean> callback);

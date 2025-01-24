@@ -10,7 +10,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import com.logicaldoc.core.PersistenceException;
-import com.logicaldoc.core.document.dao.DocumentDAO;
+import com.logicaldoc.core.document.DocumentDAO;
 import com.logicaldoc.core.security.Session;
 import com.logicaldoc.util.Context;
 
@@ -55,7 +55,7 @@ public class EnvironmentDataServlet extends AbstractDataServlet {
 			writer.print(ENTRY_CLOSE);
 		}
 
-		DocumentDAO dao = (DocumentDAO) Context.get().getBean(DocumentDAO.class);
+		DocumentDAO dao = Context.get(DocumentDAO.class);
 		Map<String, String> meta = dao.getDatabaseMetadata();
 		for (Map.Entry<String, String> entry : meta.entrySet()) {
 			writer.print(ENTRY_SCOPE_DATABASE_SCOPE);

@@ -1,7 +1,11 @@
 package com.logicaldoc.gui.frontend.client.folder.copy;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import java.util.Arrays;
+import java.util.List;
+
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Session;
+import com.logicaldoc.gui.common.client.beans.GUIAccessControlEntry;
 import com.logicaldoc.gui.common.client.beans.GUIFolder;
 import com.logicaldoc.gui.common.client.i18n.I18N;
 import com.logicaldoc.gui.common.client.log.GuiLog;
@@ -18,6 +22,7 @@ import com.smartgwt.client.widgets.form.fields.CheckboxItem;
 import com.smartgwt.client.widgets.form.fields.SelectItem;
 import com.smartgwt.client.widgets.form.fields.TextItem;
 import com.smartgwt.client.widgets.tree.TreeGrid;
+import com.smartgwt.client.widgets.tree.TreeNode;
 
 /**
  * This is the form used to copy a folder into another path
@@ -45,10 +50,9 @@ public class FolderCopyDialog extends Dialog {
 		folders.setWidth100();
 		folders.setHeight100();
 
-		long[] selectedSourceIds = FolderNavigator.get().getSelectedIds();
+		List<Long> selectedSourceIds = FolderNavigator.get().getSelectedIds();
 
-		final boolean securityOptionEnabled = "true"
-				.equals(Session.get().getInfo().getConfig("gui.security.inheritoption"));
+		final boolean securityOptionEnabled = Session.get().getConfigAsBoolean("gui.security.inheritoption");
 
 		final DynamicForm form = new DynamicForm();
 		form.setWidth100();
@@ -56,7 +60,7 @@ public class FolderCopyDialog extends Dialog {
 
 		TextItem name = ItemFactory.newTextItem("name", "newname",
 				FolderNavigator.get().getSelectedRecord().getAttributeAsString("name"));
-		name.setHidden(selectedSourceIds.length > 1);
+		name.setHidden(selectedSourceIds.size() > 1);
 
 		SelectItem securityOption = ItemFactory.newFolderSecurityOption(SECURITY);
 		securityOption.setHidden(!securityOptionEnabled);
@@ -75,7 +79,7 @@ public class FolderCopyDialog extends Dialog {
 		addMember(form);
 	}
 
-	private ButtonItem prepareCopyButton(TreeGrid folders, long[] selectedSourceIds,
+	private ButtonItem prepareCopyButton(TreeGrid folders, List<Long> selectedSourceIds,
 			final boolean securityOptionEnabled, final DynamicForm form) {
 		ButtonItem copy = new ButtonItem(I18N.message("copy"));
 		copy.setAutoFit(true);
@@ -91,8 +95,8 @@ public class FolderCopyDialog extends Dialog {
 
 			long tagetFolderId = Long.parseLong(folders.getSelectedRecord().getAttributeAsString("folderId"));
 
-			if (selectedSourceIds.length == 1) {
-				copySingleFolder(selectedSourceIds[0], form, tagetFolderId);
+			if (selectedSourceIds.size() == 1) {
+				copySingleFolder(selectedSourceIds.get(0), form, tagetFolderId);
 			} else {
 				copyMultipleFolders(folders, selectedSourceIds, securityOptionEnabled, form, tagetFolderId);
 			}
@@ -100,16 +104,15 @@ public class FolderCopyDialog extends Dialog {
 		return copy;
 	}
 
-	private void copyMultipleFolders(TreeGrid folders, long[] selectedSourceIds, final boolean securityOptionEnabled,
-			final DynamicForm form, long tagetFolderId) {
-		String label = selectedSourceIds.length + " " + I18N.message("folders").toLowerCase();
+	private void copyMultipleFolders(TreeGrid folders, List<Long> selectedSourceIds,
+			final boolean securityOptionEnabled, final DynamicForm form, long tagetFolderId) {
+		String label = selectedSourceIds.size() + " " + I18N.message("folders").toLowerCase();
 
 		LD.ask(I18N.message("copy"),
-				I18N.message("copyask",
-						new String[] { label, folders.getSelectedRecord().getAttributeAsString("name") }),
-				(Boolean yes) -> {
+				I18N.message("copyask", Arrays.asList(label, folders.getSelectedRecord().getAttributeAsString("name"))),
+				yes -> {
 					if (Boolean.TRUE.equals(yes)) {
-						FolderNavigator.get().copyTo(tagetFolderId, "true".equals(form.getValueAsString(FOLDERS_ONLY)),
+						copy(tagetFolderId, Boolean.valueOf(form.getValueAsString(FOLDERS_ONLY)),
 								!securityOptionEnabled ? "inheritparentsec" : form.getValueAsString(SECURITY));
 						hide();
 						destroy();
@@ -118,24 +121,51 @@ public class FolderCopyDialog extends Dialog {
 	}
 
 	private void copySingleFolder(long selectedSourceId, final DynamicForm form, long tagetFolderId) {
-		FolderService.Instance.get().getFolder(selectedSourceId, false, false, false, new AsyncCallback<GUIFolder>() {
-
-			@Override
-			public void onFailure(Throwable caught) {
-				GuiLog.serverError(caught);
-			}
-
+		FolderService.Instance.get().getFolder(selectedSourceId, false, false, false, new DefaultAsyncCallback<>() {
 			@Override
 			public void onSuccess(GUIFolder sourceFolder) {
 				sourceFolder.setName(form.getValueAsString("name"));
-				sourceFolder.setPermissions(new String[] { "read", "write" });
+				sourceFolder.setAllowedPermissions(new GUIAccessControlEntry(GUIAccessControlEntry.PERMISSION_READ,
+						GUIAccessControlEntry.PERMISSION_WRITE));
 
-				FolderCopyDetailsDialog dialog = new FolderCopyDetailsDialog(sourceFolder, tagetFolderId,
-						form.getValueAsString(SECURITY), "true".equals(form.getValueAsString(FOLDERS_ONLY)));
-				dialog.show();
+				new FolderCopyDetailsDialog(sourceFolder, tagetFolderId, form.getValueAsString(SECURITY),
+						Boolean.valueOf(form.getValueAsString(FOLDERS_ONLY))).show();
 				hide();
 				destroy();
 			}
 		});
+	}
+
+	/**
+	 * Copies the currently selected folders to the new parent folder
+	 * 
+	 * @param targetFolderId identifier of the parent folder
+	 * @param foldersOnly to create just the folders
+	 * @param securityOption how to setup the security for the new folder'none',
+	 *        'inherit' or 'replicate'
+	 */
+	private void copy(long targetFolderId, boolean foldersOnly, String securityOption) {
+		final TreeNode target = FolderNavigator.get().getTree().findById(Long.toString(targetFolderId));
+
+		LD.contactingServer();
+		FolderService.Instance.get().copyFolders(FolderNavigator.get().getSelectedIds(), targetFolderId, foldersOnly,
+				securityOption, null, new DefaultAsyncCallback<>() {
+					@Override
+					public void onSuccess(Void ret) {
+						LD.clearPrompt();
+						if (target != null)
+							FolderNavigator.get().reload();
+					}
+				});
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

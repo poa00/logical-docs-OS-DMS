@@ -1,23 +1,23 @@
 package com.logicaldoc.gui.frontend.client.impex.folders;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.logicaldoc.gui.common.client.DefaultAsyncCallback;
 import com.logicaldoc.gui.common.client.Feature;
 import com.logicaldoc.gui.common.client.beans.GUIImportFolder;
 import com.logicaldoc.gui.common.client.data.ImportFoldersDS;
+import com.logicaldoc.gui.common.client.grid.EnabledListGridField;
+import com.logicaldoc.gui.common.client.grid.IdListGridField;
+import com.logicaldoc.gui.common.client.grid.IntegerListGridField;
+import com.logicaldoc.gui.common.client.grid.RefreshableListGrid;
 import com.logicaldoc.gui.common.client.i18n.I18N;
 import com.logicaldoc.gui.common.client.log.GuiLog;
 import com.logicaldoc.gui.common.client.util.LD;
-import com.logicaldoc.gui.common.client.util.Util;
 import com.logicaldoc.gui.common.client.widgets.HTMLPanel;
 import com.logicaldoc.gui.common.client.widgets.InfoPanel;
-import com.logicaldoc.gui.common.client.widgets.grid.IntegerListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.RefreshableListGrid;
 import com.logicaldoc.gui.frontend.client.administration.AdminPanel;
 import com.logicaldoc.gui.frontend.client.services.ImportFolderService;
 import com.smartgwt.client.data.AdvancedCriteria;
 import com.smartgwt.client.data.Record;
 import com.smartgwt.client.types.Alignment;
-import com.smartgwt.client.types.ListGridFieldType;
 import com.smartgwt.client.types.OperatorId;
 import com.smartgwt.client.types.SelectionStyle;
 import com.smartgwt.client.util.SC;
@@ -46,7 +46,7 @@ public class ImportFoldersPanel extends AdminPanel {
 
 	private static final String QUESTION = "question";
 
-	private static final String EENABLED = "eenabled";
+	private static final String ENABLED = "eenabled";
 
 	private Layout detailsContainer = new VLayout();
 
@@ -70,8 +70,10 @@ public class ImportFoldersPanel extends AdminPanel {
 		listing.setHeight("60%");
 		listing.setShowResizeBar(true);
 
-		ListGridField id = new ListGridField("id", 50);
-		id.setHidden(true);
+		ListGridField id = new IdListGridField();
+
+		ListGridField targetFolderId = new ListGridField("targetFolderId", I18N.message("targetid"), 50);
+		targetFolderId.setHidden(true);
 
 		ListGridField src = new ListGridField("src", I18N.message("source"), 300);
 		src.setCanFilter(true);
@@ -83,14 +85,7 @@ public class ImportFoldersPanel extends AdminPanel {
 		IntegerListGridField importedDocs = new IntegerListGridField("docs", I18N.message("importeddocuments"));
 		importedDocs.setAutoFitWidth(true);
 
-		ListGridField enabled = new ListGridField(EENABLED, " ", 24);
-		enabled.setType(ListGridFieldType.IMAGE);
-		enabled.setCanSort(false);
-		enabled.setAlign(Alignment.CENTER);
-		enabled.setShowDefaultContextMenu(false);
-		enabled.setImageURLPrefix(Util.imagePrefix());
-		enabled.setImageURLSuffix(".gif");
-		enabled.setCanFilter(false);
+		ListGridField enabled = new EnabledListGridField();
 
 		list = new RefreshableListGrid();
 		list.setEmptyMessage(I18N.message("notitemstoshow"));
@@ -98,7 +93,7 @@ public class ImportFoldersPanel extends AdminPanel {
 		list.setAutoFetchData(true);
 		list.setWidth100();
 		list.setHeight100();
-		list.setFields(enabled, id, src, type, importedDocs);
+		list.setFields(enabled, id, targetFolderId, src, type, importedDocs);
 		list.setSelectionType(SelectionStyle.SINGLE);
 		list.setShowRecordComponents(true);
 		list.setShowRecordComponentsByCell(true);
@@ -139,13 +134,7 @@ public class ImportFoldersPanel extends AdminPanel {
 			Record rec = list.getSelectedRecord();
 			if (rec != null)
 				ImportFolderService.Instance.get().getImportFolder(Long.parseLong(rec.getAttributeAsString("id")),
-						new AsyncCallback<GUIImportFolder>() {
-
-							@Override
-							public void onFailure(Throwable caught) {
-								GuiLog.serverError(caught);
-							}
-
+						new DefaultAsyncCallback<>() {
 							@Override
 							public void onSuccess(GUIImportFolder share) {
 								showShareDetails(share);
@@ -180,12 +169,7 @@ public class ImportFoldersPanel extends AdminPanel {
 		delete.addClickHandler(
 				event -> LD.ask(I18N.message(QUESTION), I18N.message("confirmdelete"), (Boolean value) -> {
 					if (Boolean.TRUE.equals(value)) {
-						ImportFolderService.Instance.get().delete(id, new AsyncCallback<Void>() {
-							@Override
-							public void onFailure(Throwable caught) {
-								GuiLog.serverError(caught);
-							}
-
+						ImportFolderService.Instance.get().delete(id, new DefaultAsyncCallback<>() {
 							@Override
 							public void onSuccess(Void result) {
 								list.removeSelectedData();
@@ -199,12 +183,7 @@ public class ImportFoldersPanel extends AdminPanel {
 		MenuItem test = new MenuItem();
 		test.setTitle(I18N.message("testconnection"));
 		test.addClickHandler(event -> ImportFolderService.Instance.get()
-				.test(Long.parseLong(rec.getAttributeAsString("id")), new AsyncCallback<Boolean>() {
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				.test(Long.parseLong(rec.getAttributeAsString("id")), new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Boolean result) {
 						if (Boolean.TRUE.equals(result))
@@ -216,68 +195,47 @@ public class ImportFoldersPanel extends AdminPanel {
 
 		MenuItem enable = new MenuItem();
 		enable.setTitle(I18N.message("enable"));
+		enable.setEnabled(Boolean.FALSE.equals(rec.getAttributeAsBoolean(ENABLED)));
 		enable.addClickHandler(event -> ImportFolderService.Instance.get()
-				.changeStatus(Long.parseLong(rec.getAttributeAsString("id")), true, new AsyncCallback<Void>() {
-
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				.changeStatus(Long.parseLong(rec.getAttributeAsString("id")), true, new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Void result) {
-						rec.setAttribute(EENABLED, "0");
+						rec.setAttribute(ENABLED, true);
 						list.refreshRow(list.getRecordIndex(rec));
 					}
 				}));
 
 		MenuItem disable = new MenuItem();
 		disable.setTitle(I18N.message("disable"));
+		disable.setEnabled(Boolean.TRUE.equals(rec.getAttributeAsBoolean(ENABLED)));
 		disable.addClickHandler(event -> ImportFolderService.Instance.get()
-				.changeStatus(Long.parseLong(rec.getAttributeAsString("id")), false, new AsyncCallback<Void>() {
-
-					@Override
-					public void onFailure(Throwable caught) {
-						GuiLog.serverError(caught);
-					}
-
+				.changeStatus(Long.parseLong(rec.getAttributeAsString("id")), false, new DefaultAsyncCallback<>() {
 					@Override
 					public void onSuccess(Void result) {
-						rec.setAttribute(EENABLED, "2");
+						rec.setAttribute(ENABLED, false);
 						list.refreshRow(list.getRecordIndex(rec));
 					}
 				}));
 
 		MenuItem resetCache = new MenuItem();
 		resetCache.setTitle(I18N.message("resetcache"));
-		resetCache.addClickHandler(
-				event -> LD.ask(I18N.message(QUESTION), I18N.message("confirmresetcache"), (Boolean value) -> {
-					if (Boolean.TRUE.equals(value)) {
-						ImportFolderService.Instance.get().resetCache(id, new AsyncCallback<Void>() {
-							@Override
-							public void onFailure(Throwable caught) {
-								GuiLog.serverError(caught);
-							}
-
-							@Override
-							public void onSuccess(Void result) {
-								GuiLog.info(I18N.message("cachedeleted"), null);
-							}
-						});
+		resetCache.addClickHandler(event -> LD.ask(I18N.message(QUESTION), I18N.message("confirmresetcache"), value -> {
+			if (Boolean.TRUE.equals(value)) {
+				ImportFolderService.Instance.get().resetCache(id, new DefaultAsyncCallback<>() {
+					@Override
+					public void onSuccess(Void result) {
+						GuiLog.info(I18N.message("cachedeleted"), null);
 					}
-				}));
+				});
+			}
+		}));
 
 		MenuItem resetCounter = new MenuItem();
 		resetCounter.setTitle(I18N.message("resetcounter"));
-		resetCounter.addClickHandler(
-				event -> LD.ask(I18N.message(QUESTION), I18N.message("confirmresetcounter"), (Boolean value) -> {
+		resetCounter
+				.addClickHandler(event -> LD.ask(I18N.message(QUESTION), I18N.message("confirmresetcounter"), value -> {
 					if (Boolean.TRUE.equals(value)) {
-						ImportFolderService.Instance.get().resetCounter(id, new AsyncCallback<Void>() {
-							@Override
-							public void onFailure(Throwable caught) {
-								GuiLog.serverError(caught);
-							}
-
+						ImportFolderService.Instance.get().resetCounter(id, new DefaultAsyncCallback<>() {
 							@Override
 							public void onSuccess(Void result) {
 								GuiLog.info(I18N.message("counterreseted"), null);
@@ -288,10 +246,7 @@ public class ImportFoldersPanel extends AdminPanel {
 					}
 				}));
 
-		if ("0".equals(rec.getAttributeAsString(EENABLED)))
-			contextMenu.setItems(test, disable, delete, resetCache, resetCounter);
-		else
-			contextMenu.setItems(test, enable, delete, resetCache, resetCounter);
+		contextMenu.setItems(test, enable, disable, delete, resetCache, resetCounter);
 		contextMenu.showContextMenu();
 	}
 
@@ -325,7 +280,7 @@ public class ImportFoldersPanel extends AdminPanel {
 
 		rec.setAttribute("src", importFolder.getDisplayUrl());
 
-		rec.setAttribute(EENABLED, importFolder.getEnabled() == 1 ? "0" : "2");
+		rec.setAttribute(ENABLED, importFolder.getEnabled() == 1 ? "0" : "2");
 
 		String type = I18N.message("localfolder");
 		if (importFolder.getProvider().startsWith("smb"))
@@ -340,5 +295,15 @@ public class ImportFoldersPanel extends AdminPanel {
 		rec.setAttribute("type", type);
 
 		list.refreshRow(list.getRecordIndex(rec));
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }

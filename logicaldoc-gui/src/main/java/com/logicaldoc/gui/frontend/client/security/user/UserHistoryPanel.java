@@ -1,12 +1,13 @@
 package com.logicaldoc.gui.frontend.client.security.user;
 
 import com.logicaldoc.gui.common.client.data.UserHistoryDS;
+import com.logicaldoc.gui.common.client.grid.CopyCellClickHandler;
+import com.logicaldoc.gui.common.client.grid.DateListGridField;
+import com.logicaldoc.gui.common.client.grid.RefreshableListGrid;
+import com.logicaldoc.gui.common.client.grid.DateListGridField.DateCellFormatter;
 import com.logicaldoc.gui.common.client.i18n.I18N;
 import com.logicaldoc.gui.common.client.util.GridUtil;
 import com.logicaldoc.gui.common.client.util.ItemFactory;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField;
-import com.logicaldoc.gui.common.client.widgets.grid.DateListGridField.DateCellFormatter;
-import com.logicaldoc.gui.common.client.widgets.grid.RefreshableListGrid;
 import com.smartgwt.client.widgets.form.fields.SpinnerItem;
 import com.smartgwt.client.widgets.grid.ListGridField;
 import com.smartgwt.client.widgets.layout.VLayout;
@@ -43,6 +44,7 @@ public class UserHistoryPanel extends VLayout {
 		list.setAutoFetchData(true);
 		list.setDataSource(new UserHistoryDS(userId));
 		list.setFields(event, date, ip, geolocation, device, sid, comment);
+		list.addCellDoubleClickHandler(new CopyCellClickHandler());
 
 		ToolStrip buttons = new ToolStrip();
 		buttons.setWidth100();
@@ -70,5 +72,15 @@ public class UserHistoryPanel extends VLayout {
 
 		addMember(list);
 		addMember(buttons);
+	}
+	
+	@Override
+	public boolean equals(Object other) {
+		return super.equals(other);
+	}
+
+	@Override
+	public int hashCode() {
+		return super.hashCode();
 	}
 }
